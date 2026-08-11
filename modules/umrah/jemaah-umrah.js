@@ -48,8 +48,8 @@ const defaultColumnWidths = {
 let columnWidths = JSON.parse(localStorage.getItem('jemaahColWidths')) || { ...defaultColumnWidths };
 
 // PATCH FIX FOR PORTAL BARU - inject PAT/Base + support modul-maklumat-jemaah + clean trip code
-var AIRTABLE_PAT = window.AIRTABLE_PAT || localStorage.getItem('effah_api_pat') || localStorage.getItem('effah_pat') || '';
-var AIRTABLE_BASE_ID = window.AIRTABLE_BASE_ID || localStorage.getItem('effah_base_id') || localStorage.getItem('effah_base') || '';
+var AIRTABLE_PAT = window.AIRTABLE_PAT || localStorage.getItem('effah_api_pat') || '';
+var AIRTABLE_BASE_ID = window.AIRTABLE_BASE_ID || localStorage.getItem('effah_base_id') || '';
 window.AIRTABLE_PAT = AIRTABLE_PAT;
 window.AIRTABLE_BASE_ID = AIRTABLE_BASE_ID;
 function cleanTripName(raw){
