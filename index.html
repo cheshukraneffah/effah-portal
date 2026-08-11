@@ -10,6 +10,7 @@
 
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="js/config.js"></script>
     <!-- FontAwesome Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <!-- Google Font: Plus Jakarta Sans -->
@@ -53,29 +54,6 @@ div[class*="bg-white"][class*="border-b"] {
 }
 /* Pastikan content tak overlap */
 .tab-content { padding-top: 0; }
-</style>
-
-
-<style>
-/* Top bar sticky fix - kekal atas */
-header.sticky {
-    position: sticky !important;
-    top: 0 !important;
-    z-index: 50 !important;
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
-}
-/* Sidebar sticky already */
-aside {
-    position: sticky !important;
-    top: 0 !important;
-    height: 100vh !important;
-    overflow-y: auto !important;
-}
-/* Main content */
-main {
-    overflow-y: auto;
-}
 </style>
 
 </head>
@@ -189,7 +167,7 @@ main {
         <main class="flex-1 flex flex-col min-w-0 overflow-y-auto">
             
             <!-- Breadcrumb Header dengan Sidebar Collapse Button -->
-<header class="sticky top-0 z-40 backdrop-blur-xl bg-white/90 border-b border-slate-200" style="position:sticky;top:0;z-index:40;background:rgba(255,255,255,0.92);backdrop-filter:blur(16px);" class="bg-white border-b border-slate-200/80 px-6 py-4 flex items-center justify-between sticky top-0 z-30">
+<header style="position:sticky;top:0;z-index:50;background:rgba(255,255,255,0.92);backdrop-filter:blur(16px);" class="bg-white border-b border-slate-200/80 px-6 py-4 flex items-center justify-between sticky top-0 z-30">
     <div class="flex items-center space-x-3">
         <!-- Butang Toggle Sidebar Desktop & Mobile -->
         <button id="sidebarToggleBtn" onclick="toggleSidebar()" class="text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 w-9 h-9 rounded-xl flex items-center justify-center transition focus:outline-none" title="Sorok/Tunjuk Sidebar">
