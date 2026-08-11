@@ -17,17 +17,116 @@ document.addEventListener('DOMContentLoaded', () => {
 
 function renderTripUmrahHTML() {
     const container = document.getElementById('modul-pakej-umrah');
-    // AUTO-FILL PAT - jangan alert, auto set dari window
-    if (typeof AIRTABLE_PAT === 'undefined' || !AIRTABLE_PAT) {
-        AIRTABLE_PAT = window.AIRTABLE_PAT || localStorage.getItem('effah_api_pat') || localStorage.getItem('effah_pat') || 'patjxZg6G22e9OBuS.2a96ced64af7e931ee4d83f65c491adf1241813547d5d8e3a317f5bc6d9a8de7';
-        AIRTABLE_BASE_ID = window.AIRTABLE_BASE_ID || localStorage.getItem('effah_base_id') || localStorage.getItem('effah_base') || 'appSsn4JyQD4DnYu0';
-        window.AIRTABLE_PAT = AIRTABLE_PAT;
-        window.AIRTABLE_BASE_ID = AIRTABLE_BASE_ID;
-    }
+    if (!container) return;
+
+    container.innerHTML = `
+        <div class="flex flex-col lg:flex-row gap-6 min-h-[calc(100vh-140px)]">
+            
+            <!-- 1. SIDEBAR KIRI: SENARAI TRIP -->
+            <div class="w-full lg:w-80 bg-white rounded-2xl border border-slate-200/80 shadow-2xs p-4 flex flex-col flex-shrink-0">
+                
+                <!-- Search & Action Header -->
+                <div class="flex items-center space-x-2 mb-3">
+                    <div class="relative flex-1">
+                        <i class="fa-solid fa-magnifying-glass absolute left-3 top-3 text-slate-400 text-xs"></i>
+                        <input type="text" id="searchTripSidebar" onkeyup="filterTripSidebar()" placeholder="Search..." 
+                            class="w-full text-xs pl-8 pr-3 py-2 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:outline-none focus:ring-1 focus:ring-slate-400">
+                    </div>
+                    <button onclick="openNewTripModal()" class="bg-slate-900 text-white w-8 h-8 rounded-xl flex items-center justify-center hover:bg-black transition text-xs shadow-2xs" title="Tambah Trip">
+                        <i class="fa-solid fa-plus"></i>
+                    </button>
+                    <button onclick="fetchTripUmrahData()" class="bg-slate-100 text-slate-600 w-8 h-8 rounded-xl flex items-center justify-center hover:bg-slate-200 transition text-xs" title="Refresh">
+                        <i class="fa-solid fa-rotate"></i>
+                    </button>
+                </div>
+
+                <!-- List Container -->
+                <div id="tripSidebarContainer" class="space-y-2 overflow-y-auto flex-1 max-h-[75vh] pr-1">
+                    <div class="text-center py-10 text-slate-400 text-xs">Sila klik 'Refresh' untuk muat turun trip...</div>
+                </div>
+            </div>
+
+            <!-- 2. KANAN: DETAIL FORM & TABLE DATA JEMAAH -->
+            <div class="flex-1 flex flex-col space-y-6 overflow-x-hidden" id="tripMainDetailWorkspace">
+                <div class="bg-white rounded-2xl border border-slate-200/80 shadow-2xs p-12 text-center text-slate-400 my-auto">
+                    <i class="fa-solid fa-kaaba text-5xl mb-3 text-slate-200"></i>
+                    <p class="text-xs font-semibold">Sila pilih mana-mana trip di senarai belah kiri untuk melihat perincian & data jemaah.</p>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- POPUP MODAL TAMBAH TRIP BARU -->
+        <div id="newTripModal" class="fixed inset-0 bg-slate-950/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 hidden">
+            <div class="bg-white rounded-3xl shadow-2xl p-6 md:p-8 max-w-md w-full border border-slate-100 animate-in fade-in zoom-in duration-150">
+                <div class="flex items-center justify-between pb-4 mb-4 border-b border-slate-100">
+                    <div class="flex items-center space-x-2.5">
+                        <div class="w-9 h-9 bg-rose-50 text-brand-maroon rounded-xl flex items-center justify-center font-bold text-sm">
+                            <i class="fa-solid fa-calendar-plus"></i>
+                        </div>
+                        <h3 class="font-extrabold text-slate-900 text-base">Tambah Trip Umrah Baru</h3>
+                    </div>
+                    <button onclick="closeNewTripModal()" class="text-slate-400 hover:text-slate-700 p-1">
+                        <i class="fa-solid fa-xmark text-lg"></i>
+                    </button>
+                </div>
+
+                <form onsubmit="submitNewTripRecord(event)" class="space-y-4 text-xs font-medium text-slate-700">
+                    <div>
+                        <label class="block font-bold text-slate-800 mb-1.5">Tarikh Mula Pakej (Fly) *</label>
+                        <input type="date" id="modalMulaPakej" onchange="handleMulaDateChange()" required
+                            class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-1 focus:ring-slate-400 focus:outline-none font-semibold text-slate-800">
+                        <span class="text-[10px] text-slate-400 mt-1 block">Format European: DD/MM/YYYY</span>
+                    </div>
+
+                    <div>
+                        <label class="block font-bold text-slate-800 mb-1.5">Tarikh Tamat Pakej (Balik) *</label>
+                        <input type="date" id="modalTamatPakej" required
+                            class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-1 focus:ring-slate-400 focus:outline-none font-semibold text-slate-800">
+                        <span class="text-[10px] text-slate-400 mt-1 block">Format European: DD/MM/YYYY</span>
+                    </div>
+
+                    <div class="flex items-center space-x-3 pt-3">
+                        <button type="button" onclick="closeNewTripModal()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2.5 rounded-xl transition">
+                            Batal
+                        </button>
+                        <button type="submit" class="flex-1 bg-slate-900 hover:bg-black text-white font-bold py-2.5 rounded-xl transition shadow-xs">
+                            Cipta Trip
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    `;
+}
+
+// Helper: Bersihkan Prefix Kod (contoh: "26/07 | ")
+function cleanTripName(tripName) {
+    if (!tripName) return 'TBC';
+    return tripName.replace(/^[\d\/]+\s*\|\s*/i, '').trim();
+}
+
+// Helper: Tukar format KUL JED/JED KUL -> KUL-JED/JED-KUL (Format Ber-dash Sahaja)
+function normalizeDashFormat(str) {
+    if (!str) return '';
+    // Jika Sektor (ada KUL, JED, MED, TIF dll), paksa letak dash
+    return str.trim().toUpperCase()
+        .replace(/KUL\s+/g, 'KUL-')
+        .replace(/\s+JED/g, '-JED')
+        .replace(/\s+MED/g, '-MED')
+        .replace(/\s+KUL/g, '-KUL')
+        .replace(/\s+TIF/g, '-TIF')
+        .replace(/--+/g, '-'); // Elak double dash
+}
+
+// Fetch Data dari Airtable dengan Sorting
+async function fetchTripUmrahData() {
+    // REFRESH PAT
+    if(typeof AIRTABLE_PAT === 'undefined' || !AIRTABLE_PAT) { AIRTABLE_PAT = window.AIRTABLE_PAT || localStorage.getItem('effah_api_pat') || ''; AIRTABLE_BASE_ID = window.AIRTABLE_BASE_ID || localStorage.getItem('effah_base_id') || ''; }
+    AIRTABLE_PAT = window.AIRTABLE_PAT || localStorage.getItem('effah_api_pat') || AIRTABLE_PAT || ''; AIRTABLE_BASE_ID = window.AIRTABLE_BASE_ID || localStorage.getItem('effah_base_id') || AIRTABLE_BASE_ID || '';
     if (!AIRTABLE_PAT || !AIRTABLE_BASE_ID) {
-        console.warn('PAT missing, but continue with default');
-        AIRTABLE_PAT = window.AIRTABLE_PAT || 'patjxZg6G22e9OBuS.2a96ced64af7e931ee4d83f65c491adf1241813547d5d8e3a317f5bc6d9a8de7';
-        AIRTABLE_BASE_ID = window.AIRTABLE_BASE_ID || 'appSsn4JyQD4DnYu0';
+        alert('Sila tetapkan API Token & Base ID di Settings API terlebih dahulu.');
+        return;
     }
 
     const container = document.getElementById('tripSidebarContainer');
@@ -113,10 +212,21 @@ function renderTripDetailForm(rec) {
     
     const workspace = document.getElementById('tripMainDetailWorkspace');
 
+    // FIX: Filter jemaah lebih flexible - match ID, raw title, cleaned title, dan trip name tanpa prefix
     const tripJemaah = (typeof allJemaahUmrahRecords !== 'undefined') ? allJemaahUmrahRecords.filter(j => {
-        const jTrip = Array.isArray(j.fields['TRIP']) ? j.fields['TRIP'][0] : j.fields['TRIP'];
-        return jTrip === id || jTrip === rawTripTitle;
+        const jTripRaw = j.fields['TRIP'];
+        const jTrip = Array.isArray(jTripRaw) ? jTripRaw[0] : jTripRaw;
+        const jTripName = j.fields['Trip Name'] || j.fields['TRIP_NAME'] || '';
+        // Check multiple match possibilities
+        return jTrip === id || 
+               jTrip === rawTripTitle || 
+               jTrip === displayTitle ||
+               jTripName === rawTripTitle ||
+               jTripName === displayTitle ||
+               (typeof cleanTripName === 'function' && cleanTripName(jTrip) === displayTitle) ||
+               (typeof cleanTripName === 'function' && cleanTripName(jTripName) === displayTitle);
     }) : [];
+    console.log('Trip', displayTitle, 'found', tripJemaah.length, 'jemaah');
 
     workspace.innerHTML = `
         <!-- FORM UTAMA DETAIL TRIP -->
