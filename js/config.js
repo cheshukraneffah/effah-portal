@@ -1,8 +1,7 @@
-// config.js - AUTO FILL FOR ALL STAFF - NO MANUAL SETUP NEEDED
+// config.js - AUTO FILL FOR ALL STAFF - EFFAH TRAVEL
 (function(){
   const DEFAULT_PAT = 'patjxZg6G22e9OBuS.2a96ced64af7e931ee4d83f65c491adf1241813547d5d8e3a317f5bc6d9a8de7';
   const DEFAULT_BASE_ID = 'appSsn4JyQD4DnYu0';
-  // Always set, override any empty
   window.AIRTABLE_PAT = DEFAULT_PAT;
   window.AIRTABLE_BASE_ID = DEFAULT_BASE_ID;
   window.DEFAULT_PAT = DEFAULT_PAT;
@@ -15,5 +14,5 @@
     localStorage.setItem('AIRTABLE_PAT', DEFAULT_PAT);
     localStorage.setItem('AIRTABLE_BASE_ID', DEFAULT_BASE_ID);
   } catch(e){}
-  console.log('✅ Effah Config: Auto PAT loaded for all staff');
+  console.log('✅ Effah Config: Auto PAT loaded');
 })();
