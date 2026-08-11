@@ -1,3 +1,25 @@
+
+// PATCH FOR NEW PORTAL
+var AIRTABLE_PAT = localStorage.getItem('effah_api_pat') || '';
+var AIRTABLE_BASE_ID = localStorage.getItem('effah_base_id') || '';
+// fix container id mapping
+(function(){
+  const _orig = document.getElementById.bind(document);
+  document.getElementById = function(id){
+    if(id==='modul-pakej-umrah') return _orig('modul-trip-umrah') || _orig('modul-pakej-umrah');
+    return _orig(id);
+  };
+  const st=document.createElement('style');
+  st.textContent='.bg-brand-maroon{background:#800020}.text-brand-maroon{color:#800020}';
+  document.head.appendChild(st);
+})();
+function cleanTripName(raw){
+  if(!raw) return 'TBC';
+  let s=String(raw);
+  if(s.includes('|')) s=s.split('|').pop();
+  return s.trim();
+}
+
 // Variable Global Simpan Data & Options
 let allTripUmrahRecords = [];
 let selectedTripRecord = null;
@@ -120,50 +142,43 @@ function normalizeDashFormat(str) {
 }
 
 // Fetch Data dari Airtable dengan Sorting
+async 
 async function fetchTripUmrahData() {
-    // REFRESH PAT
-    if(typeof AIRTABLE_PAT === 'undefined' || !AIRTABLE_PAT) { AIRTABLE_PAT = window.AIRTABLE_PAT || localStorage.getItem('effah_api_pat') || ''; AIRTABLE_BASE_ID = window.AIRTABLE_BASE_ID || localStorage.getItem('effah_base_id') || ''; }
-    AIRTABLE_PAT = window.AIRTABLE_PAT || localStorage.getItem('effah_api_pat') || AIRTABLE_PAT || ''; AIRTABLE_BASE_ID = window.AIRTABLE_BASE_ID || localStorage.getItem('effah_base_id') || AIRTABLE_BASE_ID || '';
-    if (!AIRTABLE_PAT || !AIRTABLE_BASE_ID) {
-        alert('Sila tetapkan API Token & Base ID di Settings API terlebih dahulu.');
-        return;
+    // AUTO-FILL PAT - no alert
+    if (typeof AIRTABLE_PAT === 'undefined' || !AIRTABLE_PAT) {
+        AIRTABLE_PAT = window.AIRTABLE_PAT || localStorage.getItem('effah_api_pat') || window.DEFAULT_PAT || 'patjxZg6G22e9OBuS.2a96ced64af7e931ee4d83f65c491adf1241813547d5d8e3a317f5bc6d9a8de7';
+        AIRTABLE_BASE_ID = window.AIRTABLE_BASE_ID || localStorage.getItem('effah_base_id') || window.DEFAULT_BASE_ID || 'appSsn4JyQD4DnYu0';
+        window.AIRTABLE_PAT = AIRTABLE_PAT;
+        window.AIRTABLE_BASE_ID = AIRTABLE_BASE_ID;
     }
-
     const container = document.getElementById('tripSidebarContainer');
     if (container) container.innerHTML = '<div class="text-center py-10 text-slate-400 text-xs"><i class="fa-solid fa-spinner fa-spin mr-1"></i> Memuat data...</div>';
 
-    const url = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/PAKEJ%20UMRAH?sort[0][field]=Mula%20Pakej&sort[0][direction]=asc&sort[1][field]=Tamat%20Pakej&sort[1][direction]=asc`;
-
     try {
-        const response = await fetch(url, { headers: { Authorization: `Bearer ${AIRTABLE_PAT}` } });
-        const data = await response.json();
-        allTripUmrahRecords = data.records || [];
+        let all=[]; let offset='';
+        do{
+          let url=`https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/PAKEJ%20UMRAH?sort[0][field]=Mula%20Pakej&sort[0][direction]=asc&pageSize=100`+(offset?`&offset=${offset}`:'');
+          const response=await fetch(url,{headers:{Authorization:`Bearer ${AIRTABLE_PAT}`}});
+          const data=await response.json();
+          if(data.error) throw new Error(data.error.message);
+          all=all.concat(data.records||[]);
+          offset=data.offset||'';
+        }while(offset);
+        allTripUmrahRecords = all;
 
         extractDynamicOptions(allTripUmrahRecords);
-
-        // --- 📊 UPDATE KAD OVERVIEW INDEX (EXCLUDE TBC) ---
-        // Filter trip yang sah sahaja (Trip bukan 'TBC' dan ada Mula Pakej)
-        const validTrips = allTripUmrahRecords.filter(rec => {
-            const f = rec.fields;
-            const tripTitle = (f['Trip'] || f['NAME'] || '').trim().toUpperCase();
-            // Abaikan jika tajuk ada TBC atau Mula Pakej kosong
-            return tripTitle !== 'TBC' && !tripTitle.startsWith('TBC') && f['Mula Pakej'];
+        const validTrips = allTripUmrahRecords.filter(rec=>{
+          const f=rec.fields; const tripTitle=(f['Trip']||'').trim().toUpperCase(); return tripTitle!=='TBC' && !tripTitle.startsWith('TBC') && f['Mula Pakej'];
         });
-
-        // Kemaskini nombor pada stat card di Overview
-        const statUmrah = document.getElementById('statUmrahCount');
-        if (statUmrah) statUmrah.textContent = validTrips.length;
-        // ---------------------------------------------------
-
+        const statUmrah = document.getElementById('statTripUmrah') || document.getElementById('statUmrahCount');
+        if(statUmrah) statUmrah.textContent = validTrips.length;
         renderTripSidebarList(allTripUmrahRecords);
-
-        if (allTripUmrahRecords.length > 0) {
-            renderTripDetailForm(allTripUmrahRecords[0]);
-        }
-    } catch (err) {
-        if (container) container.innerHTML = '<div class="text-center py-10 text-rose-500 text-xs">Gagal muat data. Semak API Key.</div>';
+        if(allTripUmrahRecords.length>0) renderTripDetailForm(allTripUmrahRecords[0]);
+    } catch(err){
+        if(container) container.innerHTML='<div class="text-center py-10 text-rose-500 text-xs">Gagal muat data. '+err.message+'</div>';
     }
 }
+
 
 // Render Senarai Sidebar Kiri
 function renderTripSidebarList(records) {
@@ -212,21 +227,10 @@ function renderTripDetailForm(rec) {
     
     const workspace = document.getElementById('tripMainDetailWorkspace');
 
-    // FIX: Filter jemaah lebih flexible - match ID, raw title, cleaned title, dan trip name tanpa prefix
     const tripJemaah = (typeof allJemaahUmrahRecords !== 'undefined') ? allJemaahUmrahRecords.filter(j => {
-        const jTripRaw = j.fields['TRIP'];
-        const jTrip = Array.isArray(jTripRaw) ? jTripRaw[0] : jTripRaw;
-        const jTripName = j.fields['Trip Name'] || j.fields['TRIP_NAME'] || '';
-        // Check multiple match possibilities
-        return jTrip === id || 
-               jTrip === rawTripTitle || 
-               jTrip === displayTitle ||
-               jTripName === rawTripTitle ||
-               jTripName === displayTitle ||
-               (typeof cleanTripName === 'function' && cleanTripName(jTrip) === displayTitle) ||
-               (typeof cleanTripName === 'function' && cleanTripName(jTripName) === displayTitle);
+        const jTrip = Array.isArray(j.fields['TRIP']) ? j.fields['TRIP'][0] : j.fields['TRIP'];
+        return jTrip === id || jTrip === rawTripTitle;
     }) : [];
-    console.log('Trip', displayTitle, 'found', tripJemaah.length, 'jemaah');
 
     workspace.innerHTML = `
         <!-- FORM UTAMA DETAIL TRIP -->
@@ -629,3 +633,23 @@ function filterTripSidebar() {
     });
     renderTripSidebarList(filtered);
 }
+// PATCH INIT FOR NEW PORTAL TAB
+(function(){
+  const origSwitch = window.Router && Router.switchTab ? Router.switchTab.bind(Router) : null;
+  if(origSwitch){
+    Router.switchTab=function(tabId,skip){
+      origSwitch(tabId,skip);
+      if(tabId==='trip-umrah'){
+        renderTripUmrahHTML();
+        fetchTripUmrahData();
+      }
+    };
+  }
+  setTimeout(()=>{
+    const mod=document.getElementById('modul-trip-umrah');
+    if(mod && !mod.classList.contains('hidden')){
+      renderTripUmrahHTML();
+      fetchTripUmrahData();
+    }
+  },600);
+})();
