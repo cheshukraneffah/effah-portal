@@ -9,4 +9,4 @@ window.DEFAULT_PAT = DEFAULT_PAT;
 window.DEFAULT_BASE_ID = DEFAULT_BASE_ID;
 localStorage.setItem('effah_api_pat', AIRTABLE_PAT);
 localStorage.setItem('effah_base_id', AIRTABLE_BASE_ID);
-console.log('✅ Config auto-loaded');
+console.log('✅ Config auto-loaded - Online ready');
