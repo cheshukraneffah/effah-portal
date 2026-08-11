@@ -37,21 +37,46 @@
         }
     </script>
 
-    <style>
-    /* FIX: Floating sidebar ikut scroll */
-    aside, #sidebar, .sidebar, nav.p-4 {
-        position: sticky !important;
-        top: 0 !important;
-        height: 100vh !important;
-        overflow-y: auto !important;
-        overflow-x: hidden !important;
-    }
-    /* Scrollbar cantik */
-    aside::-webkit-scrollbar, #sidebar::-webkit-scrollbar { width: 4px; }
-    aside::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
-    /* Status API badge fix */
-    #statusApiBadge, #statApiStatus { transition: all 0.3s; }
-    </style>
+<style id="sticky-topbar-fix">
+/* Top Bar Sticky - kekal atas */
+body > div > div:nth-child(2) > div:first-child,
+#app > header,
+main > header,
+div.flex.items-center.justify-between.p-4.bg-white,
+div[class*="bg-white"][class*="border-b"] {
+    position: sticky !important;
+    top: 0 !important;
+    z-index: 50 !important;
+    background: rgba(255,255,255,0.9) !important;
+    backdrop-filter: blur(16px) !important;
+    -webkit-backdrop-filter: blur(16px) !important;
+}
+/* Pastikan content tak overlap */
+.tab-content { padding-top: 0; }
+</style>
+
+
+<style>
+/* Top bar sticky fix - kekal atas */
+header.sticky {
+    position: sticky !important;
+    top: 0 !important;
+    z-index: 50 !important;
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+}
+/* Sidebar sticky already */
+aside {
+    position: sticky !important;
+    top: 0 !important;
+    height: 100vh !important;
+    overflow-y: auto !important;
+}
+/* Main content */
+main {
+    overflow-y: auto;
+}
+</style>
 
 </head>
 <body class="bg-brand-bg font-sans text-slate-800 antialiased selection:bg-brand-maroon selection:text-white">
@@ -91,7 +116,7 @@
             <div>
                 <!-- Logo & Brand Header -->
                 <div class="p-6 flex items-center space-x-3 border-b border-slate-800">
-                    <div class="w-10 h-10 rounded-xl overflow-hidden flex items-center justify-center bg-white/5 p-1 border border-slate-700/50">
+                    <div class="w-10 h-10 rounded-xl overflow-visible flex items-center justify-center bg-white/5 p-1 border border-slate-700/50">
                         <img src="assets/logo-effah.png" alt="Effah Travel" class="w-full h-full object-contain" onerror="this.outerHTML='<i class=\'fa-solid fa-kaaba text-amber-300 text-lg\'></i>'">
                     </div>
                     <div>
@@ -104,7 +129,7 @@
                 <nav class="p-4 space-y-1.5 text-xs font-semibold">
                     
                     <a href="#" onclick="switchTab('home')" id="nav-home" class="nav-link flex items-center space-x-3 px-3.5 py-3 rounded-xl transition text-white bg-slate-800/80">
-                        <i class="fa-solid fa-table-cells-large w-5 text-emerald-400"></i>
+                        <i class="fa-solid fa-grid-2 w-5 text-emerald-400"></i>
                         <span>Utama & Overview</span>
                     </a>
 
@@ -164,7 +189,7 @@
         <main class="flex-1 flex flex-col min-w-0 overflow-y-auto">
             
             <!-- Breadcrumb Header dengan Sidebar Collapse Button -->
-<header class="bg-white border-b border-slate-200/80 px-6 py-4 flex items-center justify-between sticky top-0 z-30">
+<header class="sticky top-0 z-40 backdrop-blur-xl bg-white/90 border-b border-slate-200" style="position:sticky;top:0;z-index:40;background:rgba(255,255,255,0.92);backdrop-filter:blur(16px);" class="bg-white border-b border-slate-200/80 px-6 py-4 flex items-center justify-between sticky top-0 z-30">
     <div class="flex items-center space-x-3">
         <!-- Butang Toggle Sidebar Desktop & Mobile -->
         <button id="sidebarToggleBtn" onclick="toggleSidebar()" class="text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 w-9 h-9 rounded-xl flex items-center justify-center transition focus:outline-none" title="Sorok/Tunjuk Sidebar">
@@ -189,7 +214,7 @@
                 <section id="modul-home" class="tab-content">
                     
                     <!-- Modern Hero Banner -->
-                    <div class="bg-gradient-to-r from-slate-900 via-emerald-950 to-slate-900 text-white rounded-3xl p-8 md:p-10 shadow-xl relative overflow-hidden mb-8 border border-slate-800">
+                    <div class="bg-gradient-to-r from-slate-900 via-emerald-950 to-slate-900 text-white rounded-3xl p-8 md:p-10 shadow-xl relative overflow-visible mb-8 border border-slate-800">
                         <div class="max-w-2xl relative z-10">
                             <span class="bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[11px] font-bold px-3.5 py-1 rounded-full uppercase tracking-wider">
                                 Selamat Datang ke Portal Effah Travel
@@ -299,7 +324,7 @@
     </div>
 
 <div id="attachmentPreviewModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-75 hidden p-4">
-    <div class="relative bg-white rounded-lg shadow-2xl w-full max-w-4xl h-[85vh] flex flex-col overflow-hidden">
+    <div class="relative bg-white rounded-lg shadow-2xl w-full max-w-4xl h-[85vh] flex flex-col overflow-visible">
         
         <div class="flex items-center justify-between px-6 py-4 bg-gray-100 border-b border-gray-200">
             <h3 id="previewTitle" class="text-lg font-semibold text-gray-800 truncate">
@@ -323,7 +348,7 @@
             </div>
         </div>
 
-        <div class="flex-1 bg-gray-900 flex items-center justify-center p-2 overflow-hidden relative">
+        <div class="flex-1 bg-gray-900 flex items-center justify-center p-2 overflow-visible relative">
             <img id="previewImage" src="" alt="Preview Gambar" 
                  class="max-w-full max-h-full object-contain hidden transition-all duration-200" />
             
@@ -335,7 +360,6 @@
 </div>
 
     <!-- SCRIPT MODULES LOADING -->
-    <script src="js/config.js"></script>
     <script src="js/auth.js"></script>
     <script src="js/router.js"></script>
     <script src="modules/settings/settings.js"></script>
@@ -343,52 +367,6 @@
     <script src="modules/umrah/jemaah-umrah.js"></script>
     <script src="modules/umrah/rooming.js"></script>
 
-
-
-<script>
-// FIX: Update Status API badge jadi Online bila data berjaya load
-(function(){
-    function updateApiStatus(online){
-        const badges = document.querySelectorAll('[id*="statApi"], [id*="StatusAPI"], .status-api');
-        const el = document.getElementById('statusApiBadge') || document.querySelector('[class*="Status API"]') || document.body.querySelector('div:has(> span:contains("Offline"))');
-        // Cari element yang ada text Offline di sidebar bawah
-        const sidebarStatus = document.querySelector('#sidebarStatus, #apiStatusBadge');
-        // Simple: cari semua element yang ada text Offline
-        document.querySelectorAll('*').forEach(el=>{
-            if(el.textContent && el.textContent.trim() === 'Offline' && el.tagName === 'SPAN'){
-                if(online){
-                    el.textContent = 'Online';
-                    el.className = el.className.replace('rose','emerald').replace('red','emerald');
-                    el.style.background = '#10b981';
-                    el.style.color = 'white';
-                }
-            }
-        });
-    }
-    // Hook ke fetch success
-    const origFetchJemaah = window.fetchJemaahUmrahData;
-    const origFetchTrip = window.fetchTripUmrahData;
-    window.addEventListener('jemaahLoaded', ()=> updateApiStatus(true));
-    window.addEventListener('tripLoaded', ()=> updateApiStatus(true));
-    // Polling fallback
-    setInterval(()=>{
-        if(typeof allJemaahUmrahRecords !== 'undefined' && allJemaahUmrahRecords.length > 0){
-            updateApiStatus(true);
-            // Update dashboard stats juga
-            const statJemaah = document.getElementById('statJemaahCount');
-            if(statJemaah) statJemaah.textContent = allJemaahUmrahRecords.length;
-            const statTrip = document.getElementById('statUmrahCount');
-            if(statTrip && typeof allTripUmrahRecords !== 'undefined'){
-                const valid = allTripUmrahRecords.filter(r=> {
-                    const t = r.fields['Trip'] || '';
-                    return t && !t.includes('TBC');
-                });
-                statTrip.textContent = valid.length || allTripUmrahRecords.length;
-            }
-        }
-    }, 1500);
-})();
-</script>
 
 </body>
 </html>
