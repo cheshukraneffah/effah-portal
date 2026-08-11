@@ -424,11 +424,6 @@ async function fetchJemaahUmrahData(isManualClick = false) {
 
         allJemaahUmrahRecords = newFetchedRecords;
         localStorage.setItem('cache_jemaah_records', JSON.stringify(allJemaahUmrahRecords));
-            // Update dashboard stats
-            try { const s = document.getElementById('statJemaahCount'); if(s) s.textContent = allJemaahUmrahRecords.length; } catch(e){}
-            try { window.dispatchEvent(new Event('jemaahLoaded')); } catch(e){}
-            // Update Status API to Online
-            try { document.querySelectorAll('span').forEach(el=>{ if(el.textContent.trim()==='Offline'){ el.textContent='Online'; el.classList.remove('bg-rose-900/20','text-rose-300'); el.classList.add('bg-emerald-500/20','text-emerald-300'); } }); } catch(e){}
 
         const statJemaah = document.getElementById('statJemaahUmrahCount');
         if (statJemaah) statJemaah.textContent = allJemaahUmrahRecords.length;
