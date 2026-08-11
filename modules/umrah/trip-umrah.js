@@ -113,21 +113,10 @@ function renderTripDetailForm(rec) {
     
     const workspace = document.getElementById('tripMainDetailWorkspace');
 
-    // FIX: Filter jemaah lebih flexible - match ID, raw title, cleaned title, dan trip name tanpa prefix
     const tripJemaah = (typeof allJemaahUmrahRecords !== 'undefined') ? allJemaahUmrahRecords.filter(j => {
-        const jTripRaw = j.fields['TRIP'];
-        const jTrip = Array.isArray(jTripRaw) ? jTripRaw[0] : jTripRaw;
-        const jTripName = j.fields['Trip Name'] || j.fields['TRIP_NAME'] || '';
-        // Check multiple match possibilities
-        return jTrip === id || 
-               jTrip === rawTripTitle || 
-               jTrip === displayTitle ||
-               jTripName === rawTripTitle ||
-               jTripName === displayTitle ||
-               (typeof cleanTripName === 'function' && cleanTripName(jTrip) === displayTitle) ||
-               (typeof cleanTripName === 'function' && cleanTripName(jTripName) === displayTitle);
+        const jTrip = Array.isArray(j.fields['TRIP']) ? j.fields['TRIP'][0] : j.fields['TRIP'];
+        return jTrip === id || jTrip === rawTripTitle;
     }) : [];
-    console.log('Trip', displayTitle, 'found', tripJemaah.length, 'jemaah');
 
     workspace.innerHTML = `
         <!-- FORM UTAMA DETAIL TRIP -->
