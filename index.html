@@ -36,6 +36,23 @@
             }
         }
     </script>
+
+    <style>
+    /* FIX: Floating sidebar ikut scroll */
+    aside, #sidebar, .sidebar, nav.p-4 {
+        position: sticky !important;
+        top: 0 !important;
+        height: 100vh !important;
+        overflow-y: auto !important;
+        overflow-x: hidden !important;
+    }
+    /* Scrollbar cantik */
+    aside::-webkit-scrollbar, #sidebar::-webkit-scrollbar { width: 4px; }
+    aside::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
+    /* Status API badge fix */
+    #statusApiBadge, #statApiStatus { transition: all 0.3s; }
+    </style>
+
 </head>
 <body class="bg-brand-bg font-sans text-slate-800 antialiased selection:bg-brand-maroon selection:text-white">
 
@@ -87,7 +104,7 @@
                 <nav class="p-4 space-y-1.5 text-xs font-semibold">
                     
                     <a href="#" onclick="switchTab('home')" id="nav-home" class="nav-link flex items-center space-x-3 px-3.5 py-3 rounded-xl transition text-white bg-slate-800/80">
-                        <i class="fa-solid fa-grid-2 w-5 text-emerald-400"></i>
+                        <i class="fa-solid fa-table-cells-large w-5 text-emerald-400"></i>
                         <span>Utama & Overview</span>
                     </a>
 
@@ -326,6 +343,52 @@
     <script src="modules/umrah/jemaah-umrah.js"></script>
     <script src="modules/umrah/rooming.js"></script>
 
+
+
+<script>
+// FIX: Update Status API badge jadi Online bila data berjaya load
+(function(){
+    function updateApiStatus(online){
+        const badges = document.querySelectorAll('[id*="statApi"], [id*="StatusAPI"], .status-api');
+        const el = document.getElementById('statusApiBadge') || document.querySelector('[class*="Status API"]') || document.body.querySelector('div:has(> span:contains("Offline"))');
+        // Cari element yang ada text Offline di sidebar bawah
+        const sidebarStatus = document.querySelector('#sidebarStatus, #apiStatusBadge');
+        // Simple: cari semua element yang ada text Offline
+        document.querySelectorAll('*').forEach(el=>{
+            if(el.textContent && el.textContent.trim() === 'Offline' && el.tagName === 'SPAN'){
+                if(online){
+                    el.textContent = 'Online';
+                    el.className = el.className.replace('rose','emerald').replace('red','emerald');
+                    el.style.background = '#10b981';
+                    el.style.color = 'white';
+                }
+            }
+        });
+    }
+    // Hook ke fetch success
+    const origFetchJemaah = window.fetchJemaahUmrahData;
+    const origFetchTrip = window.fetchTripUmrahData;
+    window.addEventListener('jemaahLoaded', ()=> updateApiStatus(true));
+    window.addEventListener('tripLoaded', ()=> updateApiStatus(true));
+    // Polling fallback
+    setInterval(()=>{
+        if(typeof allJemaahUmrahRecords !== 'undefined' && allJemaahUmrahRecords.length > 0){
+            updateApiStatus(true);
+            // Update dashboard stats juga
+            const statJemaah = document.getElementById('statJemaahCount');
+            if(statJemaah) statJemaah.textContent = allJemaahUmrahRecords.length;
+            const statTrip = document.getElementById('statUmrahCount');
+            if(statTrip && typeof allTripUmrahRecords !== 'undefined'){
+                const valid = allTripUmrahRecords.filter(r=> {
+                    const t = r.fields['Trip'] || '';
+                    return t && !t.includes('TBC');
+                });
+                statTrip.textContent = valid.length || allTripUmrahRecords.length;
+            }
+        }
+    }, 1500);
+})();
+</script>
 
 </body>
 </html>
