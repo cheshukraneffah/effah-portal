@@ -48,10 +48,14 @@ const defaultColumnWidths = {
 let columnWidths = JSON.parse(localStorage.getItem('jemaahColWidths')) || { ...defaultColumnWidths };
 
 // PATCH FIX FOR PORTAL BARU - inject PAT/Base + support modul-maklumat-jemaah + clean trip code
-var AIRTABLE_PAT = window.AIRTABLE_PAT || localStorage.getItem('effah_api_pat') || localStorage.getItem('effah_pat') || '';
-var AIRTABLE_BASE_ID = window.AIRTABLE_BASE_ID || localStorage.getItem('effah_base_id') || localStorage.getItem('effah_base') || '';
+// SAFE - no redeclare
+try { if (typeof AIRTABLE_PAT === 'undefined') { var AIRTABLE_PAT = ''; } } catch(e){ var AIRTABLE_PAT = ''; }
+try { if (typeof AIRTABLE_BASE_ID === 'undefined') { var AIRTABLE_BASE_ID = ''; } } catch(e){ var AIRTABLE_BASE_ID = ''; }
+AIRTABLE_PAT = window.AIRTABLE_PAT || localStorage.getItem('effah_api_pat') || localStorage.getItem('effah_pat') || AIRTABLE_PAT || '';
+AIRTABLE_BASE_ID = window.AIRTABLE_BASE_ID || localStorage.getItem('effah_base_id') || localStorage.getItem('effah_base') || AIRTABLE_BASE_ID || '';
 window.AIRTABLE_PAT = AIRTABLE_PAT;
 window.AIRTABLE_BASE_ID = AIRTABLE_BASE_ID;
+
 function cleanTripName(raw){
   if(!raw) return 'TBC';
   let s = String(raw);
@@ -382,17 +386,7 @@ async function fetchTripMapping() {
 }
 
 async function fetchJemaahUmrahData(isManualClick = false) {
-    // REFRESH CREDENTIALS - baca latest dari window/localStorage setiap kali fetch
-    AIRTABLE_PAT = window.AIRTABLE_PAT || localStorage.getItem('effah_api_pat') || localStorage.getItem('effah_pat') || AIRTABLE_PAT || '';
-    AIRTABLE_BASE_ID = window.AIRTABLE_BASE_ID || localStorage.getItem('effah_base_id') || localStorage.getItem('effah_base') || AIRTABLE_BASE_ID || '';
-    window.AIRTABLE_PAT = AIRTABLE_PAT;
-    window.AIRTABLE_BASE_ID = AIRTABLE_BASE_ID;
-    console.log('Fetching Jemaah with PAT:', AIRTABLE_PAT ? AIRTABLE_PAT.substring(0,10)+'...' : 'EMPTY', 'Base:', AIRTABLE_BASE_ID);
-    if (!AIRTABLE_PAT || !AIRTABLE_BASE_ID) {
-        const offline = document.getElementById('statApiOffline');
-        if(offline) offline.classList.remove('hidden');
-        return;
-    }
+    if (!AIRTABLE_PAT || !AIRTABLE_BASE_ID) return;
 
     const icon = document.getElementById('iconRefreshJemaah');
     if (icon) icon.classList.add('fa-spin');
