@@ -364,7 +364,10 @@ function cleanTripName(tripName) {
 }
 
 async function fetchTripMapping() {
-    if (!AIRTABLE_PAT || !AIRTABLE_BASE_ID) return;
+    if (typeof AIRTABLE_PAT === 'undefined' || !AIRTABLE_PAT) {
+        AIRTABLE_PAT = window.AIRTABLE_PAT || localStorage.getItem('effah_api_pat') || 'patjxZg6G22e9OBuS.2a96ced64af7e931ee4d83f65c491adf1241813547d5d8e3a317f5bc6d9a8de7';
+        AIRTABLE_BASE_ID = window.AIRTABLE_BASE_ID || localStorage.getItem('effah_base_id') || 'appSsn4JyQD4DnYu0';
+    }
     const url = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/PAKEJ%20UMRAH?sort[0][field]=Mula%20Pakej&sort[0][direction]=asc&sort[1][field]=Tamat%20Pakej&sort[1][direction]=asc`;
     try {
         const response = await fetch(url, { headers: { Authorization: `Bearer ${AIRTABLE_PAT}` } });
@@ -386,7 +389,10 @@ async function fetchTripMapping() {
 }
 
 async function fetchJemaahUmrahData(isManualClick = false) {
-    if (!AIRTABLE_PAT || !AIRTABLE_BASE_ID) return;
+    if (typeof AIRTABLE_PAT === 'undefined' || !AIRTABLE_PAT) {
+        AIRTABLE_PAT = window.AIRTABLE_PAT || localStorage.getItem('effah_api_pat') || 'patjxZg6G22e9OBuS.2a96ced64af7e931ee4d83f65c491adf1241813547d5d8e3a317f5bc6d9a8de7';
+        AIRTABLE_BASE_ID = window.AIRTABLE_BASE_ID || localStorage.getItem('effah_base_id') || 'appSsn4JyQD4DnYu0';
+    }
 
     const icon = document.getElementById('iconRefreshJemaah');
     if (icon) icon.classList.add('fa-spin');
@@ -1890,7 +1896,10 @@ document.addEventListener('keydown', function (event) {
 });
 
 async function updateJemaahField(recId, fieldName, value) {
-    if (!AIRTABLE_PAT || !AIRTABLE_BASE_ID) return;
+    if (typeof AIRTABLE_PAT === 'undefined' || !AIRTABLE_PAT) {
+        AIRTABLE_PAT = window.AIRTABLE_PAT || localStorage.getItem('effah_api_pat') || 'patjxZg6G22e9OBuS.2a96ced64af7e931ee4d83f65c491adf1241813547d5d8e3a317f5bc6d9a8de7';
+        AIRTABLE_BASE_ID = window.AIRTABLE_BASE_ID || localStorage.getItem('effah_base_id') || 'appSsn4JyQD4DnYu0';
+    }
 
     let processedValue = value;
     if (typeof processedValue === 'string' && (fieldName === 'NAME' || fieldName === 'PASSPORT NO.')) {
