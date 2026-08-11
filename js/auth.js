@@ -25,7 +25,7 @@ function verifyPin(e) {
     const inputEl = document.getElementById('pinInput');
     const pinInput = (inputEl?.value || '').trim();
     const errorMsg = document.getElementById('pinErrorMsg');
-    console.log('Trying PIN:', pinInput);
+    //
     if (pinInput === DEFAULT_PIN || pinInput === "5822") {
         safeSet('effah_logged_in','true');
         if(errorMsg) errorMsg.classList.add('hidden');
@@ -36,7 +36,7 @@ function verifyPin(e) {
     } else {
         if (errorMsg) errorMsg.classList.remove('hidden');
         if(inputEl) inputEl.value='';
-        if(inputEl) inputEl.placeholder='PIN Salah! Cuba 5822';
+        if(inputEl) inputEl.placeholder='PIN Salah! Cuba semula';
     }
 }
 
