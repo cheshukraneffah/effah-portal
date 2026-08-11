@@ -41,7 +41,7 @@ function renderTripUmrahHTML() {
                 </div>
 
                 <!-- List Container -->
-                <div id="tripSidebarContainer" class="space-y-2 overflow-y-auto flex-1 max-h- pr-1">
+                <div id="tripSidebarContainer" class="space-y-2 overflow-y-auto flex-1 max-h-[75vh] pr-1">
                     <div class="text-center py-10 text-slate-400 text-xs">Sila klik 'Refresh' untuk muat turun trip...</div>
                 </div>
             </div>
@@ -76,14 +76,14 @@ function renderTripUmrahHTML() {
                         <label class="block font-bold text-slate-800 mb-1.5">Tarikh Mula Pakej (Fly) *</label>
                         <input type="date" id="modalMulaPakej" onchange="handleMulaDateChange()" required
                             class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-1 focus:ring-slate-400 focus:outline-none font-semibold text-slate-800">
-                        <span class="text- text-slate-400 mt-1 block">Format European: DD/MM/YYYY</span>
+                        <span class="text-[10px] text-slate-400 mt-1 block">Format European: DD/MM/YYYY</span>
                     </div>
 
                     <div>
                         <label class="block font-bold text-slate-800 mb-1.5">Tarikh Tamat Pakej (Balik) *</label>
                         <input type="date" id="modalTamatPakej" required
                             class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-1 focus:ring-slate-400 focus:outline-none font-semibold text-slate-800">
-                        <span class="text- text-slate-400 mt-1 block">Format European: DD/MM/YYYY</span>
+                        <span class="text-[10px] text-slate-400 mt-1 block">Format European: DD/MM/YYYY</span>
                     </div>
 
                     <div class="flex items-center space-x-3 pt-3">
@@ -191,7 +191,7 @@ function renderTripSidebarList(records) {
         card.innerHTML = `
             <h4 class="font-bold text-xs text-slate-900 leading-snug">${displayTitle}</h4>
             <div class="mt-2">
-                <span class="bg-amber-100/80 text-amber-900 border border-amber-200/60 text- font-bold px-2 py-0.5 rounded-md uppercase tracking-wide">
+                <span class="bg-amber-100/80 text-amber-900 border border-amber-200/60 text-[10px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wide">
                     ${airline}
                 </span>
             </div>
@@ -378,10 +378,10 @@ function renderTripDetailForm(rec) {
                                     <td class="p-3 font-mono font-bold text-slate-700">${jf['PASSPORT NO.'] || '-'}</td>
                                     <td class="p-3 text-slate-600">${jf['AGE'] || '-'}</td>
                                     <td class="p-3">
-                                        <span class="text- font-bold px-2.5 py-0.5 rounded-md border uppercase ${genderBadge}">${jf['GENDER'] || '-'}</span>
+                                        <span class="text-[10px] font-bold px-2.5 py-0.5 rounded-md border uppercase ${genderBadge}">${jf['GENDER'] || '-'}</span>
                                     </td>
                                     <td class="p-3">
-                                        <span class="bg-sky-100/80 text-sky-900 border border-sky-200 text- font-bold px-2 py-0.5 rounded-md uppercase">${jf['NATIONALITY'] || 'MALAYSIA'}</span>
+                                        <span class="bg-sky-100/80 text-sky-900 border border-sky-200 text-[10px] font-bold px-2 py-0.5 rounded-md uppercase">${jf['NATIONALITY'] || 'MALAYSIA'}</span>
                                     </td>
                                 </tr>
                             `;
@@ -442,7 +442,7 @@ async function submitNewTripRecord(e) {
     }
 
     if (tamatDate < mulaDate) {
-        alert('⚠ Ralat Tarikh!\n\nTarikh Tamat Pakej (Balik) mesti dipilih selepas atau pada tarikh Mula Pakej (Fly).');
+        alert('⚠️ Ralat Tarikh!\n\nTarikh Tamat Pakej (Balik) mesti dipilih selepas atau pada tarikh Mula Pakej (Fly).');
         document.getElementById('modalTamatPakej').focus();
         return;
     }
