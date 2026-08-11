@@ -53,6 +53,23 @@
     #statusApiBadge, #statApiStatus { transition: all 0.3s; }
     </style>
 
+
+    <style>
+    /* STICKY TOPBAR FIX - stay on top when scroll */
+    header, .topbar, #topbar, .main-header {
+        position: sticky !important;
+        top: 0 !important;
+        z-index: 50 !important;
+        background: rgba(255,255,255,0.92) !important;
+        backdrop-filter: blur(16px) !important;
+        -webkit-backdrop-filter: blur(16px) !important;
+    }
+    /* API Status badge colors */
+    #apiStatusBadge.offline { background: #fee2e2 !important; color: #dc2626 !important; }
+    #apiStatusBadge.online { background: #dcfce7 !important; color: #16a34a !important; }
+    #apiStatusBadge { transition: all 0.3s ease; }
+    </style>
+    
 </head>
 <body class="bg-brand-bg font-sans text-slate-800 antialiased selection:bg-brand-maroon selection:text-white">
 
@@ -164,7 +181,7 @@
         <main class="flex-1 flex flex-col min-w-0 overflow-y-auto">
             
             <!-- Breadcrumb Header dengan Sidebar Collapse Button -->
-<header class="bg-white border-b border-slate-200/80 px-6 py-4 flex items-center justify-between sticky top-0 z-30">
+<header class="bg-white border-b border-slate-200/80 px-6 py-4 flex items-center justify-between sticky top-0 z-30" style="position:sticky;top:0;z-index:40;background:rgba(255,255,255,0.95);backdrop-filter:blur(16px);border-bottom:1px solid #e2e8f0;">
     <div class="flex items-center space-x-3">
         <!-- Butang Toggle Sidebar Desktop & Mobile -->
         <button id="sidebarToggleBtn" onclick="toggleSidebar()" class="text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 w-9 h-9 rounded-xl flex items-center justify-center transition focus:outline-none" title="Sorok/Tunjuk Sidebar">
@@ -387,6 +404,36 @@
             }
         }
     }, 1500);
+})();
+</script>
+
+
+<script>
+// FIX: Status API Online hijau - Effah Travel
+(function(){
+  function setOnline(){
+    var badge = document.getElementById('apiStatusBadge');
+    if(!badge) return;
+    var pat = window.AIRTABLE_PAT || localStorage.getItem('effah_api_pat') || localStorage.getItem('effah_pat');
+    var base = window.AIRTABLE_BASE_ID || localStorage.getItem('effah_base_id');
+    if(pat && base){
+      badge.textContent = 'Online';
+      badge.style.background = '#dcfce7';
+      badge.style.color = '#16a34a';
+      badge.style.borderColor = '#86efac';
+      badge.style.borderWidth = '1px';
+      badge.style.borderStyle = 'solid';
+      badge.classList.remove('bg-rose-500/20','text-rose-400','border-rose-500/30');
+      badge.classList.add('bg-emerald-500/20','text-emerald-600');
+    }
+  }
+  document.addEventListener('DOMContentLoaded', function(){
+    setTimeout(setOnline, 300);
+    setTimeout(setOnline, 1000);
+    setTimeout(setOnline, 2000);
+  });
+  setInterval(setOnline, 2000);
+  window.setApiOnline = setOnline;
 })();
 </script>
 
