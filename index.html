@@ -387,5 +387,69 @@
 })();
 </script>
 
+
+<script>
+// ===== FINAL OVERRIDE V13: Preview Modal Global - Fix close button + outside click =====
+(function(){
+  function getGlobalModal(){
+    const all = document.querySelectorAll('#attachmentPreviewModal');
+    if(all.length === 0) return null;
+    // Prefer the one NOT inside modul-jemaah-umrah (global one)
+    for(let m of all){
+      if(!m.closest('#modul-jemaah-umrah')){
+        return m;
+      }
+    }
+    return all[0];
+  }
+
+  window.openTripPreviewModal = function(url, title){
+    const modal = getGlobalModal();
+    if(!modal){ window.open(url, '_blank'); return; }
+    const img = modal.querySelector('#previewImage');
+    const pdf = modal.querySelector('#previewPdf');
+    const titleEl = modal.querySelector('#previewTitle');
+    const dlBtn = modal.querySelector('#downloadAttachmentBtn');
+    if(titleEl) titleEl.textContent = title || 'Preview';
+    if(dlBtn) dlBtn.href = url;
+    const isPdf = url.toLowerCase().includes('.pdf');
+    if(img){ img.classList.add('hidden'); img.src=''; }
+    if(pdf){ pdf.classList.add('hidden'); pdf.src=''; }
+    if(isPdf){
+      if(pdf){ pdf.src = url; pdf.classList.remove('hidden'); }
+    } else {
+      if(img){ img.src = url; img.classList.remove('hidden'); }
+    }
+    modal.classList.remove('hidden');
+    modal.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+  };
+
+  window.closePreviewModal = function(){
+    document.querySelectorAll('#attachmentPreviewModal').forEach(m=>{
+      m.classList.add('hidden');
+      m.style.display = 'none';
+      const img = m.querySelector('#previewImage');
+      const pdf = m.querySelector('#previewPdf');
+      if(img){ img.src=''; img.classList.add('hidden'); }
+      if(pdf){ pdf.src=''; pdf.classList.add('hidden'); }
+    });
+    document.body.style.overflow = '';
+  };
+
+  window.openPreviewModal = function(url, title){
+    return window.openTripPreviewModal(url, title);
+  };
+
+  // ESC to close
+  document.addEventListener('keydown', function(e){
+    if(e.key === 'Escape'){
+      const open = Array.from(document.querySelectorAll('#attachmentPreviewModal')).some(m=> !m.classList.contains('hidden'));
+      if(open) window.closePreviewModal();
+    }
+  });
+})();
+</script>
+
 </body>
 </html>
