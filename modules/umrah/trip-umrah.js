@@ -225,19 +225,29 @@ function renderTripDetailForm(rec) {
     
     const workspace = document.getElementById('tripMainDetailWorkspace');
 
-    // FIX: Filter jemaah lebih flexible - match ID, raw title, cleaned title, dan trip name tanpa prefix
+    // FIX V7: Filter jemaah - TBC hanya tunjuk tanpa trip / TBC sahaja, bukan semua
+    const isTBC = (displayTitle || '').toUpperCase() === 'TBC' || (rawTripTitle || '').toUpperCase() === 'TBC' || (rawTripTitle || '').toUpperCase().includes('TBC');
     const tripJemaah = (typeof allJemaahUmrahRecords !== 'undefined') ? allJemaahUmrahRecords.filter(j => {
         const jTripRaw = j.fields['TRIP'];
         const jTrip = Array.isArray(jTripRaw) ? jTripRaw[0] : jTripRaw;
-        const jTripName = j.fields['Trip Name'] || j.fields['TRIP_NAME'] || '';
-        // Check multiple match possibilities
-        return jTrip === id || 
-               jTrip === rawTripTitle || 
-               jTrip === displayTitle ||
-               jTripName === rawTripTitle ||
-               jTripName === displayTitle ||
-               (typeof cleanTripName === 'function' && cleanTripName(jTrip) === displayTitle) ||
-               (typeof cleanTripName === 'function' && cleanTripName(jTripName) === displayTitle);
+        const jTripName = (j.fields['Trip Name'] || j.fields['TRIP_NAME'] || j.fields['Trip'] || '').toString();
+        const jTripStr = (jTrip || '').toString().trim();
+        const jTripNameStr = jTripName.trim();
+
+        if(isTBC){
+            // Untuk TBC: hanya yang tiada trip, kosong, atau memang TBC
+            const isEmpty = !jTripRaw || (Array.isArray(jTripRaw) && jTripRaw.length===0) || jTripStr === '' || jTripNameStr === '';
+            const isTBCTag = jTripStr.toUpperCase() === 'TBC' || jTripNameStr.toUpperCase() === 'TBC' || jTripStr.toUpperCase().includes('TBC') || jTripNameStr.toUpperCase().includes('TBC');
+            return isEmpty || isTBCTag;
+        } else {
+            // Untuk trip normal: match ID atau nama trip exact, jangan ambil yang kosong
+            if(!jTripRaw) return false;
+            return jTrip === id || 
+                   jTripStr === rawTripTitle || 
+                   jTripStr === displayTitle ||
+                   jTripNameStr === rawTripTitle ||
+                   jTripNameStr === displayTitle;
+        }
     }) : [];
     console.log('Trip', displayTitle, 'found', tripJemaah.length, 'jemaah');
 
