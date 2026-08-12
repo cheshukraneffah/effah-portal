@@ -120,6 +120,12 @@ async function fetchTripUmrahData() {
     if (container) container.innerHTML = '<div class="text-center py-10 text-slate-400 text-xs"><i class="fa-solid fa-spinner fa-spin mr-1"></i> Memuat data...</div>';
     const url = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/PAKEJ%20UMRAH?sort[0][field]=Mula%20Pakej&sort[0][direction]=asc&sort[1][field]=Tamat%20Pakej&sort[1][direction]=asc`;
     try {
+        // Simpan ID trip yang sedang dibuka sebelum refresh
+        const prevSelectedId = (selectedTripRecord && selectedTripRecord.id) ? selectedTripRecord.id : localStorage.getItem('effah_last_selected_trip');
+        // Simpan scroll position sidebar
+        const sidebarContainer = document.getElementById('tripSidebarContainer');
+        const prevScrollTop = sidebarContainer ? sidebarContainer.scrollTop : 0;
+
         const response = await fetch(url, { headers: { Authorization: `Bearer ${AIRTABLE_PAT}` } });
         const data = await response.json();
         allTripUmrahRecords = data.records || [];
@@ -132,8 +138,30 @@ async function fetchTripUmrahData() {
         const statUmrah = document.getElementById('statUmrahCount');
         if (statUmrah) statUmrah.textContent = validTrips.length;
         renderTripSidebarList(allTripUmrahRecords);
-        if (allTripUmrahRecords.length > 0) {
+        
+        // Restore scroll position
+        setTimeout(()=>{
+          const sc = document.getElementById('tripSidebarContainer');
+          if(sc) sc.scrollTop = prevScrollTop;
+        }, 50);
+
+        // Kekal di trip yang sama lepas refresh
+        if(prevSelectedId){
+          const stillExists = allTripUmrahRecords.find(r=> r.id === prevSelectedId);
+          if(stillExists){
+            renderTripDetailForm(stillExists);
+            // Auto refresh jemaah data juga
+            if(typeof fetchJemaahUmrahData === 'function'){
+              fetchJemaahUmrahData(true).then(()=>{
+                // re-render detail dengan data jemaah baru
+                renderTripDetailForm(stillExists);
+              });
+            }
+          } else if (allTripUmrahRecords.length > 0) {
             renderTripDetailForm(allTripUmrahRecords[0]);
+          }
+        } else if (allTripUmrahRecords.length > 0) {
+          renderTripDetailForm(allTripUmrahRecords[0]);
         }
     } catch (err) {
         if (container) container.innerHTML = '<div class="text-center py-10 text-rose-500 text-xs">Gagal muat data. Semak API Key.</div>';
@@ -169,6 +197,10 @@ function renderTripSidebarList(records) {
 
 function renderTripDetailForm(rec) {
     selectedTripRecord = rec;
+    // Save to localStorage supaya refresh page pun kekal
+    if(rec && rec.id){
+      try{ localStorage.setItem('effah_last_selected_trip', rec.id); }catch(e){}
+    }
     renderTripSidebarList(allTripUmrahRecords);
     const f = rec.fields;
     const id = rec.id;
