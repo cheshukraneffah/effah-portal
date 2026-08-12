@@ -351,7 +351,7 @@
     </div>
 </div>
 
-    <!-- SCRIPT MODULES LOADING -->
+    <!-- SCRIPT MODULES LOADING - FINAL CLEAN ORDER -->
     <script src="js/config.js"></script>
     <script src="js/auth.js"></script>
     <script src="js/router.js"></script>
@@ -360,80 +360,30 @@
     <script src="modules/umrah/jemaah-umrah.js"></script>
     <script src="modules/umrah/rooming.js"></script>
 
-
-
 <script>
-// FIX: Update Status API badge jadi Online bila data berjaya load
-(function(){
-    function updateApiStatus(online){
-        const badges = document.querySelectorAll('[id*="statApi"], [id*="StatusAPI"], .status-api');
-        const el = document.getElementById('statusApiBadge') || document.querySelector('[class*="Status API"]') || document.body.querySelector('div:has(> span:contains("Offline"))');
-        // Cari element yang ada text Offline di sidebar bawah
-        const sidebarStatus = document.querySelector('#sidebarStatus, #apiStatusBadge');
-        // Simple: cari semua element yang ada text Offline
-        document.querySelectorAll('*').forEach(el=>{
-            if(el.textContent && el.textContent.trim() === 'Offline' && el.tagName === 'SPAN'){
-                if(online){
-                    el.textContent = 'Online';
-                    el.className = el.className.replace('rose','emerald').replace('red','emerald');
-                    el.style.background = '#10b981';
-                    el.style.color = 'white';
-                }
-            }
-        });
-    }
-    // Hook ke fetch success
-    const origFetchJemaah = window.fetchJemaahUmrahData;
-    const origFetchTrip = window.fetchTripUmrahData;
-    window.addEventListener('jemaahLoaded', ()=> updateApiStatus(true));
-    window.addEventListener('tripLoaded', ()=> updateApiStatus(true));
-    // Polling fallback
-    setInterval(()=>{
-        if(typeof allJemaahUmrahRecords !== 'undefined' && allJemaahUmrahRecords.length > 0){
-            updateApiStatus(true);
-            // Update dashboard stats juga
-            const statJemaah = document.getElementById('statJemaahCount');
-            if(statJemaah) statJemaah.textContent = allJemaahUmrahRecords.length;
-            const statTrip = document.getElementById('statUmrahCount');
-            if(statTrip && typeof allTripUmrahRecords !== 'undefined'){
-                const valid = allTripUmrahRecords.filter(r=> {
-                    const t = r.fields['Trip'] || '';
-                    return t && !t.includes('TBC');
-                });
-                statTrip.textContent = valid.length || allTripUmrahRecords.length;
-            }
-        }
-    }, 1500);
-})();
-</script>
-
-
-<script>
-// FIX: Status API Online hijau - Effah Travel
+// FINAL: Status API Online hijau - clean version
 (function(){
   function setOnline(){
     var badge = document.getElementById('apiStatusBadge');
     if(!badge) return;
-    var pat = window.AIRTABLE_PAT || localStorage.getItem('effah_api_pat') || localStorage.getItem('effah_pat');
+    var pat = window.AIRTABLE_PAT || localStorage.getItem('effah_api_pat');
     var base = window.AIRTABLE_BASE_ID || localStorage.getItem('effah_base_id');
     if(pat && base){
       badge.textContent = 'Online';
+      badge.className = 'text-[10px] px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30';
       badge.style.background = '#dcfce7';
       badge.style.color = '#16a34a';
       badge.style.borderColor = '#86efac';
-      badge.style.borderWidth = '1px';
-      badge.style.borderStyle = 'solid';
-      badge.classList.remove('bg-rose-500/20','text-rose-400','border-rose-500/30');
-      badge.classList.add('bg-emerald-500/20','text-emerald-600');
     }
   }
   document.addEventListener('DOMContentLoaded', function(){
-    setTimeout(setOnline, 300);
-    setTimeout(setOnline, 1000);
-    setTimeout(setOnline, 2000);
+    setTimeout(setOnline, 500);
+    setTimeout(setOnline, 1500);
   });
-  setInterval(setOnline, 2000);
+  setInterval(setOnline, 3000);
   window.setApiOnline = setOnline;
+  window.addEventListener('tripLoaded', setOnline);
+  window.addEventListener('jemaahLoaded', setOnline);
 })();
 </script>
 
