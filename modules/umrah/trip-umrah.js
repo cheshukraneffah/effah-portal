@@ -871,14 +871,11 @@ function sortTripJemaahBy(field){
 }
 
 
-// ===== FIX V11: GLOBAL PREVIEW MODAL - works from Trip Umrah tab, not Jemaah tab =====
+// ===== FIX V12: GLOBAL PREVIEW MODAL + CLOSE BUTTON + OUTSIDE CLICK =====
 window.openTripPreviewModal = function(url, title){
-  // Always use the global modal in index.html (outside tabs)
   let modal = document.getElementById('attachmentPreviewModal');
-  // If there are 2 modals with same ID (one in jemaah tab), pick the one in body (global)
   const allModals = document.querySelectorAll('#attachmentPreviewModal');
   if(allModals.length > 1){
-    // The global one is the last one in DOM (in index.html footer) or the one not inside modul-jemaah-umrah
     for(let m of allModals){
       if(!m.closest('#modul-jemaah-umrah')){
         modal = m;
@@ -909,8 +906,8 @@ window.openTripPreviewModal = function(url, title){
   }
   modal.classList.remove('hidden');
   modal.style.display = 'flex';
-  // Ensure modal is on top of everything
   modal.style.zIndex = '9999';
+  document.body.style.overflow = 'hidden'; // prevent background scroll
 };
 
 window.closePreviewModal = function(){
@@ -919,22 +916,43 @@ window.closePreviewModal = function(){
     m.style.display = 'none';
     const img = m.querySelector('#previewImage');
     const pdf = m.querySelector('#previewPdf');
-    if(img) img.src = '';
-    if(pdf) pdf.src = '';
+    if(img){ img.src = ''; img.classList.add('hidden'); }
+    if(pdf){ pdf.src = ''; pdf.classList.add('hidden'); }
   });
+  document.body.style.overflow = '';
 };
 
-// Override the jemaah version to use global
-const originalOpenPreview = window.openPreviewModal;
 window.openPreviewModal = function(url, title){
-  // Always call our global trip version to avoid tab switch
   return window.openTripPreviewModal(url, title);
 };
 
-// Close when click backdrop
+// Close on backdrop click - click outside box
 document.addEventListener('click', function(e){
-  if(e.target && e.target.id === 'attachmentPreviewModal'){
-    window.closePreviewModal();
+  const modals = document.querySelectorAll('#attachmentPreviewModal');
+  modals.forEach(modal=>{
+    if(!modal.classList.contains('hidden')){
+      // If click is directly on the modal backdrop (not inner content)
+      if(e.target === modal){
+        window.closePreviewModal();
+      }
+      // Also check if click is outside the inner content box
+      const contentBox = modal.querySelector('.relative, .bg-white, .max-w-4xl, .rounded-3xl');
+      if(contentBox && !contentBox.contains(e.target) && modal.contains(e.target) && e.target !== contentBox){
+        // If clicked on backdrop area
+        if(e.target === modal || e.target.classList.contains('bg-black') || e.target.classList.contains('bg-slate-950')){
+          window.closePreviewModal();
+        }
+      }
+    }
+  });
+});
+
+// Close on ESC key
+document.addEventListener('keydown', function(e){
+  if(e.key === 'Escape'){
+    const anyOpen = Array.from(document.querySelectorAll('#attachmentPreviewModal')).some(m=> !m.classList.contains('hidden'));
+    if(anyOpen) window.closePreviewModal();
   }
 });
+
 
