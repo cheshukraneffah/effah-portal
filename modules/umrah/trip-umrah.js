@@ -419,43 +419,120 @@ function printTripManifest(){
 
 async function exportTripPdf(){
   const fileName = (selectedTripRecord ? cleanTripName(selectedTripRecord.fields['Trip']||'manifest') : 'manifest').replace(/[^a-z0-9\-_]/gi,'_') + '.pdf';
-  // Check if html2pdf is loaded, if not load it
-  if(typeof html2pdf === 'undefined'){
-    // Load html2pdf dynamically
-    await new Promise((resolve, reject)=>{
-      const s=document.createElement('script');
-      s.src='https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js';
-      s.onload=resolve;
-      s.onerror=reject;
-      document.head.appendChild(s);
-    });
+  
+  // Load jsPDF + autoTable if needed
+  const loadScript = (src)=> new Promise((res, rej)=>{
+    if(document.querySelector(`script[src="${src}"]`)) return res();
+    const s=document.createElement('script'); s.src=src; s.onload=res; s.onerror=rej; document.head.appendChild(s);
+  });
+  
+  if(typeof window.jspdf === 'undefined' || typeof window.jspdf.jsPDF === 'undefined'){
+    await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
   }
-  // Create hidden container for PDF content (without buttons)
-  const htmlContent = buildTripManifestHTML(false);
-  const container = document.createElement('div');
-  container.style.position='fixed';
-  container.style.left='-9999px';
-  container.style.top='0';
-  container.style.width='1100px';
-  container.innerHTML = htmlContent;
-  document.body.appendChild(container);
-  const element = container.querySelector('#manifestContent');
-  const opt = {
-    margin: [10, 10, 10, 10],
-    filename: fileName,
-    image: { type: 'jpeg', quality: 0.98 },
-    html2canvas: { scale: 2, useCORS: true },
-    jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' }
-  };
-  try{
-    await html2pdf().set(opt).from(element).save();
-  }catch(e){
-    console.error('PDF export failed', e);
-    // Fallback to print
-    printTripManifest();
-  } finally {
-    document.body.removeChild(container);
+  if(typeof window.jspdf.jsPDF !== 'undefined' && typeof window.jspdf.jsPDF.API.autoTable === 'undefined'){
+    await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js');
   }
+
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+  
+  // Header info from trip
+  if(!selectedTripRecord){ alert('No trip selected'); return; }
+  const f = selectedTripRecord.fields;
+  const rawTrip = f['Trip'] || f['NAME'] || 'TBC';
+  const displayTitle = cleanTripName(rawTrip);
+  const sektor = f['Sektor'] || '-';
+  const mutawwif = f['Mutawwif/Pengiring'] || '-';
+  const tempoh = f['Tempoh Pakej'] || '-';
+  const flight = f['Penerbangan'] || '-';
+  const total = currentTripJemaahList.length;
+  const gb = getGenderBreakdown();
+
+  // Title
+  doc.setFont('helvetica','bold');
+  doc.setFontSize(9);
+  doc.setTextColor(30, 64, 175);
+  doc.text('MAKLUMAT TRIP & PENERBANGAN', 14, 12);
+  doc.setFontSize(14);
+  doc.setTextColor(15, 23, 42);
+  doc.text(displayTitle, 14, 20);
+
+  // Info grid - draw as text
+  doc.setFontSize(7);
+  doc.setTextColor(100, 116, 139);
+  doc.setFont('helvetica','normal');
+  let y = 26;
+  doc.text('Sektor', 14, y);
+  doc.text('Mutawwif / Pengiring', 50, y);
+  doc.text('Tempoh Pakej', 110, y);
+  doc.text('Penerbangan (Flight)', 145, y);
+  doc.text('Total Jemaah', 200, y);
+  y+=4;
+  doc.setFont('helvetica','bold');
+  doc.setFontSize(9);
+  doc.setTextColor(15, 23, 42);
+  doc.text(sektor, 14, y);
+  doc.text(mutawwif.substring(0,30), 50, y);
+  doc.text(tempoh, 110, y);
+  doc.text(flight, 145, y);
+  doc.text(total + ' orang', 200, y);
+
+  y+=8;
+  doc.setDrawColor(226, 232, 240);
+  doc.setLineWidth(0.2);
+  doc.line(14, y, 283, y);
+  y+=4;
+  doc.setFontSize(8);
+  doc.setFont('helvetica','bold');
+  doc.text('Gender breakdown:   Male: '+gb.male+'   Female: '+gb.female+'   Male Kids: '+gb.maleKids+'   Female Kids: '+gb.femaleKids, 14, y);
+
+  y+=6;
+  // Table data
+  const tableHead = [['#', 'Nama Jemaah', 'Gender', 'Passport No.', 'Date Issue', 'Date Expire', 'DOB', 'Age', 'IC No.', 'Nationality']];
+  const tableBody = currentTripJemaahList.map((j, idx)=>{
+    const jf=j.fields;
+    return [
+      idx+1,
+      (jf['NAME']||'').toString(),
+      (jf['GENDER']||''),
+      (jf['PASSPORT NO.']||''),
+      formatDateMY(jf['DATE OF ISSUE']||jf['Date Issue']||jf['ISSUE DATE']||''),
+      formatDateMY(jf['DATE OF EXPIRE']||jf['Date Expire']||jf['EXPIRY DATE']||''),
+      formatDateMY(jf['DOB']||jf['DATE OF BIRTH']||''),
+      (jf['AGE']||''),
+      (jf['IC NO.']||jf['IC']||''),
+      (jf['NATIONALITY']||'MALAYSIA')
+    ];
+  });
+
+  doc.autoTable({
+    startY: y+2,
+    head: tableHead,
+    body: tableBody,
+    theme: 'grid',
+    styles: { font: 'helvetica', fontSize: 8, cellPadding: 2, lineColor: [203,213,225], lineWidth: 0.2 },
+    headStyles: { fillColor: [241,245,249], textColor: [51,65,85], fontStyle: 'bold', fontSize: 8 },
+    columnStyles: {
+      0: { cellWidth: 8, halign: 'center' },
+      1: { cellWidth: 45 },
+      2: { cellWidth: 18 },
+      3: { cellWidth: 28 },
+      4: { cellWidth: 22 },
+      5: { cellWidth: 22 },
+      6: { cellWidth: 22 },
+      7: { cellWidth: 16 },
+      8: { cellWidth: 32 },
+      9: { cellWidth: 22 }
+    },
+    didDrawPage: function(data){
+      // Footer page number
+      doc.setFontSize(7);
+      doc.setTextColor(150);
+      doc.text('Page ' + doc.internal.getNumberOfPages(), 270, 195);
+    }
+  });
+
+  doc.save(fileName);
 }
 
 // ===== FIX V13: GLOBAL PREVIEW MODAL + CLOSE BUTTON + OUTSIDE CLICK =====
