@@ -346,12 +346,15 @@ function renderTripDetailForm(rec) {
         <div class="bg-white rounded-2xl border border-slate-200/80 shadow-2xs p-6 md:p-8">
             <div class="flex flex-col sm:flex-row justify-between sm:items-center mb-5 gap-3">
                 <h3 class="font-extrabold text-base text-slate-900 tracking-tight">DATA JEMAAH UMRAH</h3>
-                <div class="flex items-center space-x-2 text-xs">
-                    <span class="text-slate-400 font-medium">Filter | Sort</span>
-                    <button class="bg-slate-900 text-white font-bold px-3.5 py-2 rounded-xl hover:bg-black transition text-xs flex items-center">
-                        <i class="fa-solid fa-plus mr-1.5"></i> Add customer
-                    </button>
-                </div>
+                <div class="flex items-center gap-2">
+                        <div class="relative">
+                            <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-slate-400 text-[10px]"></i>
+                            <input type="text" onkeyup="if(typeof filterTripDetailJemaah==='function'){filterTripDetailJemaah(this.value)} else { const v=this.value.toLowerCase(); document.querySelectorAll('#tripJemaahTableBody tr').forEach(tr=>{ tr.style.display = tr.textContent.toLowerCase().includes(v) ? '' : 'none'; }); }" placeholder="Search..." class="pl-8 pr-3 py-2 border border-slate-200 rounded-xl text-xs bg-slate-50 focus:bg-white focus:outline-none focus:ring-1 focus:ring-slate-300 w-32 md:w-48">
+                        </div>
+                        <button onclick="if(typeof openAddJemaahModal==='function'){ openAddJemaahModal(selectedTripRecord ? selectedTripRecord.fields['Trip'] : null); } else { alert('Buka tab Maklumat Jemaah sekali untuk load modal'); switchTab('jemaah-umrah'); }" class="bg-slate-900 text-white font-bold px-3.5 py-2 rounded-xl hover:bg-black transition text-xs flex items-center shadow-xs">
+                            <i class="fa-solid fa-plus mr-1.5"></i> Add customer
+                        </button>
+                    </div>
             </div>
 
             <div class="overflow-x-auto border border-slate-200/80 rounded-xl">
@@ -642,3 +645,39 @@ function filterTripSidebar() {
     });
     renderTripSidebarList(filtered);
 }
+
+
+// FIX: Search & Add customer integration for Trip Umrah detail
+function filterTripDetailJemaah(q){
+  const query = (q||'').toLowerCase();
+  const rows = document.querySelectorAll('#tripJemaahTableBody tr, #jemaahTableBody tr');
+  rows.forEach(tr=>{
+    const txt = tr.textContent.toLowerCase();
+    tr.style.display = txt.includes(query) ? '' : 'none';
+  });
+}
+function searchTripJemaah(q){ filterTripDetailJemaah(q); }
+
+// Ensure openAddJemaahModal can prefill trip if passed
+(function(){
+  const orig = window.openAddJemaahModal;
+  if(orig && !orig._patched){
+    window.openAddJemaahModal = function(prefillTrip){
+      orig();
+      if(prefillTrip){
+        setTimeout(()=>{
+          const tripInput = document.querySelector('[name="Trip"], #jemaahTripInput, input[placeholder*="Trip"]');
+          if(tripInput) tripInput.value = prefillTrip;
+          // try select
+          const selects = document.querySelectorAll('select');
+          selects.forEach(sel=>{
+            const opts = Array.from(sel.options);
+            const match = opts.find(o=> o.textContent.trim().toLowerCase() === String(prefillTrip).trim().toLowerCase() || o.value.trim().toLowerCase() === String(prefillTrip).trim().toLowerCase());
+            if(match) sel.value = match.value;
+          });
+        }, 300);
+      }
+    };
+    window.openAddJemaahModal._patched = true;
+  }
+})();
