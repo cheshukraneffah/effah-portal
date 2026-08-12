@@ -55,6 +55,20 @@
 
 
     <style>
+    
+    /* FINAL STICKY NAVBAR - Effah Travel */
+    #topNavbar {
+        position: sticky !important;
+        top: 0 !important;
+        z-index: 100 !important;
+        background: rgba(255,255,255,0.92) !important;
+        backdrop-filter: blur(20px) !important;
+        -webkit-backdrop-filter: blur(20px) !important;
+    }
+    /* Ensure main content scrolls but header stays */
+    main { overflow-y: auto !important; }
+    #topNavbar { position: sticky !important; }
+    
     /* STICKY TOPBAR FIX - stay on top when scroll */
     header, .topbar, #topbar, .main-header {
         position: sticky !important;
@@ -121,7 +135,7 @@
                 <nav class="p-4 space-y-1.5 text-xs font-semibold">
                     
                     <a href="#" onclick="switchTab('home')" id="nav-home" class="nav-link flex items-center space-x-3 px-3.5 py-3 rounded-xl transition text-white bg-slate-800/80">
-                        <i class="fa-solid fa-table-cells-large w-5 text-emerald-400"></i>
+                        <i class="fa-solid fa-house w-5 text-emerald-400"></i>
                         <span>Utama & Overview</span>
                     </a>
 
@@ -181,7 +195,7 @@
         <main class="flex-1 flex flex-col min-w-0 overflow-y-auto">
             
             <!-- Breadcrumb Header dengan Sidebar Collapse Button -->
-<header class="bg-white border-b border-slate-200/80 px-6 py-4 flex items-center justify-between sticky top-0 z-30" style="position:sticky;top:0;z-index:40;background:rgba(255,255,255,0.95);backdrop-filter:blur(16px);border-bottom:1px solid #e2e8f0;">
+<header id="topNavbar" class="bg-white/90 backdrop-blur-xl border-b border-slate-200/80 px-6 py-4 flex items-center justify-between sticky top-0 z-50" style="position:sticky;top:0;z-index:100;background:rgba(255,255,255,0.92);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-bottom:1px solid #e2e8f0;box-shadow:0 1px 3px rgba(0,0,0,0.05);">
     <div class="flex items-center space-x-3">
         <!-- Butang Toggle Sidebar Desktop & Mobile -->
         <button id="sidebarToggleBtn" onclick="toggleSidebar()" class="text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 w-9 h-9 rounded-xl flex items-center justify-center transition focus:outline-none" title="Sorok/Tunjuk Sidebar">
@@ -351,7 +365,7 @@
     </div>
 </div>
 
-    <!-- SCRIPT MODULES LOADING - FINAL CLEAN ORDER -->
+    <!-- SCRIPT MODULES LOADING -->
     <script src="js/config.js"></script>
     <script src="js/auth.js"></script>
     <script src="js/router.js"></script>
@@ -360,13 +374,15 @@
     <script src="modules/umrah/jemaah-umrah.js"></script>
     <script src="modules/umrah/rooming.js"></script>
 
+
+
 <script>
-// FINAL: Status API Online hijau - clean version
+// FINAL: Status API Online hijau - clean single version
 (function(){
   function setOnline(){
     var badge = document.getElementById('apiStatusBadge');
     if(!badge) return;
-    var pat = window.AIRTABLE_PAT || localStorage.getItem('effah_api_pat');
+    var pat = window.AIRTABLE_PAT || localStorage.getItem('effah_api_pat') || localStorage.getItem('effah_pat');
     var base = window.AIRTABLE_BASE_ID || localStorage.getItem('effah_base_id');
     if(pat && base){
       badge.textContent = 'Online';
@@ -382,8 +398,6 @@
   });
   setInterval(setOnline, 3000);
   window.setApiOnline = setOnline;
-  window.addEventListener('tripLoaded', setOnline);
-  window.addEventListener('jemaahLoaded', setOnline);
 })();
 </script>
 
