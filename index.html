@@ -342,11 +342,11 @@
                 </button>
             </div>
         </div>
-        <div class="flex-1 bg-slate-950 flex items-center justify-center overflow-hidden relative p-0">
+        <div class="flex-1 bg-black flex justify-center items-start overflow-auto relative p-2" style="min-height:0;">
             <img id="previewImage" src="" alt="" 
-                 class="hidden max-w-full max-h-full object-contain mx-auto" style="max-height: calc(90vh - 60px);" />
+                 class="hidden max-w-full h-auto object-contain mx-auto my-auto" style="max-width: 100%; display:none;" />
             <iframe id="previewPdf" src="" 
-                    class="hidden w-full h-full border-0 bg-white"></iframe>
+                    class="hidden w-full h-full border-0 bg-white min-h-[70vh]"></iframe>
         </div>
     </div>
 </div>
@@ -416,19 +416,38 @@
     let pdfMode = false;
     if(lowerUrl.includes('.pdf') || lowerTitle.includes('.pdf')) pdfMode = true;
     else if(lowerUrl.match(/\.(jpg|jpeg|png|gif|webp)(\?|$)/)) pdfMode = false;
-    else if(lowerTitle.includes('visa') || lowerTitle.includes('passport')) pdfMode = true;
+    else if(lowerTitle.includes('visa') || lowerTitle.includes('passport') || lowerTitle.includes('picture')) pdfMode = false;
     
-    // Reset both
-    if(img){ img.classList.add('hidden'); img.style.display='none'; img.removeAttribute('src'); }
-    if(pdf){ pdf.classList.add('hidden'); pdf.style.display='none'; pdf.src='about:blank'; }
+    // Reset both completely
+    if(img){ 
+      img.classList.add('hidden'); 
+      img.style.display='none'; 
+      img.style.width='auto';
+      img.style.height='auto';
+      img.removeAttribute('src'); 
+    }
+    if(pdf){ 
+      pdf.classList.add('hidden'); 
+      pdf.style.display='none'; 
+      pdf.src='about:blank'; 
+    }
     
     if(pdfMode){
-      if(pdf){ pdf.src = url; pdf.classList.remove('hidden'); pdf.style.display='block'; }
+      if(pdf){ 
+        pdf.src = url; 
+        pdf.classList.remove('hidden'); 
+        pdf.style.display='block';
+        pdf.style.width='100%';
+        pdf.style.height='100%';
+      }
     } else {
       if(img){ 
         img.src = url; 
         img.classList.remove('hidden'); 
         img.style.display='block';
+        img.style.maxWidth='100%';
+        img.style.height='auto';
+        img.style.margin='auto';
         img.onerror = function(){ this.style.display='none'; };
       }
     }
