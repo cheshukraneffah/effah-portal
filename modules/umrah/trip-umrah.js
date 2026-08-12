@@ -121,11 +121,24 @@ function normalizeDashFormat(str) {
 
 // Fetch Data dari Airtable dengan Sorting
 async function fetchTripUmrahData() {
-    // REFRESH PAT
-    if(typeof AIRTABLE_PAT === 'undefined' || !AIRTABLE_PAT) { AIRTABLE_PAT = window.AIRTABLE_PAT || localStorage.getItem('effah_api_pat') || ''; AIRTABLE_BASE_ID = window.AIRTABLE_BASE_ID || localStorage.getItem('effah_base_id') || ''; }
-    AIRTABLE_PAT = window.AIRTABLE_PAT || localStorage.getItem('effah_api_pat') || AIRTABLE_PAT || ''; AIRTABLE_BASE_ID = window.AIRTABLE_BASE_ID || localStorage.getItem('effah_base_id') || AIRTABLE_BASE_ID || '';
+    // AUTO-FILL PAT FINAL - takde alert lagi
+    try{
+      if(typeof AIRTABLE_PAT === 'undefined' || !AIRTABLE_PAT){
+        AIRTABLE_PAT = window.AIRTABLE_PAT || localStorage.getItem('effah_api_pat') || window.DEFAULT_PAT || 'patjxZg6G22e9OBuS.2a96ced64af7e931ee4d83f65c491adf1241813547d5d8e3a317f5bc6d9a8de7';
+        AIRTABLE_BASE_ID = window.AIRTABLE_BASE_ID || localStorage.getItem('effah_base_id') || window.DEFAULT_BASE_ID || 'appSsn4JyQD4DnYu0';
+      }
+      // sync dari window/default
+      AIRTABLE_PAT = window.AIRTABLE_PAT || localStorage.getItem('effah_api_pat') || AIRTABLE_PAT || window.DEFAULT_PAT || 'patjxZg6G22e9OBuS.2a96ced64af7e931ee4d83f65c491adf1241813547d5d8e3a317f5bc6d9a8de7';
+      AIRTABLE_BASE_ID = window.AIRTABLE_BASE_ID || localStorage.getItem('effah_base_id') || AIRTABLE_BASE_ID || window.DEFAULT_BASE_ID || 'appSsn4JyQD4DnYu0';
+      window.AIRTABLE_PAT = AIRTABLE_PAT;
+      window.AIRTABLE_BASE_ID = AIRTABLE_BASE_ID;
+      localStorage.setItem('effah_api_pat', AIRTABLE_PAT);
+      localStorage.setItem('effah_base_id', AIRTABLE_BASE_ID);
+      if(typeof updateApiStatusBadge === 'function') updateApiStatusBadge();
+      if(typeof setApiOnline === 'function') setApiOnline();
+    }catch(e){ console.warn('PAT auto-fill warning', e); }
     if (!AIRTABLE_PAT || !AIRTABLE_BASE_ID) {
-        alert('Sila tetapkan API Token & Base ID di Settings API terlebih dahulu.');
+        console.warn('PAT/Base missing, abort fetchTrip');
         return;
     }
 
