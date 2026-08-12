@@ -55,25 +55,6 @@
 
 
     <style>
-    
-    
-    /* FORCE STICKY NAVBAR V2 - fixed wrapper */
-    .sticky.top-0.z-\[100\] { position: sticky !important; top: 0 !important; z-index: 100 !important; }
-    #topNavbar { display: flex !important; min-height: 64px; }
-
-    /* FINAL FIX - Top Navbar always sticky + visible */
-    #topNavbar {
-        position: sticky !important;
-        top: 0 !important;
-        z-index: 100 !important;
-        display: flex !important;
-        visibility: visible !important;
-        opacity: 1 !important;
-        background: rgba(255,255,255,0.92) !important;
-        backdrop-filter: blur(20px) !important;
-    }
-    main { position: relative; }
-
     /* STICKY TOPBAR FIX - stay on top when scroll */
     header, .topbar, #topbar, .main-header {
         position: sticky !important;
@@ -198,12 +179,18 @@
 
         <!-- MAIN WORKSPACE CONTENT (BELAH KANAN) -->
         <main class="flex-1 flex flex-col min-w-0 h-screen overflow-y-auto relative">
-            <!-- TOP NAVBAR - FIXED STICKY -->
             <div class="sticky top-0 z-[100] w-full">
-
+<header id="topNavbar" class="bg-white/90 backdrop-blur-xl border-b border-slate-200/80 px-6 py-4 flex items-center justify-between shadow-sm" style="position:sticky;top:0;z-index:100;background:rgba(255,255,255,0.92);backdrop-filter:blur(20px);">
+    <div class="flex items-center space-x-3">
+        <button onclick="toggleSidebar()" class="bg-slate-100 w-9 h-9 rounded-xl"><i class="fa-solid fa-bars-staggered"></i></button>
+        <div class="text-xs font-semibold text-slate-400 flex items-center space-x-2"><span>Sistem Effah Travel</span><span>/</span><span id="breadcrumbCurrent" class="text-slate-800 font-bold">Overview</span></div>
+    </div>
+    <button onclick="logoutPortal()" class="text-xs bg-slate-100 px-3 py-1.5 rounded-xl font-bold"><i class="fa-solid fa-lock mr-1"></i> Kunci</button>
+</header>
+            </div>
             
             <!-- Breadcrumb Header dengan Sidebar Collapse Button -->
-<header id="topNavbar" class="bg-white/90 backdrop-blur-xl border-b border-slate-200/80 px-6 py-4 flex items-center justify-between sticky top-0 z-50 shadow-sm" style="position:sticky;top:0;z-index:100;background:rgba(255,255,255,0.92);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);">
+<header class="bg-white border-b border-slate-200/80 px-6 py-4 flex items-center justify-between sticky top-0 z-30" style="position:sticky;top:0;z-index:40;background:rgba(255,255,255,0.95);backdrop-filter:blur(16px);border-bottom:1px solid #e2e8f0;">
     <div class="flex items-center space-x-3">
         <!-- Butang Toggle Sidebar Desktop & Mobile -->
         <button id="sidebarToggleBtn" onclick="toggleSidebar()" class="text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 w-9 h-9 rounded-xl flex items-center justify-center transition focus:outline-none" title="Sorok/Tunjuk Sidebar">
@@ -221,7 +208,6 @@
         <i class="fa-solid fa-lock mr-1"></i> Kunci
     </button>
 </header>
-            </div>
 
             <div class="p-6 md:p-8 space-y-6 max-w-7xl w-full mx-auto">
 
@@ -374,7 +360,7 @@
     </div>
 </div>
 
-    <!-- SCRIPT MODULES LOADING - FINAL CLEAN ORDER -->
+    <!-- SCRIPT MODULES LOADING -->
     <script src="js/config.js"></script>
     <script src="js/auth.js"></script>
     <script src="js/router.js"></script>
@@ -383,30 +369,80 @@
     <script src="modules/umrah/jemaah-umrah.js"></script>
     <script src="modules/umrah/rooming.js"></script>
 
+
+
 <script>
-// FINAL: Status API Online hijau - clean version
+// FIX: Update Status API badge jadi Online bila data berjaya load
+(function(){
+    function updateApiStatus(online){
+        const badges = document.querySelectorAll('[id*="statApi"], [id*="StatusAPI"], .status-api');
+        const el = document.getElementById('statusApiBadge') || document.querySelector('[class*="Status API"]') || document.body.querySelector('div:has(> span:contains("Offline"))');
+        // Cari element yang ada text Offline di sidebar bawah
+        const sidebarStatus = document.querySelector('#sidebarStatus, #apiStatusBadge');
+        // Simple: cari semua element yang ada text Offline
+        document.querySelectorAll('*').forEach(el=>{
+            if(el.textContent && el.textContent.trim() === 'Offline' && el.tagName === 'SPAN'){
+                if(online){
+                    el.textContent = 'Online';
+                    el.className = el.className.replace('rose','emerald').replace('red','emerald');
+                    el.style.background = '#10b981';
+                    el.style.color = 'white';
+                }
+            }
+        });
+    }
+    // Hook ke fetch success
+    const origFetchJemaah = window.fetchJemaahUmrahData;
+    const origFetchTrip = window.fetchTripUmrahData;
+    window.addEventListener('jemaahLoaded', ()=> updateApiStatus(true));
+    window.addEventListener('tripLoaded', ()=> updateApiStatus(true));
+    // Polling fallback
+    setInterval(()=>{
+        if(typeof allJemaahUmrahRecords !== 'undefined' && allJemaahUmrahRecords.length > 0){
+            updateApiStatus(true);
+            // Update dashboard stats juga
+            const statJemaah = document.getElementById('statJemaahCount');
+            if(statJemaah) statJemaah.textContent = allJemaahUmrahRecords.length;
+            const statTrip = document.getElementById('statUmrahCount');
+            if(statTrip && typeof allTripUmrahRecords !== 'undefined'){
+                const valid = allTripUmrahRecords.filter(r=> {
+                    const t = r.fields['Trip'] || '';
+                    return t && !t.includes('TBC');
+                });
+                statTrip.textContent = valid.length || allTripUmrahRecords.length;
+            }
+        }
+    }, 1500);
+})();
+</script>
+
+
+<script>
+// FIX: Status API Online hijau - Effah Travel
 (function(){
   function setOnline(){
     var badge = document.getElementById('apiStatusBadge');
     if(!badge) return;
-    var pat = window.AIRTABLE_PAT || localStorage.getItem('effah_api_pat');
+    var pat = window.AIRTABLE_PAT || localStorage.getItem('effah_api_pat') || localStorage.getItem('effah_pat');
     var base = window.AIRTABLE_BASE_ID || localStorage.getItem('effah_base_id');
     if(pat && base){
       badge.textContent = 'Online';
-      badge.className = 'text-[10px] px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30';
       badge.style.background = '#dcfce7';
       badge.style.color = '#16a34a';
       badge.style.borderColor = '#86efac';
+      badge.style.borderWidth = '1px';
+      badge.style.borderStyle = 'solid';
+      badge.classList.remove('bg-rose-500/20','text-rose-400','border-rose-500/30');
+      badge.classList.add('bg-emerald-500/20','text-emerald-600');
     }
   }
   document.addEventListener('DOMContentLoaded', function(){
-    setTimeout(setOnline, 500);
-    setTimeout(setOnline, 1500);
+    setTimeout(setOnline, 300);
+    setTimeout(setOnline, 1000);
+    setTimeout(setOnline, 2000);
   });
-  setInterval(setOnline, 3000);
+  setInterval(setOnline, 2000);
   window.setApiOnline = setOnline;
-  window.addEventListener('tripLoaded', setOnline);
-  window.addEventListener('jemaahLoaded', setOnline);
 })();
 </script>
 
