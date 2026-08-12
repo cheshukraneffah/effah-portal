@@ -395,10 +395,10 @@ function renderTripDetailForm(rec) {
                                     <td class="p-3 text-center text-slate-400 font-bold">${idx + 1}</td>
                                     <td class="p-3 font-bold text-slate-900 uppercase">${jf['NAME'] || '-'}</td>
                                     <td class="p-3">
-                                        ${pic ? `<img src="${pic}" class="w-9 h-9 rounded-lg object-cover border border-slate-200">` : `<div class="w-9 h-9 bg-slate-100 rounded-lg flex items-center justify-center text-slate-400"><i class="fa-solid fa-user"></i></div>`}
+                                        ${pic ? `<img src="${pic}" onclick="openPreviewModal('${pic}', '${(jf['NAME']||'').replace(/'/g, '')} - PICTURE')" class="w-9 h-9 rounded-lg object-cover border border-slate-200 cursor-pointer hover:scale-110 transition" title="Click to preview">` : `<div class="w-9 h-9 bg-slate-100 rounded-lg flex items-center justify-center text-slate-400"><i class="fa-solid fa-user"></i></div>`}
                                     </td>
                                     <td class="p-3">
-                                        ${passCopy ? `<a href="${passCopy}" target="_blank" class="text-sky-600 underline font-semibold flex items-center"><i class="fa-solid fa-file-pdf mr-1"></i> View Copy</a>` : `<span class="text-slate-300">-</span>`}
+                                        ${passCopy ? `<button onclick="openPreviewModal('${passCopy}', '${(jf['NAME']||'').replace(/'/g, '')} - PASSPORT COPY')" class="text-sky-600 hover:text-sky-800 underline font-semibold flex items-center text-xs"><i class="fa-solid fa-file-pdf mr-1"></i> View Copy</button>` : `<span class="text-slate-300">-</span>`}
                                     </td>
                                     <td class="p-3 font-mono font-bold text-slate-700">${jf['PASSPORT NO.'] || '-'}</td>
                                     <td class="p-3 text-slate-600">${jf['AGE'] || '-'}</td>
@@ -726,11 +726,24 @@ async function submitTripAddCustomer(e){
   const pat = window.AIRTABLE_PAT || localStorage.getItem('effah_api_pat');
   const base = window.AIRTABLE_BASE_ID || localStorage.getItem('effah_base_id');
   if(!pat || !base){ alert('API not set'); return; }
+  // FIX: Use correct field name TRIP as linked record ID, not "Trip" string
+  const tripId = (typeof selectedTripRecord !== 'undefined' && selectedTripRecord) ? selectedTripRecord.id : null;
+  if(!tripId){
+    // fallback if TBC selected - no linked ID, try create without trip or with Trip Name if needed
+    console.warn('No trip ID, creating without TRIP link');
+  }
   try{
+    const fieldsPayload = { 'NAME': name.toUpperCase(), 'IC NO.': ic || null, 'PASSPORT NO.': passport || null };
+    if(tripId){
+      fieldsPayload['TRIP'] = [tripId];
+    } else if(trip){
+      // if TBC or no ID, try Trip text field if exists as fallback, but primary is TRIP linked
+      fieldsPayload['Trip'] = trip;
+    }
     const res = await fetch(`https://api.airtable.com/v0/${base}/DATA%20JEMAAH%20UMRAH`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${pat}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ fields: { 'NAME': name.toUpperCase(), 'IC NO.': ic || null, 'PASSPORT NO.': passport || null, 'Trip': trip } })
+      body: JSON.stringify({ fields: fieldsPayload })
     });
     if(res.ok){
       closeTripAddCustomerModal();
@@ -787,8 +800,8 @@ function sortTripJemaahBy(field){
       <tr class="hover:bg-slate-50/80 transition">
         <td class="p-3 text-center text-slate-400 font-bold">${idx + 1}</td>
         <td class="p-3 font-bold text-slate-900 uppercase">${jf['NAME'] || '-'}</td>
-        <td class="p-3">${pic ? `<img src="${pic}" class="w-9 h-9 rounded-lg object-cover border border-slate-200">` : `<div class="w-9 h-9 bg-slate-100 rounded-lg flex items-center justify-center text-slate-400"><i class="fa-solid fa-user"></i></div>`}</td>
-        <td class="p-3">${passCopy ? `<a href="${passCopy}" target="_blank" class="text-sky-600 underline font-semibold flex items-center"><i class="fa-solid fa-file-pdf mr-1"></i> View Copy</a>` : `<span class="text-slate-300">-</span>`}</td>
+        <td class="p-3">${pic ? `<img src="${pic}" onclick="openPreviewModal('${pic}', '${(jf['NAME']||'').replace(/'/g, '')} - PICTURE')" class="w-9 h-9 rounded-lg object-cover border border-slate-200 cursor-pointer hover:scale-110 transition" title="Click to preview">` : `<div class="w-9 h-9 bg-slate-100 rounded-lg flex items-center justify-center text-slate-400"><i class="fa-solid fa-user"></i></div>`}</td>
+        <td class="p-3">${passCopy ? `<button onclick="openPreviewModal('${passCopy}', '${(jf['NAME']||'').replace(/'/g, '')} - PASSPORT COPY')" class="text-sky-600 hover:text-sky-800 underline font-semibold flex items-center text-xs"><i class="fa-solid fa-file-pdf mr-1"></i> View Copy</button>` : `<span class="text-slate-300">-</span>`}</td>
         <td class="p-3 font-mono font-bold text-slate-700">${jf['PASSPORT NO.'] || '-'}</td>
         <td class="p-3 text-slate-600">${jf['AGE'] || '-'}</td>
         <td class="p-3"><span class="text-[10px] font-bold px-2.5 py-0.5 rounded-md border uppercase ${genderBadge}">${jf['GENDER'] || '-'}</span></td>
@@ -806,4 +819,34 @@ function sortTripJemaahBy(field){
       el.textContent = '';
     }
   });
+}
+
+
+// Fallback preview modal if jemaah-umrah.js not loaded yet
+if(typeof window.openPreviewModal !== 'function'){
+  window.openPreviewModal = function(url, title){
+    const modal = document.getElementById('attachmentPreviewModal');
+    if(!modal){ window.open(url, '_blank'); return; }
+    const img = document.getElementById('previewImage');
+    const pdf = document.getElementById('previewPdf');
+    const titleEl = document.getElementById('previewTitle');
+    const dlBtn = document.getElementById('downloadAttachmentBtn');
+    if(titleEl) titleEl.textContent = title || 'Preview';
+    if(dlBtn) dlBtn.href = url;
+    const isPdf = url.toLowerCase().includes('.pdf');
+    if(img) img.classList.add('hidden');
+    if(pdf) pdf.classList.add('hidden');
+    if(isPdf){
+      if(pdf){ pdf.src = url; pdf.classList.remove('hidden'); }
+    } else {
+      if(img){ img.src = url; img.classList.remove('hidden'); }
+    }
+    modal.classList.remove('hidden');
+  };
+}
+if(typeof window.closePreviewModal !== 'function'){
+  window.closePreviewModal = function(){
+    const modal = document.getElementById('attachmentPreviewModal');
+    if(modal) modal.classList.add('hidden');
+  };
 }
