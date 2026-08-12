@@ -326,46 +326,28 @@
 
 <div id="attachmentPreviewModal" class="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 backdrop-blur-sm hidden p-4" onclick="if(event.target===this) closePreviewModal()">
     <div class="relative bg-white rounded-xl shadow-2xl w-full max-w-5xl h-[90vh] flex flex-col overflow-hidden">
-        
         <div class="flex items-center justify-between px-5 py-3 bg-white border-b border-slate-200 shrink-0">
-            <div class="flex items-center gap-2 flex-1 min-w-0">
-                <h3 id="previewTitle" class="text-sm font-bold text-slate-800 truncate">
-                    Pratonton Lampiran
-                </h3>
-                <button id="renameAttachmentBtn" onclick="renameCurrentAttachment()" class="ml-2 text-[11px] bg-slate-100 hover:bg-slate-200 border border-slate-200 px-2.5 py-1 rounded-lg font-bold flex items-center gap-1 shrink-0">
-                    <i class="fa-solid fa-pen text-[10px]"></i> Rename
-                </button>
-            </div>
+            <h3 id="previewTitle" class="text-sm font-bold text-slate-800 truncate flex-1 mr-3">
+                Pratonton Lampiran
+            </h3>
             <div class="flex items-center gap-2 shrink-0">
                 <a id="downloadAttachmentBtn" href="#" download target="_blank" 
                    class="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 transition">
                     <i class="fa-solid fa-download text-xs"></i>
                     Muat Turun
                 </a>
-                
                 <button onclick="closePreviewModal()" type="button" 
                         class="text-slate-400 hover:text-slate-700 p-2 rounded-lg hover:bg-slate-100 transition">
                     <i class="fa-solid fa-xmark text-lg"></i>
                 </button>
             </div>
         </div>
-
         <div class="flex-1 bg-slate-950 flex items-center justify-center overflow-hidden relative p-0">
             <img id="previewImage" src="" alt="" 
                  class="hidden max-w-full max-h-full object-contain mx-auto" style="max-height: calc(90vh - 60px);" />
-            
             <iframe id="previewPdf" src="" 
                     class="hidden w-full h-full border-0 bg-white"></iframe>
-            
-            <div id="previewFallback" class="hidden absolute inset-0 flex items-center justify-center text-slate-400 text-sm">
-                <div class="text-center">
-                    <i class="fa-solid fa-file-circle-question text-4xl mb-2"></i>
-                    <p>Preview tidak tersedia</p>
-                    <a id="fallbackDownload" href="#" target="_blank" class="mt-2 inline-block bg-white text-slate-800 px-3 py-1 rounded-lg text-xs font-bold">Buka di tab baru</a>
-                </div>
-            </div>
         </div>
-
     </div>
 </div>
 
@@ -406,10 +388,8 @@
 </script>
 
 <script>
-// ===== FINAL OVERRIDE V19: Preview Modal - Fixed layout + PDF + Image + Rename + Sticky Header =====
+// ===== FINAL OVERRIDE V20: Preview Modal - Fixed layout clean, no rename button =====
 (function(){
-  window.currentPreviewAttachment = null;
-
   function getGlobalModal(){
     const all = document.querySelectorAll('#attachmentPreviewModal');
     if(all.length === 0) return null;
@@ -421,71 +401,35 @@
     return all[0];
   }
 
-  window.openTripPreviewModal = function(url, title, extra){
+  window.openTripPreviewModal = function(url, title){
     const modal = getGlobalModal();
     if(!modal){ window.open(url, '_blank'); return; }
     const img = modal.querySelector('#previewImage');
     const pdf = modal.querySelector('#previewPdf');
-    const fallback = modal.querySelector('#previewFallback');
     const titleEl = modal.querySelector('#previewTitle');
     const dlBtn = modal.querySelector('#downloadAttachmentBtn');
-    const fallbackDl = modal.querySelector('#fallbackDownload');
-    
     if(titleEl) titleEl.textContent = title || 'Preview';
     if(dlBtn) dlBtn.href = url;
-    if(fallbackDl) fallbackDl.href = url;
-    
-    // Save current preview for rename
-    window.currentPreviewAttachment = {
-      url: url,
-      title: title,
-      recordId: extra && extra.recordId ? extra.recordId : null,
-      fieldName: extra && extra.fieldName ? extra.fieldName : null,
-      attachmentId: extra && extra.attachmentId ? extra.attachmentId : null,
-      filename: extra && extra.filename ? extra.filename : (title||'file')
-    };
     
     const lowerUrl = (url||'').toLowerCase();
     const lowerTitle = (title||'').toLowerCase();
-    
     let pdfMode = false;
-    // Robust detection
     if(lowerUrl.includes('.pdf') || lowerTitle.includes('.pdf')) pdfMode = true;
     else if(lowerUrl.match(/\.(jpg|jpeg|png|gif|webp)(\?|$)/)) pdfMode = false;
-    else if(lowerUrl.includes('airtableusercontent') && (lowerTitle.includes('visa') || lowerTitle.includes('passport') || lowerTitle.includes('pdf'))) {
-      // If title says pdf, pdfMode true, else check if url looks like image
-      pdfMode = lowerTitle.includes('.pdf') || !lowerUrl.match(/\.(jpg|jpeg|png)/);
-    }
+    else if(lowerTitle.includes('visa') || lowerTitle.includes('passport')) pdfMode = true;
     
-    // Reset
-    if(img){ 
-      img.classList.add('hidden'); 
-      img.style.display='none';
-      img.removeAttribute('src');
-    }
-    if(pdf){ 
-      pdf.classList.add('hidden'); 
-      pdf.style.display='none';
-      pdf.src='about:blank';
-    }
-    if(fallback) fallback.classList.add('hidden');
+    // Reset both
+    if(img){ img.classList.add('hidden'); img.style.display='none'; img.removeAttribute('src'); }
+    if(pdf){ pdf.classList.add('hidden'); pdf.style.display='none'; pdf.src='about:blank'; }
     
     if(pdfMode){
-      if(pdf){ 
-        pdf.src = url; 
-        pdf.classList.remove('hidden');
-        pdf.style.display='block';
-      }
+      if(pdf){ pdf.src = url; pdf.classList.remove('hidden'); pdf.style.display='block'; }
     } else {
       if(img){ 
         img.src = url; 
-        img.classList.remove('hidden');
+        img.classList.remove('hidden'); 
         img.style.display='block';
-        img.onerror = function(){
-          this.classList.add('hidden');
-          this.style.display='none';
-          if(fallback) fallback.classList.remove('hidden');
-        };
+        img.onerror = function(){ this.style.display='none'; };
       }
     }
     modal.classList.remove('hidden');
@@ -499,74 +443,14 @@
       m.style.display = 'none';
       const img = m.querySelector('#previewImage');
       const pdf = m.querySelector('#previewPdf');
-      const fb = m.querySelector('#previewFallback');
       if(img){ img.removeAttribute('src'); img.classList.add('hidden'); img.style.display='none'; }
       if(pdf){ pdf.src='about:blank'; pdf.classList.add('hidden'); pdf.style.display='none'; }
-      if(fb) fb.classList.add('hidden');
     });
     document.body.style.overflow = '';
-    window.currentPreviewAttachment = null;
   };
 
-  window.openPreviewModal = function(url, title, extra){
-    return window.openTripPreviewModal(url, title, extra);
-  };
-
-  window.renameCurrentAttachment = async function(){
-    const cur = window.currentPreviewAttachment;
-    if(!cur){ alert('Tiada file dipilih'); return; }
-    const oldName = cur.filename || cur.title || 'file';
-    const newName = prompt('Rename file:', oldName);
-    if(!newName || newName.trim()==='' || newName===oldName) return;
-    
-    const pat = window.AIRTABLE_PAT || localStorage.getItem('effah_api_pat');
-    const base = window.AIRTABLE_BASE_ID || localStorage.getItem('effah_base_id');
-    
-    if(!cur.recordId || !cur.fieldName || !cur.attachmentId){
-      // No Airtable info, just rename title locally
-      const titleEl = document.getElementById('previewTitle');
-      if(titleEl) titleEl.textContent = newName;
-      alert('Nama file di preview ditukar. Untuk rename kekal di Airtable, buka dari Maklumat Jemaah tab yang ada recordId.');
-      return;
-    }
-    
-    if(!pat || !base){ alert('API not set'); return; }
-    
-    // Determine table - try to guess from fieldName
-    let tableName = 'DATA JEMAAH UMRAH';
-    if(window.currentPreviewTable) tableName = window.currentPreviewTable;
-    
-    try{
-      // Airtable requires sending the attachment array with updated filename
-      // We need to keep id and filename
-      const payload = {
-        fields: {}
-      };
-      payload.fields[cur.fieldName] = [{ id: cur.attachmentId, filename: newName }];
-      
-      const url = `https://api.airtable.com/v0/${base}/${encodeURIComponent(tableName)}/${cur.recordId}`;
-      const res = await fetch(url, {
-        method: 'PATCH',
-        headers: { Authorization: `Bearer ${pat}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-      if(res.ok){
-        alert('✅ Berjaya rename kepada: ' + newName);
-        const titleEl = document.getElementById('previewTitle');
-        if(titleEl) titleEl.textContent = newName;
-        window.currentPreviewAttachment.filename = newName;
-        window.currentPreviewAttachment.title = newName;
-        // Refresh data if function exists
-        if(typeof fetchJemaahUmrahData === 'function') fetchJemaahUmrahData(true);
-      } else {
-        const err = await res.json();
-        console.error(err);
-        alert('Gagal rename: ' + (err.error?.message || 'unknown'));
-      }
-    } catch(e){
-      console.error(e);
-      alert('Error network semasa rename');
-    }
+  window.openPreviewModal = function(url, title){
+    return window.openTripPreviewModal(url, title);
   };
 
   document.addEventListener('keydown', function(e){
@@ -576,9 +460,8 @@
     }
   });
   
-  console.log('✅ V19 Modal override loaded - Fixed layout + PDF + Rename');
+  console.log('✅ V20 Modal clean - no rename, fixed layout');
 })();
-
 </script>
 
 </body>
