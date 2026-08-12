@@ -647,37 +647,159 @@ function filterTripSidebar() {
 }
 
 
-// FIX: Search & Add customer integration for Trip Umrah detail
-function filterTripDetailJemaah(q){
+
+
+// ===== FIX V5: GLOBAL ADD CUSTOMER MODAL FOR TRIP TAB =====
+function openTripAddCustomerModal(){
+  // Ensure modal exists in body (global)
+  let modal = document.getElementById('tripAddCustomerModal');
+  if(!modal){
+    const tripName = selectedTripRecord ? (selectedTripRecord.fields['Trip'] || '') : '';
+    modal = document.createElement('div');
+    modal.id = 'tripAddCustomerModal';
+    modal.className = 'fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-[200] flex items-center justify-center p-4';
+    modal.innerHTML = `
+      <div class="bg-white rounded-3xl shadow-2xl p-6 md:p-8 max-w-lg w-full border border-slate-100 animate-in fade-in zoom-in">
+        <div class="flex items-center justify-between pb-4 mb-4 border-b border-slate-100">
+          <div class="flex items-center space-x-2.5">
+            <div class="w-9 h-9 bg-emerald-50 text-emerald-700 rounded-xl flex items-center justify-center"><i class="fa-solid fa-user-plus"></i></div>
+            <div><h3 class="font-extrabold text-slate-900 text-base">Tambah Jemaah Baru</h3><p class="text-[11px] text-slate-500">${tripName ? 'Trip: '+tripName : 'Pilih Trip'}</p></div>
+          </div>
+          <button onclick="closeTripAddCustomerModal()" class="text-slate-400 hover:text-slate-700 p-1"><i class="fa-solid fa-xmark text-lg"></i></button>
+        </div>
+        <form onsubmit="submitTripAddCustomer(event)" class="space-y-3 text-xs">
+          <div><label class="block font-bold text-slate-700 mb-1">Nama Penuh *</label><input type="text" id="tripAddName" required class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-1 focus:ring-slate-400 focus:outline-none font-semibold"></div>
+          <div class="grid grid-cols-2 gap-3">
+            <div><label class="block font-bold text-slate-700 mb-1">No IC</label><input type="text" id="tripAddIC" class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none"></div>
+            <div><label class="block font-bold text-slate-700 mb-1">Passport No</label><input type="text" id="tripAddPassport" class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none"></div>
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div><label class="block font-bold text-slate-700 mb-1">No Tel</label><input type="text" id="tripAddPhone" class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none"></div>
+            <div><label class="block font-bold text-slate-700 mb-1">Trip</label><input type="text" id="tripAddTrip" value="${tripName}" readonly class="w-full p-2.5 bg-slate-100 border border-slate-200 rounded-xl font-bold text-slate-600"></div>
+          </div>
+          <div class="flex gap-3 pt-3">
+            <button type="button" onclick="closeTripAddCustomerModal()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2.5 rounded-xl">Batal</button>
+            <button type="submit" class="flex-1 bg-slate-900 hover:bg-black text-white font-bold py-2.5 rounded-xl shadow-xs"><i class="fa-solid fa-floppy-disk mr-1.5"></i> Simpan</button>
+          </div>
+        </form>
+      </div>
+    `;
+    document.body.appendChild(modal);
+    // close when click backdrop
+    modal.addEventListener('click', (e)=>{ if(e.target===modal) closeTripAddCustomerModal(); });
+  } else {
+    // update trip name
+    const tripName = selectedTripRecord ? (selectedTripRecord.fields['Trip'] || '') : '';
+    const inp = modal.querySelector('#tripAddTrip');
+    if(inp) inp.value = tripName;
+    const p = modal.querySelector('p.text-\[11px\]');
+    if(p) p.textContent = tripName ? 'Trip: '+tripName : 'Pilih Trip';
+    modal.classList.remove('hidden');
+  }
+}
+
+function closeTripAddCustomerModal(){
+  const modal = document.getElementById('tripAddCustomerModal');
+  if(modal) modal.classList.add('hidden');
+  // also remove to be safe after animation
+  setTimeout(()=>{ if(modal && modal.classList.contains('hidden')) modal.style.display='none'; }, 200);
+  // restore display for next open
+  setTimeout(()=>{ if(modal){ modal.style.display=''; modal.classList.remove('hidden'); } }, 210);
+  // Actually keep hidden class logic simple: just hide
+  if(modal){ modal.classList.add('hidden'); }
+}
+
+// Override to show modal even if hidden class present
+function openTripAddCustomerModalFixShow(){
+  let modal = document.getElementById('tripAddCustomerModal');
+  if(!modal){ openTripAddCustomerModal(); return; }
+  modal.classList.remove('hidden');
+  modal.style.display='flex';
+}
+
+function closeTripAddCustomerModal(){
+  const modal = document.getElementById('tripAddCustomerModal');
+  if(modal){ modal.classList.add('hidden'); modal.style.display='none'; }
+}
+
+function openTripAddCustomerModal(){
+  let modal = document.getElementById('tripAddCustomerModal');
+  const tripName = selectedTripRecord ? (selectedTripRecord.fields['Trip'] || '') : '';
+  if(!modal){
+    modal = document.createElement('div');
+    modal.id = 'tripAddCustomerModal';
+    modal.className = 'fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-[200] flex items-center justify-center p-4';
+    modal.innerHTML = `
+      <div class="bg-white rounded-3xl shadow-2xl p-6 md:p-8 max-w-lg w-full border border-slate-100">
+        <div class="flex items-center justify-between pb-4 mb-4 border-b border-slate-100">
+          <div class="flex items-center space-x-2.5">
+            <div class="w-9 h-9 bg-emerald-50 text-emerald-700 rounded-xl flex items-center justify-center"><i class="fa-solid fa-user-plus"></i></div>
+            <div><h3 class="font-extrabold text-slate-900 text-base">Tambah Jemaah Baru</h3><p class="text-[11px] text-slate-500">${tripName ? 'Trip: '+tripName : ''}</p></div>
+          </div>
+          <button onclick="closeTripAddCustomerModal()" class="text-slate-400 hover:text-slate-700 p-1"><i class="fa-solid fa-xmark text-lg"></i></button>
+        </div>
+        <form onsubmit="submitTripAddCustomer(event)" class="space-y-3 text-xs">
+          <div><label class="block font-bold text-slate-700 mb-1">Nama Penuh *</label><input type="text" id="tripAddName" required class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-1 focus:ring-slate-400 focus:outline-none font-semibold"></div>
+          <div class="grid grid-cols-2 gap-3">
+            <div><label class="block font-bold text-slate-700 mb-1">No IC</label><input type="text" id="tripAddIC" class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none"></div>
+            <div><label class="block font-bold text-slate-700 mb-1">Passport No</label><input type="text" id="tripAddPassport" class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none"></div>
+          </div>
+          <div><label class="block font-bold text-slate-700 mb-1">Trip</label><input type="text" id="tripAddTrip" value="${tripName}" readonly class="w-full p-2.5 bg-slate-100 border border-slate-200 rounded-xl font-bold text-slate-600"></div>
+          <div class="flex gap-3 pt-3">
+            <button type="button" onclick="closeTripAddCustomerModal()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2.5 rounded-xl">Batal</button>
+            <button type="submit" class="flex-1 bg-slate-900 hover:bg-black text-white font-bold py-2.5 rounded-xl shadow-xs">Simpan</button>
+          </div>
+        </form>
+      </div>
+    `;
+    document.body.appendChild(modal);
+    modal.addEventListener('click', (e)=>{ if(e.target===modal) closeTripAddCustomerModal(); });
+  } else {
+    modal.style.display='flex';
+    modal.classList.remove('hidden');
+    const inp = modal.querySelector('#tripAddTrip');
+    if(inp) inp.value = tripName;
+  }
+}
+
+async function submitTripAddCustomer(e){
+  e.preventDefault();
+  const name = document.getElementById('tripAddName')?.value.trim();
+  const ic = document.getElementById('tripAddIC')?.value.trim();
+  const passport = document.getElementById('tripAddPassport')?.value.trim();
+  const trip = document.getElementById('tripAddTrip')?.value.trim() || (selectedTripRecord ? selectedTripRecord.fields['Trip'] : '');
+  if(!name){ alert('Nama wajib isi'); return; }
+  if(!trip){ alert('Trip tidak dipilih'); return; }
+  const pat = window.AIRTABLE_PAT || localStorage.getItem('effah_api_pat');
+  const base = window.AIRTABLE_BASE_ID || localStorage.getItem('effah_base_id');
+  if(!pat || !base){ alert('API not set'); return; }
+  try{
+    const res = await fetch(`https://api.airtable.com/v0/${base}/DATA%20JEMAAH%20UMRAH`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${pat}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fields: { 'NAME': name.toUpperCase(), 'IC NO.': ic || null, 'PASSPORT NO.': passport || null, 'Trip': trip } })
+    });
+    if(res.ok){
+      closeTripAddCustomerModal();
+      alert('Jemaah berjaya ditambah!');
+      if(typeof fetchJemaahUmrahData === 'function') fetchJemaahUmrahData(true);
+      // refresh current trip detail table
+      setTimeout(()=>{ if(selectedTripRecord) selectTripRecord(selectedTripRecord.id); }, 800);
+    } else {
+      const err = await res.json();
+      console.error(err);
+      alert('Gagal tambah: '+(err.error?.message||'unknown'));
+    }
+  }catch(err){ console.error(err); alert('Error network'); }
+}
+
+function filterTripJemaahTable(q){
   const query = (q||'').toLowerCase();
-  const rows = document.querySelectorAll('#tripJemaahTableBody tr, #jemaahTableBody tr');
+  const tbody = document.getElementById('tripJemaahTableBody') || document.querySelector('#modul-pakej-umrah table tbody') || document.querySelector('table tbody');
+  if(!tbody) return;
+  const rows = tbody.querySelectorAll('tr');
   rows.forEach(tr=>{
     const txt = tr.textContent.toLowerCase();
     tr.style.display = txt.includes(query) ? '' : 'none';
   });
 }
-function searchTripJemaah(q){ filterTripDetailJemaah(q); }
-
-// Ensure openAddJemaahModal can prefill trip if passed
-(function(){
-  const orig = window.openAddJemaahModal;
-  if(orig && !orig._patched){
-    window.openAddJemaahModal = function(prefillTrip){
-      orig();
-      if(prefillTrip){
-        setTimeout(()=>{
-          const tripInput = document.querySelector('[name="Trip"], #jemaahTripInput, input[placeholder*="Trip"]');
-          if(tripInput) tripInput.value = prefillTrip;
-          // try select
-          const selects = document.querySelectorAll('select');
-          selects.forEach(sel=>{
-            const opts = Array.from(sel.options);
-            const match = opts.find(o=> o.textContent.trim().toLowerCase() === String(prefillTrip).trim().toLowerCase() || o.value.trim().toLowerCase() === String(prefillTrip).trim().toLowerCase());
-            if(match) sel.value = match.value;
-          });
-        }, 300);
-      }
-    };
-    window.openAddJemaahModal._patched = true;
-  }
-})();
