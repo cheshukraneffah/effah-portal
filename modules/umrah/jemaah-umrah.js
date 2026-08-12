@@ -668,14 +668,16 @@ function renderInlineUploadCell(recId, fieldName, fileList, labelName) {
         filesListHtml = files.map((fileObj, idx) => {
             const fileUrl = fileObj.url;
             const fileName = fileObj.filename || `${labelName} ${idx + 1}`;
-            const isPdf = fileUrl && (fileUrl.toLowerCase().includes('.pdf') || fileUrl.toLowerCase().includes('/pdf/'));
+            const fileId = fileObj.id || '';
+            const safeFileName = fileName.replace(/'/g, "\\'");
+            const isPdf = fileUrl && (fileUrl.toLowerCase().includes('.pdf') || fileName.toLowerCase().includes('.pdf'));
 
             return `
                 <div class="flex items-center space-x-1 my-0.5">
                     ${isPdf ? `
-                        <button onclick="openPreviewModal('${fileUrl}', '${fileName}')" class="bg-rose-50 text-rose-700 hover:bg-rose-100 font-bold px-1.5 py-0.5 rounded text-[10px] border border-rose-200 truncate max-w-[70px]" title="${fileName}">PDF</button>
+                        <button onclick="openPreviewModal('${fileUrl}', '${safeFileName}', {recordId:'${recId}', fieldName:'${fieldName}', attachmentId:'${fileId}', filename:'${safeFileName}'})" class="bg-rose-50 text-rose-700 hover:bg-rose-100 font-bold px-1.5 py-0.5 rounded text-[10px] border border-rose-200 truncate max-w-[70px]" title="${fileName}">PDF</button>
                     ` : `
-                        <img src="${fileUrl}" onclick="openPreviewModal('${fileUrl}', '${fileName}')" class="w-6 h-6 rounded object-cover border border-slate-300 cursor-pointer hover:scale-110 transition" title="${fileName}">
+                        <img src="${fileUrl}" onclick="openPreviewModal('${fileUrl}', '${safeFileName}', {recordId:'${recId}', fieldName:'${fieldName}', attachmentId:'${fileId}', filename:'${safeFileName}'})" class="w-6 h-6 rounded object-cover border border-slate-300 cursor-pointer hover:scale-110 transition" title="${fileName}">
                     `}
                     <button onclick="confirmDeleteAttachment('${recId}', '${fieldName}', ${idx})" class="text-slate-400 hover:text-rose-600 p-0.5" title="Padam Fail Ini"><i class="fa-solid fa-xmark text-[10px]"></i></button>
                 </div>
