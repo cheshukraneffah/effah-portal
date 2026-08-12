@@ -57,14 +57,21 @@
 
 
     <style>
-    /* STICKY TOPBAR FIX - stay on top when scroll */
-    header, .topbar, #topbar, .main-header {
+    /* STICKY TOPBAR FIX - stay on top when scroll - V18 */
+    header, .topbar, #topbar, .main-header, main > div:first-child.bg-white\/80,
+    #mainPortalWrapper > main > div:first-child,
+    .sticky.top-0 {
         position: sticky !important;
         top: 0 !important;
-        z-index: 50 !important;
+        z-index: 40 !important;
         background: rgba(255,255,255,0.92) !important;
         backdrop-filter: blur(16px) !important;
         -webkit-backdrop-filter: blur(16px) !important;
+    }
+    /* Ensure main content scrolls but header stays */
+    main {
+        overflow-y: auto !important;
+        height: 100vh !important;
     }
     /* API Status badge colors */
     #apiStatusBadge.offline { background: #fee2e2 !important; color: #dc2626 !important; }
@@ -389,9 +396,8 @@
 })();
 </script>
 
-
 <script>
-// ===== FINAL OVERRIDE V17: Preview Modal Global - Fix close button + outside click + ESC - MUST BE LAST =====
+// ===== FINAL OVERRIDE V18: Preview Modal Global - Fix PDF blank + close + outside click + header sticky =====
 (function(){
   function getGlobalModal(){
     const all = document.querySelectorAll('#attachmentPreviewModal');
@@ -404,6 +410,13 @@
     return all[0];
   }
 
+  function isPdfFile(url, title){
+    const u = (url||'').toLowerCase();
+    const t = (title||'').toLowerCase();
+    // Check url, title, extension, mime hints
+    return u.includes('.pdf') || t.includes('.pdf') || u.includes('%2epdf') || u.includes('pdf') && (u.includes('attachment') || t.includes('pdf')) || t.includes('visa') && u.includes('airtable') || u.includes('application/pdf');
+  }
+
   window.openTripPreviewModal = function(url, title){
     const modal = getGlobalModal();
     if(!modal){ window.open(url, '_blank'); return; }
@@ -413,13 +426,46 @@
     const dlBtn = modal.querySelector('#downloadAttachmentBtn');
     if(titleEl) titleEl.textContent = title || 'Preview';
     if(dlBtn) dlBtn.href = url;
-    const isPdf = url.toLowerCase().includes('.pdf');
+    
+    // Robust PDF detection
+    let pdfMode = false;
+    const lowerUrl = (url||'').toLowerCase();
+    const lowerTitle = (title||'').toLowerCase();
+    if(lowerUrl.includes('.pdf') || lowerTitle.includes('.pdf') || lowerTitle.includes('visa') || lowerTitle.includes('passport') && lowerUrl.includes('airtableusercontent')){
+      // Further check: if url has image extensions, treat as image
+      if(lowerUrl.match(/\.(jpg|jpeg|png|gif|webp)(\?|$)/)){
+        pdfMode = false;
+      } else {
+        // If title says .pdf, always pdf mode
+        if(lowerTitle.includes('.pdf')) pdfMode = true;
+        else if(lowerUrl.includes('.pdf') || lowerUrl.includes('pdf')) pdfMode = true;
+        // For safety, if url is airtable and title contains pdf, show pdf
+        else pdfMode = lowerTitle.includes('.pdf');
+      }
+    }
+    // Fallback: if file extension not image, assume pdf for safety when from Maklumat Jemaah VISA/PASSPORT COPY which are often pdf
+    if(!pdfMode){
+      // If URL does not end with image ext, try pdf
+      const isImage = lowerUrl.match(/\.(jpg|jpeg|png|gif|webp)/);
+      const isPdfHint = lowerUrl.includes('pdf') || lowerTitle.includes('.pdf');
+      if(isPdfHint && !isImage) pdfMode = true;
+    }
+
     if(img){ img.classList.add('hidden'); img.src=''; }
     if(pdf){ pdf.classList.add('hidden'); pdf.src=''; }
-    if(isPdf){
-      if(pdf){ pdf.src = url; pdf.classList.remove('hidden'); }
+    
+    if(pdfMode){
+      if(pdf){ 
+        pdf.src = url; 
+        pdf.classList.remove('hidden');
+        pdf.style.display='block';
+      }
     } else {
-      if(img){ img.src = url; img.classList.remove('hidden'); }
+      if(img){ 
+        img.src = url; 
+        img.classList.remove('hidden');
+        img.style.display='block';
+      }
     }
     modal.classList.remove('hidden');
     modal.style.display = 'flex';
@@ -442,7 +488,6 @@
     return window.openTripPreviewModal(url, title);
   };
 
-  // Close on ESC
   document.addEventListener('keydown', function(e){
     if(e.key === 'Escape'){
       const open = Array.from(document.querySelectorAll('#attachmentPreviewModal')).some(m=> !m.classList.contains('hidden'));
@@ -450,7 +495,7 @@
     }
   });
   
-  console.log('✅ V17 Modal override loaded - close + outside click fixed');
+  console.log('✅ V18 Modal override loaded - PDF preview + close + sticky header fixed');
 })();
 </script>
 
