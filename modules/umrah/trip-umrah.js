@@ -225,23 +225,24 @@ function renderTripDetailForm(rec) {
     
     const workspace = document.getElementById('tripMainDetailWorkspace');
 
-    // FIX V7: Filter jemaah - TBC hanya tunjuk tanpa trip / TBC sahaja, bukan semua
+    // FIX V8: Filter jemaah - TBC hanya 20 unassigned, bukan 500
     const isTBC = (displayTitle || '').toUpperCase() === 'TBC' || (rawTripTitle || '').toUpperCase() === 'TBC' || (rawTripTitle || '').toUpperCase().includes('TBC');
     const tripJemaah = (typeof allJemaahUmrahRecords !== 'undefined') ? allJemaahUmrahRecords.filter(j => {
-        const jTripRaw = j.fields['TRIP'];
+        const jTripRaw = j.fields['TRIP']; // linked record array
         const jTrip = Array.isArray(jTripRaw) ? jTripRaw[0] : jTripRaw;
         const jTripName = (j.fields['Trip Name'] || j.fields['TRIP_NAME'] || j.fields['Trip'] || '').toString();
         const jTripStr = (jTrip || '').toString().trim();
         const jTripNameStr = jTripName.trim();
 
         if(isTBC){
-            // Untuk TBC: hanya yang tiada trip, kosong, atau memang TBC
-            const isEmpty = !jTripRaw || (Array.isArray(jTripRaw) && jTripRaw.length===0) || jTripStr === '' || jTripNameStr === '';
-            const isTBCTag = jTripStr.toUpperCase() === 'TBC' || jTripNameStr.toUpperCase() === 'TBC' || jTripStr.toUpperCase().includes('TBC') || jTripNameStr.toUpperCase().includes('TBC');
-            return isEmpty || isTBCTag;
+            // TBC: hanya yang TRIP linked kosong ATAU nama trip memang TBC
+            const isEmptyLinked = !jTripRaw || (Array.isArray(jTripRaw) && jTripRaw.length===0) || jTripStr === '';
+            const isTBCTag = jTripStr.toUpperCase() === 'TBC' || jTripNameStr.toUpperCase() === 'TBC' || jTripNameStr.toUpperCase().includes('TBC') || jTripStr.toUpperCase().includes('TBC');
+            // Jangan check jTripNameStr === '' sebagai empty kalau TRIP linked ada - itu bug lama
+            return isEmptyLinked || isTBCTag;
         } else {
-            // Untuk trip normal: match ID atau nama trip exact, jangan ambil yang kosong
-            if(!jTripRaw) return false;
+            // Trip normal: wajib ada linked TRIP, dan match ID atau nama
+            if(!jTripRaw || (Array.isArray(jTripRaw) && jTripRaw.length===0)) return false;
             return jTrip === id || 
                    jTripStr === rawTripTitle || 
                    jTripStr === displayTitle ||
