@@ -2,7 +2,19 @@
 let allJemaahUmrahRecords = [];
 let rawTripRecordsList = []; 
 let tripMap = {}; 
-let selectedTripFilter = null; // Bermula kosong supaya staf pilih trip dulu
+let selectedTripFilter = null;
+
+ // AUTO-FILL GLOBAL PAT - FINAL
+try{
+  if(typeof AIRTABLE_PAT === 'undefined' || !AIRTABLE_PAT){
+    var AIRTABLE_PAT = window.AIRTABLE_PAT || localStorage.getItem('effah_api_pat') || window.DEFAULT_PAT || 'patjxZg6G22e9OBuS.2a96ced64af7e931ee4d83f65c491adf1241813547d5d8e3a317f5bc6d9a8de7';
+    var AIRTABLE_BASE_ID = window.AIRTABLE_BASE_ID || localStorage.getItem('effah_base_id') || window.DEFAULT_BASE_ID || 'appSsn4JyQD4DnYu0';
+  }
+  AIRTABLE_PAT = window.AIRTABLE_PAT || AIRTABLE_PAT || '';
+  AIRTABLE_BASE_ID = window.AIRTABLE_BASE_ID || AIRTABLE_BASE_ID || '';
+  window.AIRTABLE_PAT = AIRTABLE_PAT;
+  window.AIRTABLE_BASE_ID = AIRTABLE_BASE_ID;
+}catch(e){}
 
 // Selected Jemaah Checkbox Tracking
 let selectedJemaahIds = new Set();
@@ -47,14 +59,7 @@ const defaultColumnWidths = {
 
 let columnWidths = JSON.parse(localStorage.getItem('jemaahColWidths')) || { ...defaultColumnWidths };
 
-// PATCH FIX FOR PORTAL BARU - inject PAT/Base + support modul-maklumat-jemaah + clean trip code
-// SAFE - no redeclare
-try { if (typeof AIRTABLE_PAT === 'undefined') { var AIRTABLE_PAT = ''; } } catch(e){ var AIRTABLE_PAT = ''; }
-try { if (typeof AIRTABLE_BASE_ID === 'undefined') { var AIRTABLE_BASE_ID = ''; } } catch(e){ var AIRTABLE_BASE_ID = ''; }
-AIRTABLE_PAT = window.AIRTABLE_PAT || localStorage.getItem('effah_api_pat') || localStorage.getItem('effah_pat') || AIRTABLE_PAT || '';
-AIRTABLE_BASE_ID = window.AIRTABLE_BASE_ID || localStorage.getItem('effah_base_id') || localStorage.getItem('effah_base') || AIRTABLE_BASE_ID || '';
-window.AIRTABLE_PAT = AIRTABLE_PAT;
-window.AIRTABLE_BASE_ID = AIRTABLE_BASE_ID;
+// CLEANED: override removed - using global var from config.js
 
 function cleanTripName(raw){
   if(!raw) return 'TBC';
@@ -63,14 +68,7 @@ function cleanTripName(raw){
   if(s.includes('|')) s = s.split('|').pop();
   return s.trim();
 }
-// alias container id lama -> baru
-const _origGet = document.getElementById.bind(document);
-document.getElementById = function(id){
-  if(id==='modul-jemaah-umrah'){
-    return _origGet('modul-maklumat-jemaah') || _origGet('modul-jemaah-umrah');
-  }
-  return _origGet(id);
-};
+// CLEANED: override removed - using global var from config.js
 // make brand-maroon class fallback
 (function(){
   const style=document.createElement('style');
@@ -364,10 +362,12 @@ function cleanTripName(tripName) {
 }
 
 async function fetchTripMapping() {
-    if (typeof AIRTABLE_PAT === 'undefined' || !AIRTABLE_PAT) {
-        AIRTABLE_PAT = window.AIRTABLE_PAT || localStorage.getItem('effah_api_pat') || 'patjxZg6G22e9OBuS.2a96ced64af7e931ee4d83f65c491adf1241813547d5d8e3a317f5bc6d9a8de7';
-        AIRTABLE_BASE_ID = window.AIRTABLE_BASE_ID || localStorage.getItem('effah_base_id') || 'appSsn4JyQD4DnYu0';
-    }
+    try{
+      if (typeof AIRTABLE_PAT === 'undefined' || !AIRTABLE_PAT) {
+        AIRTABLE_PAT = window.AIRTABLE_PAT || localStorage.getItem('effah_api_pat') || window.DEFAULT_PAT || 'patjxZg6G22e9OBuS.2a96ced64af7e931ee4d83f65c491adf1241813547d5d8e3a317f5bc6d9a8de7';
+        AIRTABLE_BASE_ID = window.AIRTABLE_BASE_ID || localStorage.getItem('effah_base_id') || window.DEFAULT_BASE_ID || 'appSsn4JyQD4DnYu0';
+      }
+    }catch(e){}
     const url = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/PAKEJ%20UMRAH?sort[0][field]=Mula%20Pakej&sort[0][direction]=asc&sort[1][field]=Tamat%20Pakej&sort[1][direction]=asc`;
     try {
         const response = await fetch(url, { headers: { Authorization: `Bearer ${AIRTABLE_PAT}` } });
@@ -389,10 +389,12 @@ async function fetchTripMapping() {
 }
 
 async function fetchJemaahUmrahData(isManualClick = false) {
-    if (typeof AIRTABLE_PAT === 'undefined' || !AIRTABLE_PAT) {
-        AIRTABLE_PAT = window.AIRTABLE_PAT || localStorage.getItem('effah_api_pat') || 'patjxZg6G22e9OBuS.2a96ced64af7e931ee4d83f65c491adf1241813547d5d8e3a317f5bc6d9a8de7';
-        AIRTABLE_BASE_ID = window.AIRTABLE_BASE_ID || localStorage.getItem('effah_base_id') || 'appSsn4JyQD4DnYu0';
-    }
+    try{
+      if (typeof AIRTABLE_PAT === 'undefined' || !AIRTABLE_PAT) {
+        AIRTABLE_PAT = window.AIRTABLE_PAT || localStorage.getItem('effah_api_pat') || window.DEFAULT_PAT || 'patjxZg6G22e9OBuS.2a96ced64af7e931ee4d83f65c491adf1241813547d5d8e3a317f5bc6d9a8de7';
+        AIRTABLE_BASE_ID = window.AIRTABLE_BASE_ID || localStorage.getItem('effah_base_id') || window.DEFAULT_BASE_ID || 'appSsn4JyQD4DnYu0';
+      }
+    }catch(e){}
 
     const icon = document.getElementById('iconRefreshJemaah');
     if (icon) icon.classList.add('fa-spin');
@@ -1896,10 +1898,12 @@ document.addEventListener('keydown', function (event) {
 });
 
 async function updateJemaahField(recId, fieldName, value) {
-    if (typeof AIRTABLE_PAT === 'undefined' || !AIRTABLE_PAT) {
-        AIRTABLE_PAT = window.AIRTABLE_PAT || localStorage.getItem('effah_api_pat') || 'patjxZg6G22e9OBuS.2a96ced64af7e931ee4d83f65c491adf1241813547d5d8e3a317f5bc6d9a8de7';
-        AIRTABLE_BASE_ID = window.AIRTABLE_BASE_ID || localStorage.getItem('effah_base_id') || 'appSsn4JyQD4DnYu0';
-    }
+    try{
+      if (typeof AIRTABLE_PAT === 'undefined' || !AIRTABLE_PAT) {
+        AIRTABLE_PAT = window.AIRTABLE_PAT || localStorage.getItem('effah_api_pat') || window.DEFAULT_PAT || 'patjxZg6G22e9OBuS.2a96ced64af7e931ee4d83f65c491adf1241813547d5d8e3a317f5bc6d9a8de7';
+        AIRTABLE_BASE_ID = window.AIRTABLE_BASE_ID || localStorage.getItem('effah_base_id') || window.DEFAULT_BASE_ID || 'appSsn4JyQD4DnYu0';
+      }
+    }catch(e){}
 
     let processedValue = value;
     if (typeof processedValue === 'string' && (fieldName === 'NAME' || fieldName === 'PASSPORT NO.')) {
