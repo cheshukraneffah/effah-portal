@@ -373,7 +373,7 @@ function renderTripDetailForm(rec) {
                     <thead class="bg-slate-50 text-slate-500 font-bold uppercase tracking-wider border-b border-slate-200/80">
                         <tr>
                             <th class="p-3 w-10 text-center">#</th>
-                            <th class="p-3 cursor-pointer hover:text-slate-800 select-none" onclick="sortTripJemaahBy('NAME')">NAME <span class="sort-icon" data-field="NAME">${'↑' if 'NAME' else ''}</span></th>
+                            <th class="p-3 cursor-pointer hover:text-slate-800 select-none" onclick="sortTripJemaahBy('NAME')">NAME <span class="sort-icon" data-field="NAME">↑</span></th>
                             <th class="p-3">PICTURE</th>
                             <th class="p-3">PASSPORT COPY</th>
                             <th class="p-3 cursor-pointer hover:text-slate-800 select-none" onclick="sortTripJemaahBy('PASSPORT NO.')">PASSPORT NO. <span class="sort-icon" data-field="PASSPORT NO."></span></th>
@@ -382,7 +382,6 @@ function renderTripDetailForm(rec) {
                             <th class="p-3 cursor-pointer hover:text-slate-800 select-none" onclick="sortTripJemaahBy('NATIONALITY')">NATIONALITY <span class="sort-icon" data-field="NATIONALITY"></span></th>
                         </tr>
                     </thead>
-                    <tbody id="tripJemaahTableBody" class="divide-y divide-slate-100 font-medium text-slate-800">
                     <tbody id="tripJemaahTableBody" class="divide-y divide-slate-100 font-medium text-slate-800">
                         ${currentTripJemaahList.length === 0 ? `
                             <tr><td colspan="8" class="p-8 text-center text-slate-400 font-normal">Tiada data jemaah berdaftar di bawah trip ini lagi.</td></tr>
