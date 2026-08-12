@@ -954,5 +954,3 @@ document.addEventListener('keydown', function(e){
     if(anyOpen) window.closePreviewModal();
   }
 });
-
-
