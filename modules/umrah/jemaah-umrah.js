@@ -1998,3 +1998,40 @@ function filterJemaahTable() {
     }
   },500);
 })();
+
+
+// PATCH V18: Robust PDF detection for Maklumat Jemaah
+(function(){
+  const _origOpen = window.openPreviewModal;
+  window._jemaahOpenPreviewModal = function(url, title){
+    const lowerUrl = (url||'').toLowerCase();
+    const lowerTitle = (title||'').toLowerCase();
+    let isPdf = lowerUrl.includes('.pdf') || lowerTitle.includes('.pdf');
+    if(!isPdf){
+      // If not image extension, treat as pdf if from Airtable docs
+      const isImage = lowerUrl.match(/\.(jpg|jpeg|png|gif|webp)/);
+      if(!isImage && (lowerTitle.includes('visa') || lowerTitle.includes('passport') || lowerUrl.includes('airtable'))){
+        // Check if url actually serves pdf by trying to see extension hint in filename param
+        // For safety, if title has .pdf, force pdf
+        if(lowerTitle.includes('.pdf')) isPdf = true;
+      }
+    }
+    const modal = document.getElementById('attachmentPreviewModal');
+    if(!modal){ window.open(url,'_blank'); return; }
+    const img = document.getElementById('previewImage');
+    const pdf = document.getElementById('previewPdf');
+    const titleEl = document.getElementById('previewTitle');
+    const dlBtn = document.getElementById('downloadAttachmentBtn');
+    if(titleEl) titleEl.textContent = title || 'Preview';
+    if(dlBtn) dlBtn.href = url;
+    if(img){ img.classList.add('hidden'); img.src=''; }
+    if(pdf){ pdf.classList.add('hidden'); pdf.src=''; }
+    if(isPdf){
+      if(pdf){ pdf.src = url; pdf.classList.remove('hidden'); }
+    } else {
+      if(img){ img.src = url; img.classList.remove('hidden'); }
+    }
+    modal.classList.remove('hidden');
+    modal.style.display='flex';
+  };
+})();
