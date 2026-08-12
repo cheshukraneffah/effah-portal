@@ -1,8 +1,8 @@
-// config.js - CENTRAL CONFIG - AUTO FILL FOR ALL STAFF - LOAD FIRST
+// js/config.js - CENTRAL CONFIG - AUTO FILL FOR ALL STAFF - LOAD FIRST
 var DEFAULT_PAT = 'patjxZg6G22e9OBuS.2a96ced64af7e931ee4d83f65c491adf1241813547d5d8e3a317f5bc6d9a8de7';
 var DEFAULT_BASE_ID = 'appSsn4JyQD4DnYu0';
-var AIRTABLE_PAT = localStorage.getItem('effah_api_pat') || localStorage.getItem('effah_pat') || window.AIRTABLE_PAT || DEFAULT_PAT;
-var AIRTABLE_BASE_ID = localStorage.getItem('effah_base_id') || localStorage.getItem('effah_base') || window.AIRTABLE_BASE_ID || DEFAULT_BASE_ID;
+var AIRTABLE_PAT = localStorage.getItem('effah_api_pat') || localStorage.getItem('effah_pat') || (typeof window !== 'undefined' && window.AIRTABLE_PAT) || DEFAULT_PAT;
+var AIRTABLE_BASE_ID = localStorage.getItem('effah_base_id') || localStorage.getItem('effah_base') || (typeof window !== 'undefined' && window.AIRTABLE_BASE_ID) || DEFAULT_BASE_ID;
 window.AIRTABLE_PAT = AIRTABLE_PAT;
 window.AIRTABLE_BASE_ID = AIRTABLE_BASE_ID;
 window.DEFAULT_PAT = DEFAULT_PAT;
