@@ -360,8 +360,14 @@ function renderTripDetailForm(rec) {
                 <div class="flex items-center gap-2">
                         <div class="relative">
                             <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-slate-400 text-[10px]"></i>
-                            <input type="text" onkeyup="filterTripJemaahTable(this.value)" placeholder="Search..." class="pl-8 pr-3 py-2 border border-slate-200 rounded-xl text-xs bg-slate-50 focus:bg-white focus:outline-none focus:ring-1 focus:ring-slate-300 w-32 md:w-48">
+                            <input type="text" onkeyup="filterTripJemaahTable(this.value)" placeholder="Search..." class="pl-8 pr-3 py-2 border border-slate-200 rounded-xl text-xs bg-slate-50 focus:bg-white focus:outline-none focus:ring-1 focus:ring-slate-300 w-24 md:w-36">
                         </div>
+                        <button onclick="printTripManifest()" class="bg-white border border-slate-300 text-slate-700 font-bold px-3 py-2 rounded-xl hover:bg-slate-50 transition text-xs flex items-center shadow-xs">
+                            <i class="fa-solid fa-print mr-1.5"></i> Print
+                        </button>
+                        <button onclick="exportTripPdf()" class="bg-slate-100 border border-slate-300 text-slate-700 font-bold px-3 py-2 rounded-xl hover:bg-slate-200 transition text-xs flex items-center shadow-xs">
+                            <i class="fa-solid fa-file-pdf mr-1.5"></i> Export PDF
+                        </button>
                         <button onclick="openTripAddCustomerModal()" class="bg-slate-900 text-white font-bold px-3.5 py-2 rounded-xl hover:bg-black transition text-xs flex items-center shadow-xs">
                             <i class="fa-solid fa-plus mr-1.5"></i> Add customer
                         </button>
@@ -871,6 +877,185 @@ function sortTripJemaahBy(field){
 }
 
 
+
+// ===== EXPORT MANIFEST - Layout sebiji screenshot =====
+function formatDateMY(dateStr){
+  if(!dateStr) return '-';
+  try{
+    const d = new Date(dateStr);
+    if(isNaN(d)) return dateStr;
+    const dd = String(d.getDate()).padStart(2,'0');
+    const mm = String(d.getMonth()+1).padStart(2,'0');
+    const yyyy = d.getFullYear();
+    return `${dd}/${mm}/${yyyy}`;
+  }catch(e){ return dateStr; }
+}
+
+function getGenderBreakdown(){
+  let male=0, female=0, maleKids=0, femaleKids=0;
+  currentTripJemaahList.forEach(j=>{
+    const g = (j.fields['GENDER']||'').toUpperCase();
+    const ageStr = (j.fields['AGE']||'').toString();
+    let ageYears = 0;
+    const m = ageStr.match(/(\d+)y/);
+    if(m) ageYears = parseInt(m[1]);
+    else ageYears = parseFloat(ageStr)||0;
+    const isKid = ageYears >0 && ageYears < 12;
+    if(g==='MALE'){
+      if(isKid) maleKids++; else male++;
+    } else if(g==='FEMALE'){
+      if(isKid) femaleKids++; else female++;
+    }
+  });
+  return {male, female, maleKids, femaleKids};
+}
+
+function buildTripManifestHTML(){
+  if(!selectedTripRecord) return '<p>No trip selected</p>';
+  const f = selectedTripRecord.fields;
+  const rawTrip = f['Trip'] || f['NAME'] || 'TBC';
+  const displayTitle = cleanTripName(rawTrip);
+  const sektor = f['Sektor'] || '-';
+  const mutawwif = f['Mutawwif/Pengiring'] || '-';
+  const tempoh = f['Tempoh Pakej'] || '-';
+  const flight = f['Penerbangan'] || '-';
+  const total = currentTripJemaahList.length;
+  const gb = getGenderBreakdown();
+  
+  const rows = currentTripJemaahList.map((j, idx)=>{
+    const jf = j.fields;
+    const visaFiles = jf['VISA'] || jf['VISA COPY'] || jf['PASSPORT COPY'] || [];
+    const hasVisa = (visaFiles && visaFiles.length>0) || jf['VISA'] || jf['VISA COPY'];
+    // Format dates
+    const dateIssue = formatDateMY(jf['DATE OF ISSUE'] || jf['Date Issue'] || jf['ISSUE DATE'] || '');
+    const dateExpire = formatDateMY(jf['DATE OF EXPIRE'] || jf['Date Expire'] || jf['EXPIRY DATE'] || jf['PASSPORT EXPIRY'] || '');
+    const dob = formatDateMY(jf['DOB'] || jf['DATE OF BIRTH'] || '');
+    const age = jf['AGE'] || '';
+    const ic = jf['IC NO.'] || jf['IC'] || '';
+    const passport = jf['PASSPORT NO.'] || '';
+    const nationality = jf['NATIONALITY'] || 'MALAYSIA';
+    const gender = jf['GENDER'] || '';
+    const name = jf['NAME'] || '';
+    return `
+      <tr>
+        <td>${idx+1}</td>
+        <td class="name-col">${name}</td>
+        <td>${gender}</td>
+        <td>${passport}</td>
+        <td>${dateIssue}</td>
+        <td>${dateExpire}</td>
+        <td>${dob}</td>
+        <td>${age}</td>
+        <td>${ic}</td>
+        <td>${nationality}</td>
+        <td class="text-center"><span class="visa-badge">👁 Lihat</span></td>
+      </tr>
+    `;
+  }).join('');
+
+  return `
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Manifest - ${displayTitle}</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700&display=swap');
+  *{font-family:'Plus Jakarta Sans', Arial, sans-serif; box-sizing:border-box;}
+  body{margin:0; padding:20px; background:#fff; color:#1e293b; font-size:11px;}
+  .header-card{border:1.5px solid #cbd5e1; border-radius:12px; padding:16px 20px; margin-bottom:16px;}
+  .header-title{font-size:11px; font-weight:700; color:#1e40af; letter-spacing:0.5px; text-transform:uppercase; margin-bottom:4px;}
+  .header-trip{font-size:18px; font-weight:800; color:#0f172a; margin-bottom:12px;}
+  .info-grid{display:grid; grid-template-columns: 1.2fr 1.5fr 0.8fr 1fr 0.7fr; gap:12px; border-top:1px solid #f1f5f9; border-bottom:1px dashed #e2e8f0; padding:12px 0; margin-bottom:10px;}
+  .info-label{font-size:10px; color:#64748b; font-weight:600; display:block;}
+  .info-value{font-size:12px; font-weight:700; color:#0f172a; margin-top:2px; display:flex; align-items:center; gap:4px;}
+  .gender-row{display:flex; gap:20px; font-size:11px; font-weight:600; padding-top:4px;}
+  .gender-item{display:flex; align-items:center; gap:6px;}
+  .male{color:#1e40af;} .female{color:#9f1239;} .mkids{color:#15803d;} .fkids{color:#7c2d12;}
+  table{width:100%; border-collapse:collapse; border:1px solid #94a3b8; font-size:10.5px;}
+  th{background:#f1f5f9; color:#334155; font-weight:700; text-align:left; padding:8px 6px; border:1px solid #94a3b8; font-size:10px; text-transform:uppercase;}
+  td{padding:7px 6px; border:1px solid #cbd5e1; vertical-align:top;}
+  .name-col{font-weight:600; text-transform:uppercase; max-width:160px;}
+  .visa-badge{background:#f8fafc; border:1px solid #e2e8f0; border-radius:12px; padding:2px 8px; font-size:9px; display:inline-flex; align-items:center; gap:3px;}
+  @media print{
+    body{padding:0;}
+    .no-print{display:none !important;}
+    @page{size:A4 landscape; margin:10mm;}
+  }
+</style>
+</head>
+<body>
+  <div class="header-card">
+    <div class="header-title">Maklumat Trip & Penerbangan</div>
+    <div class="header-trip">${displayTitle}</div>
+    <div class="info-grid">
+      <div><span class="info-label">Sektor</span><span class="info-value">📍 ${sektor}</span></div>
+      <div><span class="info-label">Mutawwif / Pengiring</span><span class="info-value">👤 ${mutawwif}</span></div>
+      <div><span class="info-label">Tempoh Pakej</span><span class="info-value">📅 ${tempoh}</span></div>
+      <div><span class="info-label">Penerbangan (Flight)</span><span class="info-value">✈️ ${flight}</span></div>
+      <div><span class="info-label">Total Jemaah</span><span class="info-value">👥 ${total} orang</span></div>
+    </div>
+    <div class="gender-row">
+      <span style="font-weight:700;">📊 Gender breakdown:</span>
+      <span class="gender-item male">👨 Male: ${gb.male}</span>
+      <span class="gender-item female">👩 Female: ${gb.female}</span>
+      <span class="gender-item mkids">🧒 Male Kids: ${gb.maleKids}</span>
+      <span class="gender-item fkids">👧 Female Kids: ${gb.femaleKids}</span>
+    </div>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th style="width:28px;">#</th>
+        <th>Nama Jemaah</th>
+        <th style="width:60px;">Gender</th>
+        <th>Passport No.</th>
+        <th>Date Issue</th>
+        <th>Date Expire</th>
+        <th>DOB</th>
+        <th>Age</th>
+        <th>IC No.</th>
+        <th>Nationality</th>
+        <th style="width:60px;">Visa</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${rows}
+    </tbody>
+  </table>
+
+  <div class="no-print" style="margin-top:20px; text-align:center;">
+    <button onclick="window.print()" style="background:#0f172a; color:#fff; padding:10px 24px; border-radius:8px; border:none; font-weight:700; cursor:pointer; margin-right:10px;">🖨️ Print</button>
+    <button onclick="window.close()" style="background:#f1f5f9; color:#334155; padding:10px 24px; border-radius:8px; border:1px solid #cbd5e1; font-weight:700; cursor:pointer;">Tutup</button>
+  </div>
+</body>
+</html>
+  `;
+}
+
+function printTripManifest(){
+  const html = buildTripManifestHTML();
+  const w = window.open('', '_blank');
+  if(!w){ alert('Popup blocked, please allow popup'); return; }
+  w.document.write(html);
+  w.document.close();
+  w.focus();
+  setTimeout(()=>{ w.print(); }, 500);
+}
+
+function exportTripPdf(){
+  const html = buildTripManifestHTML();
+  const w = window.open('', '_blank');
+  if(!w){ alert('Popup blocked'); return; }
+  w.document.write(html);
+  w.document.close();
+  w.focus();
+  // For PDF, user can choose Save as PDF in print dialog
+  setTimeout(()=>{ w.print(); }, 800);
+}
+
+
 // ===== FIX V12: GLOBAL PREVIEW MODAL + CLOSE BUTTON + OUTSIDE CLICK =====
 window.openTripPreviewModal = function(url, title){
   let modal = document.getElementById('attachmentPreviewModal');
@@ -954,3 +1139,5 @@ document.addEventListener('keydown', function(e){
     if(anyOpen) window.closePreviewModal();
   }
 });
+
+
