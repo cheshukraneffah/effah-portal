@@ -1,6 +1,9 @@
 // Variable Global Simpan Data & Options
 let allTripUmrahRecords = [];
 let selectedTripRecord = null;
+let currentTripJemaahList = [];
+let tripJemaahSortField = 'NAME';
+let tripJemaahSortDir = 'asc';
 
 // Dynamic Single Select Options (STANDARD GUNA DASH '-')
 let selectOptions = {
@@ -225,32 +228,29 @@ function renderTripDetailForm(rec) {
     
     const workspace = document.getElementById('tripMainDetailWorkspace');
 
-    // FIX V8: Filter jemaah - TBC hanya 20 unassigned, bukan 500
+    // FIX V9: Filter jemaah + sort - TBC 20 unassigned + sortable
     const isTBC = (displayTitle || '').toUpperCase() === 'TBC' || (rawTripTitle || '').toUpperCase() === 'TBC' || (rawTripTitle || '').toUpperCase().includes('TBC');
-    const tripJemaah = (typeof allJemaahUmrahRecords !== 'undefined') ? allJemaahUmrahRecords.filter(j => {
-        const jTripRaw = j.fields['TRIP']; // linked record array
+    let tripJemaah = (typeof allJemaahUmrahRecords !== 'undefined') ? allJemaahUmrahRecords.filter(j => {
+        const jTripRaw = j.fields['TRIP'];
         const jTrip = Array.isArray(jTripRaw) ? jTripRaw[0] : jTripRaw;
         const jTripName = (j.fields['Trip Name'] || j.fields['TRIP_NAME'] || j.fields['Trip'] || '').toString();
         const jTripStr = (jTrip || '').toString().trim();
         const jTripNameStr = jTripName.trim();
-
         if(isTBC){
-            // TBC: hanya yang TRIP linked kosong ATAU nama trip memang TBC
             const isEmptyLinked = !jTripRaw || (Array.isArray(jTripRaw) && jTripRaw.length===0) || jTripStr === '';
             const isTBCTag = jTripStr.toUpperCase() === 'TBC' || jTripNameStr.toUpperCase() === 'TBC' || jTripNameStr.toUpperCase().includes('TBC') || jTripStr.toUpperCase().includes('TBC');
-            // Jangan check jTripNameStr === '' sebagai empty kalau TRIP linked ada - itu bug lama
             return isEmptyLinked || isTBCTag;
         } else {
-            // Trip normal: wajib ada linked TRIP, dan match ID atau nama
             if(!jTripRaw || (Array.isArray(jTripRaw) && jTripRaw.length===0)) return false;
-            return jTrip === id || 
-                   jTripStr === rawTripTitle || 
-                   jTripStr === displayTitle ||
-                   jTripNameStr === rawTripTitle ||
-                   jTripNameStr === displayTitle;
+            return jTrip === id || jTripStr === rawTripTitle || jTripStr === displayTitle || jTripNameStr === rawTripTitle || jTripNameStr === displayTitle;
         }
     }) : [];
-    console.log('Trip', displayTitle, 'found', tripJemaah.length, 'jemaah');
+    currentTripJemaahList = tripJemaah;
+    // apply current sort
+    if(tripJemaahSortField){
+        currentTripJemaahList = sortJemaahArray(currentTripJemaahList, tripJemaahSortField, tripJemaahSortDir);
+    }
+    console.log('Trip', displayTitle, 'found', currentTripJemaahList.length, 'jemaah');
 
     workspace.innerHTML = `
         <!-- FORM UTAMA DETAIL TRIP -->
@@ -369,29 +369,28 @@ function renderTripDetailForm(rec) {
             </div>
 
             <div class="overflow-x-auto border border-slate-200/80 rounded-xl">
-                <table class="w-full text-left text-xs">
+                <table class="w-full text-left text-xs" id="tripJemaahTable">
                     <thead class="bg-slate-50 text-slate-500 font-bold uppercase tracking-wider border-b border-slate-200/80">
                         <tr>
-                            <th class="p-3 w-12 text-center">NO ↑</th>
-                            <th class="p-3">NAME</th>
+                            <th class="p-3 w-10 text-center">#</th>
+                            <th class="p-3 cursor-pointer hover:text-slate-800 select-none" onclick="sortTripJemaahBy('NAME')">NAME <span class="sort-icon" data-field="NAME">${'↑' if 'NAME' else ''}</span></th>
                             <th class="p-3">PICTURE</th>
                             <th class="p-3">PASSPORT COPY</th>
-                            <th class="p-3">PASSPORT NO.</th>
-                            <th class="p-3">AGE</th>
-                            <th class="p-3">GENDER</th>
-                            <th class="p-3">NATIONALITY</th>
+                            <th class="p-3 cursor-pointer hover:text-slate-800 select-none" onclick="sortTripJemaahBy('PASSPORT NO.')">PASSPORT NO. <span class="sort-icon" data-field="PASSPORT NO."></span></th>
+                            <th class="p-3 cursor-pointer hover:text-slate-800 select-none" onclick="sortTripJemaahBy('AGE')">AGE <span class="sort-icon" data-field="AGE"></span></th>
+                            <th class="p-3 cursor-pointer hover:text-slate-800 select-none" onclick="sortTripJemaahBy('GENDER')">GENDER <span class="sort-icon" data-field="GENDER"></span></th>
+                            <th class="p-3 cursor-pointer hover:text-slate-800 select-none" onclick="sortTripJemaahBy('NATIONALITY')">NATIONALITY <span class="sort-icon" data-field="NATIONALITY"></span></th>
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-slate-100 font-medium text-slate-800">
-                        ${tripJemaah.length === 0 ? `
+                    <tbody id="tripJemaahTableBody" class="divide-y divide-slate-100 font-medium text-slate-800">
+                    <tbody id="tripJemaahTableBody" class="divide-y divide-slate-100 font-medium text-slate-800">
+                        ${currentTripJemaahList.length === 0 ? `
                             <tr><td colspan="8" class="p-8 text-center text-slate-400 font-normal">Tiada data jemaah berdaftar di bawah trip ini lagi.</td></tr>
-                        ` : tripJemaah.map((j, idx) => {
+                        ` : currentTripJemaahList.map((j, idx) => {
                             const jf = j.fields;
                             const pic = (jf['PICTURE'] && jf['PICTURE'][0]) ? jf['PICTURE'][0].url : '';
                             const passCopy = (jf['PASSPORT COPY'] && jf['PASSPORT COPY'][0]) ? jf['PASSPORT COPY'][0].url : '';
-                            
                             const genderBadge = jf['GENDER'] === 'MALE' ? 'bg-sky-100/80 text-sky-800 border-sky-200' : 'bg-rose-100/80 text-rose-800 border-rose-200';
-
                             return `
                                 <tr class="hover:bg-slate-50/80 transition">
                                     <td class="p-3 text-center text-slate-400 font-bold">${idx + 1}</td>
@@ -745,4 +744,67 @@ async function submitTripAddCustomer(e){
       alert('Gagal tambah: '+(err.error?.message||'unknown'));
     }
   }catch(err){ console.error(err); alert('Error network'); }
+}
+
+
+function sortJemaahArray(arr, field, dir){
+  const sorted = [...arr].sort((a,b)=>{
+    let av = (a.fields[field] || '').toString().toUpperCase();
+    let bv = (b.fields[field] || '').toString().toUpperCase();
+    // Age numeric
+    if(field === 'AGE'){
+      const an = parseFloat(av) || 0;
+      const bn = parseFloat(bv) || 0;
+      return dir === 'asc' ? an - bn : bn - an;
+    }
+    if(av < bv) return dir === 'asc' ? -1 : 1;
+    if(av > bv) return dir === 'asc' ? 1 : -1;
+    return 0;
+  });
+  return sorted;
+}
+
+function sortTripJemaahBy(field){
+  if(tripJemaahSortField === field){
+    tripJemaahSortDir = tripJemaahSortDir === 'asc' ? 'desc' : 'asc';
+  } else {
+    tripJemaahSortField = field;
+    tripJemaahSortDir = 'asc';
+  }
+  currentTripJemaahList = sortJemaahArray(currentTripJemaahList, tripJemaahSortField, tripJemaahSortDir);
+  // re-render tbody
+  const tbody = document.getElementById('tripJemaahTableBody');
+  if(!tbody) return;
+  if(currentTripJemaahList.length === 0){
+    tbody.innerHTML = '<tr><td colspan="8" class="p-8 text-center text-slate-400">Tiada data</td></tr>';
+    return;
+  }
+  tbody.innerHTML = currentTripJemaahList.map((j, idx) => {
+    const jf = j.fields;
+    const pic = (jf['PICTURE'] && jf['PICTURE'][0]) ? jf['PICTURE'][0].url : '';
+    const passCopy = (jf['PASSPORT COPY'] && jf['PASSPORT COPY'][0]) ? jf['PASSPORT COPY'][0].url : '';
+    const genderBadge = jf['GENDER'] === 'MALE' ? 'bg-sky-100/80 text-sky-800 border-sky-200' : 'bg-rose-100/80 text-rose-800 border-rose-200';
+    return `
+      <tr class="hover:bg-slate-50/80 transition">
+        <td class="p-3 text-center text-slate-400 font-bold">${idx + 1}</td>
+        <td class="p-3 font-bold text-slate-900 uppercase">${jf['NAME'] || '-'}</td>
+        <td class="p-3">${pic ? `<img src="${pic}" class="w-9 h-9 rounded-lg object-cover border border-slate-200">` : `<div class="w-9 h-9 bg-slate-100 rounded-lg flex items-center justify-center text-slate-400"><i class="fa-solid fa-user"></i></div>`}</td>
+        <td class="p-3">${passCopy ? `<a href="${passCopy}" target="_blank" class="text-sky-600 underline font-semibold flex items-center"><i class="fa-solid fa-file-pdf mr-1"></i> View Copy</a>` : `<span class="text-slate-300">-</span>`}</td>
+        <td class="p-3 font-mono font-bold text-slate-700">${jf['PASSPORT NO.'] || '-'}</td>
+        <td class="p-3 text-slate-600">${jf['AGE'] || '-'}</td>
+        <td class="p-3"><span class="text-[10px] font-bold px-2.5 py-0.5 rounded-md border uppercase ${genderBadge}">${jf['GENDER'] || '-'}</span></td>
+        <td class="p-3"><span class="bg-sky-100/80 text-sky-900 border border-sky-200 text-[10px] font-bold px-2 py-0.5 rounded-md uppercase">${jf['NATIONALITY'] || 'MALAYSIA'}</span></td>
+      </tr>
+    `;
+  }).join('');
+  // update sort icons
+  document.querySelectorAll('.sort-icon').forEach(el=>{
+    const f = el.getAttribute('data-field');
+    if(f === tripJemaahSortField){
+      el.textContent = tripJemaahSortDir === 'asc' ? ' ↑' : ' ↓';
+      el.classList.add('text-slate-900');
+    } else {
+      el.textContent = '';
+    }
+  });
 }
