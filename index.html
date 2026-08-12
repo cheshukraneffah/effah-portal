@@ -56,6 +56,11 @@
 
     <style>
     
+    
+    /* FORCE STICKY NAVBAR V2 - fixed wrapper */
+    .sticky.top-0.z-\[100\] { position: sticky !important; top: 0 !important; z-index: 100 !important; }
+    #topNavbar { display: flex !important; min-height: 64px; }
+
     /* FINAL FIX - Top Navbar always sticky + visible */
     #topNavbar {
         position: sticky !important;
@@ -192,7 +197,10 @@
         </aside>
 
         <!-- MAIN WORKSPACE CONTENT (BELAH KANAN) -->
-        <main class="flex-1 flex flex-col min-w-0 overflow-y-auto">
+        <main class="flex-1 flex flex-col min-w-0 h-screen overflow-y-auto relative">
+            <!-- TOP NAVBAR - FIXED STICKY -->
+            <div class="sticky top-0 z-[100] w-full">
+
             
             <!-- Breadcrumb Header dengan Sidebar Collapse Button -->
 <header id="topNavbar" class="bg-white/90 backdrop-blur-xl border-b border-slate-200/80 px-6 py-4 flex items-center justify-between sticky top-0 z-50 shadow-sm" style="position:sticky;top:0;z-index:100;background:rgba(255,255,255,0.92);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);">
@@ -213,6 +221,7 @@
         <i class="fa-solid fa-lock mr-1"></i> Kunci
     </button>
 </header>
+            </div>
 
             <div class="p-6 md:p-8 space-y-6 max-w-7xl w-full mx-auto">
 
