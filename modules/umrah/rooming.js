@@ -172,19 +172,56 @@ function saveRoomOrder(ids){
   }
 }
 
+
+// Auto-scroll while dragging jemaah/staff
+let autoScrollInterval = null;
+function startAutoScroll(){
+  if(autoScrollInterval) return;
+  autoScrollInterval = setInterval(()=>{
+    const grid = document.getElementById('roomingGrid');
+    if(!grid) return;
+    // will be driven by last mouse position
+  }, 16);
+}
+function stopAutoScroll(){
+  if(autoScrollInterval){ clearInterval(autoScrollInterval); autoScrollInterval=null; }
+}
+let lastMouseY = 0;
+document.addEventListener('dragover', (e)=>{
+  lastMouseY = e.clientY;
+  const grid = document.getElementById('roomingGrid');
+  if(!grid) return;
+  const rect = grid.getBoundingClientRect();
+  const threshold = 120;
+  const speed = 12;
+  if(e.clientY > rect.bottom - threshold){
+    grid.scrollTop += speed;
+    // also scroll window if near bottom
+    if(window.innerHeight - e.clientY < 80) window.scrollBy(0, speed);
+  } else if(e.clientY < rect.top + threshold){
+    grid.scrollTop -= speed;
+    if(e.clientY < 80) window.scrollBy(0, -speed);
+  }
+});
+document.addEventListener('dragend', stopAutoScroll);
+document.addEventListener('drop', stopAutoScroll);
+
 let draggedRoomId = null;
 function handleRoomDragStart(e, roomId){
   draggedRoomId = roomId;
   e.dataTransfer.effectAllowed='move';
   e.dataTransfer.setData('text/plain', roomId);
+  startAutoScroll();
   const card = document.querySelector(`[data-room-id="${roomId}"]`);
   if(card) setTimeout(()=>{ card.style.opacity='0.4'; },0);
 }
 function handleRoomDragEnd(e){
+  stopAutoScroll();
   const card = document.querySelector(`[data-room-id="${draggedRoomId}"]`);
   if(card) card.style.opacity='1';
   draggedRoomId=null;
   document.querySelectorAll('[data-room-id]').forEach(c=>c.classList.remove('ring-2','ring-blue-400'));
+  document.querySelectorAll('[draggable="true"]').forEach(el=>el.style.opacity='1');
 }
 function handleRoomDragOver(e){ e.preventDefault(); const card=e.currentTarget; if(card&&card.dataset.roomId!==draggedRoomId) card.classList.add('ring-2','ring-blue-400'); }
 function handleRoomDragLeave(e){ e.currentTarget.classList.remove('ring-2','ring-blue-400'); }
@@ -366,9 +403,20 @@ function renderRoomingGrid(){
 function setActiveLocation(loc){ activeLocation=loc.toUpperCase(); localStorage.setItem('effah_active_location', activeLocation); document.getElementById('copyTargetLoc').textContent=activeLocation; renderLocationTabs(); renderRoomingGrid(); }
 function filterRoomingNamelist(){ renderNamelist(); }
 function allowDrop(e){ e.preventDefault(); }
-function dragJemaah(e,jId){ if(isJemaahAssigned(jId)) return; e.dataTransfer.setData('text/plain', jId); }
+function dragJemaah(e,jId){ 
+  if(isJemaahAssigned(jId)) return; 
+  e.dataTransfer.effectAllowed='move';
+  e.dataTransfer.setData('text/plain', jId); 
+  startAutoScroll();
+  const row = e.currentTarget;
+  if(row){ setTimeout(()=>{ row.style.opacity='0.3'; },0); }
+}
+
 function dropJemaah(e,roomId){
   e.preventDefault();
+  stopAutoScroll();
+  // clear all drag opacities
+  document.querySelectorAll('[draggable="true"]').forEach(el=>el.style.opacity='1');
   const staffId=e.dataTransfer.getData('text/staff-id');
   if(staffId){ assignStaffToRoom(staffId, roomId); return; }
   const jId=e.dataTransfer.getData('text/plain');
@@ -485,7 +533,14 @@ function isStaffAssigned(staffId){
   return allRoomingRecords.some(r=> (r.fields['STAFF / EXTRA']||'').split(',').map(x=>x.trim()).includes(s.name));
 }
 function deleteStaff(staffId){ if(!confirm('Padam?')) return; staffList=staffList.filter(s=>s.id!==staffId); saveStaffList(); renderStaffList(); }
-function dragStaff(e, staffId){ e.dataTransfer.setData('text/staff-id', staffId); e.dataTransfer.setData('text/plain', staffId); }
+function dragStaff(e, staffId){ 
+  e.dataTransfer.effectAllowed='move';
+  e.dataTransfer.setData('text/staff-id', staffId); 
+  e.dataTransfer.setData('text/plain', staffId); 
+  startAutoScroll();
+  const row = e.currentTarget;
+  if(row){ setTimeout(()=>{ row.style.opacity='0.3'; },0); }
+}
 function quickAssignStaff(staffId){ const rooms=allRoomingRecords.filter(r=> (r.fields['LOKASI / CITY']||'MEKAH').toUpperCase()===activeLocation); const target=rooms.find(r=>{ const j=r.fields['JEMAAH']?.length||0; const s=(r.fields['STAFF / EXTRA']||'').split(',').filter(Boolean).length; return (j+s)<(r.fields['KAPASITI']||4); }); if(target) assignStaffToRoom(staffId,target.id); }
 async function assignStaffToRoom(staffId, roomId){
   const staff=staffList.find(s=>s.id===staffId); if(!staff) return;
