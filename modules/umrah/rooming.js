@@ -407,38 +407,69 @@ async function autoAssignRooming(){
   }
   setTimeout(fetchRoomingData,800);
 }
-function openAddLocationModal(){ const loc = prompt('Nama Lokasi baru (contoh: TAIF, JEDDAH):'); if(loc && loc.trim()){ const upper = loc.trim().toUpperCase(); if(['MEKAH','MADINAH','TAIF','JEDDAH'].includes(upper) || confirm(`Tambah lokasi baru "${upper}"?`)){ activeLocation = upper; renderRoomingGrid(); renderNamelist(); updateLocationTabs(); } } }
 
 // Trip dropdown for rooming tab
 function populateRoomingTripDropdown(){
   const sel = document.getElementById('roomingTripSelect');
   if(!sel) return;
-  const trips = window.allTripRecords || window.allTrips || [];
-  const currentId = window.selectedTripRecord?.id || localStorage.getItem('effah_active_trip_id') || '';
+  const trips = window.allTripUmrahRecords || window.allTripRecords || window.allTrips || [];
+  const currentId = window.selectedTripRecord?.id || localStorage.getItem('effah_active_trip_id') || localStorage.getItem('effah_last_selected_trip') || '';
+  if(trips.length===0){
+    sel.innerHTML = '<option value="">Loading trips... sila tunggu</option>';
+    if(typeof fetchTripUmrahData==='function'){
+      fetchTripUmrahData();
+      setTimeout(()=>{ populateRoomingTripDropdown(); }, 1500);
+    }
+    return;
+  }
   sel.innerHTML = '<option value="">Pilih Trip...</option>' + trips.map(t=>{
-    const name = t.fields?.['TRIP NAME']||t.fields?.Trip||t.fields?.Name||t.id;
+    const name = t.fields?.Trip||t.fields?.['TRIP NAME']||t.fields?.Name||t.fields?.NAME||t.id;
     const id = t.id;
-    return `<option value="${id}" ${id===currentId?'selected':''}>${name}</option>`;
+    const display = name.length>50 ? name.slice(0,50)+'...' : name;
+    return `<option value="${id}" ${id===currentId?'selected':''}>${display}</option>`;
   }).join('');
   if(currentId) sel.value = currentId;
 }
 function onRoomingTripChange(tripId){
   if(!tripId) return;
-  const trips = window.allTripRecords || window.allTrips || [];
+  const trips = window.allTripUmrahRecords || window.allTripRecords || window.allTrips || [];
   const found = trips.find(t=>t.id===tripId);
   if(found){
     window.selectedTripRecord = found;
     localStorage.setItem('effah_active_trip_id', tripId);
     localStorage.setItem('selectedTripId', tripId);
-    if(typeof window.selectTrip==='function') window.selectTrip(found);
+    localStorage.setItem('effah_last_selected_trip', tripId);
+  } else {
+    localStorage.setItem('effah_active_trip_id', tripId);
+    localStorage.setItem('selectedTripId', tripId);
+    window.selectedTripRecord = {id: tripId, fields:{Trip: 'Trip'}};
   }
-  fetchRoomingData();
+  if(window._originalFetchRooming) window._originalFetchRooming();
+  else fetchRoomingData();
 }
 
-// override fetchRoomingData to populate dropdown first
-const _origFetchRoomingData = fetchRoomingData;
-fetchRoomingData = async function(){
-  populateRoomingTripDropdown();
-  return _origFetchRoomingData();
+let _roomingTripHookDone = false;
+function ensureTripHook(){
+  if(_roomingTripHookDone) return;
+  if(typeof fetchTripUmrahData !== 'function') return;
+  // wrap fetchTripUmrahData to also refresh rooming dropdown after
+  const origTripFetch = fetchTripUmrahData;
+  window.fetchTripUmrahData = async function(){
+    const res = await origTripFetch();
+    populateRoomingTripDropdown();
+    return res;
+  };
+  _roomingTripHookDone = true;
 }
+setTimeout(ensureTripHook, 500);
+
+function openAddLocationModal(){ const loc = prompt('Nama Lokasi baru (contoh: TAIF, JEDDAH):'); if(loc && loc.trim()){ const upper = loc.trim().toUpperCase(); if(['MEKAH','MADINAH','TAIF','JEDDAH'].includes(upper) || confirm(`Tambah lokasi baru "${upper}"?`)){ activeLocation = upper; renderRoomingGrid(); renderNamelist(); updateLocationTabs(); } } }
+
+// patch fetchRoomingData to always populate dropdown
+window._originalFetchRooming = fetchRoomingData;
+window.fetchRoomingData = async function(){
+  populateRoomingTripDropdown();
+  return window._originalFetchRooming();
+};
+var fetchRoomingData = window.fetchRoomingData;
 
