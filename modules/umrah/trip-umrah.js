@@ -104,6 +104,10 @@ async function fetchTripUmrahData() {
         const statUmrah = document.getElementById('statUmrahCount');
         if (statUmrah) statUmrah.textContent = validTrips.length;
         renderTripSidebarList(allTripUmrahRecords);
+        // sync to rooming dropdown if exists
+        if(typeof populateRoomingTripDropdown === 'function') populateRoomingTripDropdown();
+        if(typeof window.populateRoomingTripDropdown === 'function') window.populateRoomingTripDropdown();
+        window.allTripRecords = allTripUmrahRecords; // alias for rooming
         setTimeout(()=>{ const sc = document.getElementById('tripSidebarContainer'); if(sc) sc.scrollTop = prevScrollTop; }, 50);
         if(prevSelectedId){
           const stillExists = allTripUmrahRecords.find(r=> r.id === prevSelectedId);
