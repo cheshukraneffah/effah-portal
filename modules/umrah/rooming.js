@@ -648,11 +648,13 @@ function generateRoomingPrint(){
       return `<div style="border:1px solid #000;margin-bottom:8px;padding:6px 8px;background:#fff;break-inside:avoid"><div style="display:flex;justify-content:space-between;font-weight:bold;font-size:10px;border-bottom:1px solid #000;padding-bottom:3px;margin-bottom:4px"><span>${rid} (${pakej}) - ${hotel}</span><span>${jIds.length+staff.length}/${f['KAPASITI']||4}</span></div><div style="font-size:9px;line-height:1.6">${rows||'- Kosong -'}</div></div>`;
     }).join('');
     const icon = loc==='MEKAH'?'🕋':loc==='MADINAH'?'🕌':loc==='TAIF'?'⛰️':loc==='JEDDAH'?'🏙️':'📍';
+    const totalJemaahLoc = rooms.reduce((s,r)=>s+(r.fields['JEMAAH']?.length||0),0);
+    const totalStaffLoc = rooms.reduce((s,r)=>s+(r.fields['STAFF / EXTRA']||'').split(',').filter(Boolean).length,0);
     locationPages+=`
       <div class="page-break"></div>
       <div class="location-page">
         <div class="header"><span>ROOMING LIST ${tripName} - ${icon} ${loc} (${rooms.length} BILIK)</span><span>${overviewMini}</span></div>
-        <div style="font-size:9px;margin-bottom:8px;background:#f5f5f5;border:1px solid #000;padding:5px 8px"><b>${icon} ${loc} OVERVIEW:</b> ${overviewMini} | Total: ${rooms.length} bilik, ${rooms.reduce((s,r)=>s+(r.fields['JEMAAH']?.length||0),0)} jemaah</div>
+        <div style="font-size:9px;margin-bottom:8px;background:#f5f5f5;border:1px solid #000;padding:5px 8px"><b>${icon} ${loc} OVERVIEW:</b> ${overviewMini} | Total: ${rooms.length} bilik, ${totalJemaahLoc} jemaah + ${totalStaffLoc} staff</div>
         <div style="columns:2; column-gap:12px">${roomBlocks}</div>
       </div>
     `;
