@@ -6,6 +6,8 @@ let roomingDefaultCap = 4;
 let customLocations = JSON.parse(localStorage.getItem('effah_custom_locations')||'[]');
 let staffList = [];
 let staffIdCounter = parseInt(localStorage.getItem('effah_staff_counter')||'1000');
+let roomingSortDir = localStorage.getItem('effah_rooming_sort_dir') || 'asc'; // asc = A-Z, desc = Z-A
+let roomingSortActive = localStorage.getItem('effah_rooming_sort_active') === 'true' ? true : false;
 
 function cleanTripNameForRooming(name){
   if(!name) return '';
@@ -16,8 +18,19 @@ function getJemaahName(f){ if(!f) return '-'; return f['NAMA'] || f['NAME'] || f
 function generateRoomIdFromCap(cap){ return `B${parseInt(cap)||4}`; }
 function getFullboardVal(f){ return f['FULLBOARD'] || ''; }
 function getPakejVal(f){ return f['PAKEJ'] || ''; }
+function getInsuranVal(f){
+  const v=f['INSURAN'];
+  if(!v) return '';
+  if(Array.isArray(v)) return v.join(', ');
+  return v;
+}
+function getInsuranArray(f){
+  const v=f['INSURAN'];
+  if(!v) return [];
+  if(Array.isArray(v)) return v;
+  return [v];
+}
 function isTrainChecked(f){ return !!f['TRAIN']; }
-function isInsuranChecked(f){ return !!f['INSURAN']; }
 function formatCheckbox(v){ return v ? '✓' : '-'; }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -68,7 +81,12 @@ function renderRoomingHTML(){
           </div>
         </div>
         <div class="px-2.5 py-1.5 bg-slate-50/70 border-b border-slate-200 grid grid-cols-12 text-[9px] font-bold text-slate-500 tracking-wider">
-          <div class="col-span-1">NO</div><div class="col-span-4">NAMA JEMAAH</div><div class="col-span-2 text-center">FULLBOARD</div><div class="col-span-1 text-center">TRAIN</div><div class="col-span-1 text-center">INSUR</div><div class="col-span-2 text-center">PAKEJ</div><div class="col-span-1 text-center">+</div>
+          <div class="col-span-1">NO</div>
+          <div class="col-span-3 flex items-center gap-1 cursor-pointer hover:text-[#7A0C2E] select-none" onclick="toggleSortNama()" title="Klik untuk sort A-Z / Z-A">
+            <span id="headerNamaJemaah" class="bg-[#7A0C2E] text-white px-1.5 py-0.5 rounded text-[9px]">NAMA JEMAAH</span>
+            <span id="sortIcon" class="text-[10px]">${roomingSortActive ? (roomingSortDir==='asc'?'↑':'↓') : '↕'}</span>
+          </div>
+          <div class="col-span-2 text-center">FULLBOARD</div><div class="col-span-1 text-center">TRAIN</div><div class="col-span-3 text-center">INSURAN (TAKAFUL/ETIQA/KHAIRI)</div><div class="col-span-1 text-center">PAKEJ</div><div class="col-span-1 text-center">+</div>
         </div>
         <div id="namelistContainer" class="flex-1 overflow-y-auto max-h-[42vh] divide-y divide-slate-50 bg-white min-h-[180px]"></div>
         <div class="border-t border-slate-200 bg-slate-50/50">
@@ -268,6 +286,15 @@ function renderNamelist(){
   let filtered=[...allRoomingJemaah];
   if(q) filtered=filtered.filter(r=>getJemaahName(r.fields).toLowerCase().includes(q));
   if(pakejFilter) filtered=filtered.filter(r=>getPakejVal(r.fields).toUpperCase()===pakejFilter);
+  // SORT LOGIC - bila header NAMA JEMAAH ditekan
+  if(roomingSortActive){
+    filtered.sort((a,b)=>{
+      const nameA=getJemaahName(a.fields).toUpperCase();
+      const nameB=getJemaahName(b.fields).toUpperCase();
+      if(roomingSortDir==='asc') return nameA.localeCompare(nameB);
+      else return nameB.localeCompare(nameA);
+    });
+  }
   const total=allRoomingJemaah.length;
   const belumGlobal=allRoomingJemaah.filter(r=>!isJemaahAssigned(r.id)).length;
   const belumInLoc=allRoomingJemaah.filter(r=>!isJemaahAssignedInLocation(r.id, activeLocation)).length;
@@ -285,7 +312,7 @@ function renderNamelist(){
     const fb = getFullboardVal(r.fields) || '-';
     const pk = getPakejVal(r.fields) || '-';
     const trChecked = isTrainChecked(r.fields);
-    const insChecked = isInsuranChecked(r.fields);
+    const insArr = getInsuranArray(r.fields);
     let fbCls = 'bg-white border-slate-200';
     if(fb.includes('FULLBOARD (MEKAH)')) fbCls='bg-orange-100 border-orange-200 text-orange-800';
     else if(fb.includes('FULLBOARD (MADINAH)')) fbCls='bg-blue-100 border-blue-200 text-blue-800';
@@ -293,10 +320,18 @@ function renderNamelist(){
     else if(fb==='NO FULLBOARD') fbCls='bg-slate-100 border-slate-200 text-slate-500';
     else if(fb==='-') fbCls='bg-white border-dashed border-slate-300 text-slate-400';
 
+    // multi toggle untuk INSURAN - TAKAFUL/ETIQA/AL-KHAIRI
+    const insToggle = ['TAKAFUL','ETIQA','AL-KHAIRI'].map(opt=>{
+      const active = insArr.includes(opt);
+      const cls = active ? 'bg-[#7A0C2E] text-white border-[#7A0C2E]' : 'bg-white text-slate-400 border-slate-200 hover:border-slate-300';
+      const label = opt==='TAKAFUL'?'TAK':opt==='AL-KHAIRI'?'KHAIRI':opt;
+      return `<button onclick="toggleInsuran('${r.id}','${opt}')" class="px-1 py-0.5 rounded-full border text-[7px] font-bold ${cls}" title="${opt}">${label}</button>`;
+    }).join('');
+
     return `<div ${drag} class="grid grid-cols-12 items-center px-1.5 py-1.5 text-[11px] border-b border-slate-50 ${rowCls}">
       <div class="col-span-1 text-slate-400 text-[10px]">${String(i+1).padStart(2,'0')}</div>
       <div class="col-span-3 font-medium truncate text-[10px]" title="${name}">${name}</div>
-      <div class="col-span-3 flex items-center gap-0.5">
+      <div class="col-span-2 flex items-center gap-0.5">
         <select onchange="updateJemaahField('${r.id}','FULLBOARD',this.value)" class="text-[8px] border rounded-full px-1 py-0.5 bg-white font-bold ${fbCls} outline-none w-full truncate" title="FULLBOARD">
           <option value="" ${!fb || fb==='-'?'selected':''}>- FB</option>
           <option value="FULLBOARD" ${fb==='FULLBOARD'?'selected':''}>FULLBOARD</option>
@@ -308,22 +343,39 @@ function renderNamelist(){
       <div class="col-span-1 text-center">
         <input type="checkbox" ${trChecked?'checked':''} onchange="updateJemaahCheckbox('${r.id}','TRAIN',this.checked)" class="w-3.5 h-3.5 accent-[#7A0C2E] rounded" title="TRAIN">
       </div>
-      <div class="col-span-1 text-center">
-        <input type="checkbox" ${insChecked?'checked':''} onchange="updateJemaahCheckbox('${r.id}','INSURAN',this.checked)" class="w-3.5 h-3.5 accent-[#7A0C2E] rounded" title="INSURAN">
+      <div class="col-span-3 flex items-center gap-0.5 flex-wrap justify-center">
+        ${insToggle}
       </div>
-      <div class="col-span-2 flex items-center gap-0.5">
-        <select onchange="updateJemaahField('${r.id}','PAKEJ',this.value)" class="text-[8px] border rounded-full px-1 py-0.5 bg-white font-bold outline-none w-full ${pk==='-'?'border-dashed text-slate-400':'bg-slate-50'}" title="PAKEJ">
-          <option value="" ${!pk || pk==='-'?'selected':''}>- Pakej</option>
+      <div class="col-span-1 flex items-center gap-0.5">
+        <select onchange="updateJemaahField('${r.id}','PAKEJ',this.value)" class="text-[7px] border rounded-full px-1 py-0.5 bg-white font-bold outline-none w-full ${pk==='-'?'border-dashed text-slate-400':'bg-slate-50'}" title="PAKEJ">
+          <option value="" ${!pk || pk==='-'?'selected':''}>-</option>
           <option value="JIMAT" ${pk==='JIMAT'?'selected':''}>JIMAT</option>
-          <option value="EKONOMI" ${pk==='EKONOMI'?'selected':''}>EKONOMI</option>
-          <option value="STANDARD" ${pk==='STANDARD'?'selected':''}>STANDARD</option>
-          <option value="PREMIUM" ${pk==='PREMIUM'?'selected':''}>PREMIUM</option>
+          <option value="EKONOMI" ${pk==='EKONOMI'?'selected':''}>EKO</option>
+          <option value="STANDARD" ${pk==='STANDARD'?'selected':''}>STD</option>
+          <option value="PREMIUM" ${pk==='PREMIUM'?'selected':''}>PREM</option>
         </select>
       </div>
       <div class="col-span-1 text-center">${statusIcon}</div>
     </div>`;
   }).join('');
+  // update icon sort
+  const sortIconEl=document.getElementById('sortIcon');
+  if(sortIconEl) sortIconEl.textContent = roomingSortActive ? (roomingSortDir==='asc'?'↑ A-Z':'↓ Z-A') : '↕';
 }
+
+function toggleSortNama(){
+  if(!roomingSortActive){
+    roomingSortActive=true;
+    roomingSortDir='asc';
+  } else {
+    roomingSortDir = roomingSortDir==='asc' ? 'desc' : 'asc';
+  }
+  localStorage.setItem('effah_rooming_sort_dir', roomingSortDir);
+  localStorage.setItem('effah_rooming_sort_active', 'true');
+  renderNamelist();
+}
+
+function filterRoomingNamelist(){ renderNamelist(); }
 
 function renderRoomingGrid(){
   const grid=document.getElementById('roomingGrid'); if(!grid) return;
@@ -358,7 +410,6 @@ function renderRoomingGrid(){
   }).join('');
 }
 function setActiveLocation(loc){ activeLocation=loc.toUpperCase(); localStorage.setItem('effah_active_location',activeLocation); const el=document.getElementById('copyTargetLoc'); if(el) el.textContent=activeLocation; renderLocationTabs(); renderRoomingGrid(); renderNamelist(); renderStaffList(); }
-function filterRoomingNamelist(){ renderNamelist(); }
 function allowDrop(e){ e.preventDefault(); }
 function allowDropRoom(e){ e.preventDefault(); e.currentTarget.classList.add('ring-2','ring-[#7A0C2E]/20'); }
 function dragJemaah(e,jId){ if(isJemaahAssignedInLocation(jId, activeLocation)) return; e.dataTransfer.setData('text/plain',jId); const r=e.currentTarget; if(r) setTimeout(()=>r.style.opacity='0.3',0); }
@@ -416,6 +467,40 @@ async function updateJemaahCheckbox(jemaahId, field, checked){
     const data=await res.json();
     if(!data.id && data.error) throw new Error(data.error.message);
   }catch(e){ console.error(e); alert('Gagal update checkbox '+field+': '+e.message); fetchRoomingData(); }
+}
+async function updateJemaahInsuran(jemaahId, value){
+  const base=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base')||localStorage.getItem('effah_base_id'); const pat=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
+  if(!base||!pat) return alert('Airtable config missing');
+  const rec=allRoomingJemaah.find(r=>r.id===jemaahId); 
+  if(rec){
+    rec.fields['INSURAN'] = value ? [value] : [];
+  }
+  renderNamelist();
+  try{
+    const payload = value ? {[ 'INSURAN']: [value]} : {['INSURAN']: []};
+    const res=await fetch(`https://api.airtable.com/v0/${base}/DATA%20JEMAAH%20UMRAH/${jemaahId}`,{method:'PATCH',headers:{Authorization:`Bearer ${pat}`,'Content-Type':'application/json'},body:JSON.stringify({fields: payload})});
+    const data=await res.json();
+    if(!data.id && data.error) throw new Error(data.error.message);
+  }catch(e){ console.error(e); alert('Gagal update INSURAN: '+e.message); fetchRoomingData(); }
+}
+async function toggleInsuran(jemaahId, opt){
+  const base=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base')||localStorage.getItem('effah_base_id'); const pat=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
+  if(!base||!pat) return alert('Airtable config missing');
+  const rec=allRoomingJemaah.find(r=>r.id===jemaahId);
+  if(!rec) return;
+  let curr = getInsuranArray(rec.fields);
+  if(curr.includes(opt)){
+    curr = curr.filter(x=>x!==opt);
+  } else {
+    curr.push(opt);
+  }
+  rec.fields['INSURAN'] = curr;
+  renderNamelist();
+  try{
+    const res=await fetch(`https://api.airtable.com/v0/${base}/DATA%20JEMAAH%20UMRAH/${jemaahId}`,{method:'PATCH',headers:{Authorization:`Bearer ${pat}`,'Content-Type':'application/json'},body:JSON.stringify({fields: {'INSURAN': curr}})});
+    const data=await res.json();
+    if(!data.id && data.error) throw new Error(data.error.message);
+  }catch(e){ console.error(e); alert('Gagal update INSURAN multi: '+e.message); fetchRoomingData(); }
 }
 function updateHotelInline(roomId, newName){
   const name = (newName||'').trim().toUpperCase();
@@ -533,10 +618,10 @@ function generateRoomingPrint(){
   // NAMELIST - baca field Airtable jika ada, fallback jika belum ada (FULLBOARD, TRAIN, PAKEJ, INSURAN)
   let namelistRows=allRoomingJemaah.map((j,idx)=>{
     const name=getJemaahName(j.fields);
-    const board=getFullboardVal(j.fields);
-    const train=isTrainChecked(j.fields) ? '✓ TRAIN' : '-';
-    const pakej=getPakejVal(j.fields);
-    const insuran=isInsuranChecked(j.fields) ? '✓' : '-';
+    const board=getFullboardVal(j.fields) || '-';
+    const train=isTrainChecked(j.fields) ? '✓' : '-';
+    const pakej=getPakejVal(j.fields) || '-';
+    const insuran=getInsuranVal(j.fields) || '-';
     return `<tr><td>${idx+1}</td><td>${name}</td><td>${board}</td><td>${train}</td><td>${pakej}</td><td>${insuran}</td></tr>`;
   }).join('');
 
