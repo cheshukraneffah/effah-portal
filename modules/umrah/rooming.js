@@ -619,7 +619,7 @@ function generateRoomingPrint(){
   let namelistRows=allRoomingJemaah.map((j,idx)=>{
     const name=getJemaahName(j.fields);
     const board=getFullboardVal(j.fields) || '-';
-    const train=isTrainChecked(j.fields) ? '✓' : '-';
+    const train=isTrainChecked(j.fields) ? 'TRAIN' : '-';
     const pakej=getPakejVal(j.fields) || '-';
     const insuran=getInsuranVal(j.fields) || '-';
     return `<tr><td>${idx+1}</td><td>${name}</td><td>${board}</td><td>${train}</td><td>${pakej}</td><td>${insuran}</td></tr>`;
