@@ -14,6 +14,11 @@ function cleanTripNameForRooming(name){
 }
 function getJemaahName(f){ if(!f) return '-'; return f['NAMA'] || f['NAME'] || f['NAMA JEMAAH'] || f['NAMA PENUH'] || f['Name'] || '-'; }
 function generateRoomIdFromCap(cap){ return `B${parseInt(cap)||4}`; }
+function getFullboardVal(f){ return f['FULLBOARD'] || f['BOARD'] || 'NO FULLBOARD'; }
+function getPakejVal(f){ return f['PAKEJ'] || f['PAKEJ / HOTEL'] || 'EKONOMI'; }
+function isTrainChecked(f){ return !!f['TRAIN']; }
+function isInsuranChecked(f){ return !!f['INSURAN']; }
+function formatCheckbox(v){ return v ? '✓' : '-'; }
 
 document.addEventListener('DOMContentLoaded', () => {
   if(document.getElementById('modul-rooming')) renderRoomingHTML();
@@ -59,11 +64,11 @@ function renderRoomingHTML(){
               <i class="fa-solid fa-magnifying-glass absolute left-2.5 top-2.5 text-slate-400 text-[10px]"></i>
               <input id="searchRoomingJemaah" onkeyup="filterRoomingNamelist()" placeholder="Cari nama jemaah..." class="w-full text-[11px] pl-7 pr-2.5 py-2 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:outline-none">
             </div>
-            <select id="filterPakejRooming" onchange="filterRoomingNamelist()" class="text-[11px] border border-slate-200 rounded-xl px-2.5 py-2 bg-white font-medium"><option value="">Semua Pakej</option><option>EKONOMI</option><option>PREMIUM</option><option>JIMAT</option></select>
+            <select id="filterPakejRooming" onchange="filterRoomingNamelist()" class="text-[11px] border border-slate-200 rounded-xl px-2.5 py-2 bg-white font-medium"><option value="">Semua Pakej</option><option>JIMAT</option><option>EKONOMI</option><option>STANDARD</option><option>PREMIUM</option></select>
           </div>
         </div>
         <div class="px-2.5 py-1.5 bg-slate-50/70 border-b border-slate-200 grid grid-cols-12 text-[9px] font-bold text-slate-500 tracking-wider">
-          <div class="col-span-1">NO</div><div class="col-span-7">NAMA JEMAAH</div><div class="col-span-1 text-center">BOARD</div><div class="col-span-2 text-center">PAKEJ</div><div class="col-span-1 text-center">+</div>
+          <div class="col-span-1">NO</div><div class="col-span-4">NAMA JEMAAH</div><div class="col-span-2 text-center">FULLBOARD</div><div class="col-span-1 text-center">TRAIN</div><div class="col-span-1 text-center">INSUR</div><div class="col-span-2 text-center">PAKEJ</div><div class="col-span-1 text-center">+</div>
         </div>
         <div id="namelistContainer" class="flex-1 overflow-y-auto max-h-[42vh] divide-y divide-slate-50 bg-white min-h-[180px]"></div>
         <div class="border-t border-slate-200 bg-slate-50/50">
@@ -115,7 +120,7 @@ function renderRoomingHTML(){
         </div>
         <select id="newRoomLokasi" class="w-full p-2 border border-slate-200 rounded-xl bg-white text-[11px]"><option value="MEKAH">MEKAH</option><option value="MADINAH">MADINAH</option><option value="TAIF">TAIF</option><option value="JEDDAH">JEDDAH</option></select>
         <select id="newRoomPakej" class="w-full p-2 border border-slate-200 rounded-xl bg-white text-[11px]"><option>EKONOMI</option><option>PREMIUM</option><option>JIMAT</option></select>
-        <input id="newRoomHotel" placeholder="Nama Hotel (SNOOD AJYAD)" class="w-full p-2 border border-slate-200 rounded-xl bg-white text-[11px]">
+        <input id="newRoomHotel" placeholder="Nama Hotel" class="w-full p-2 border border-slate-200 rounded-xl bg-white text-[11px]">
         <div class="flex gap-2 items-center">
           <input id="newRoomCap" type="number" value="4" min="1" max="8" oninput="updateNewRoomIdFromCap()" class="flex-1 p-2 border border-slate-200 rounded-xl font-bold bg-white text-[11px]">
           <span class="py-2 text-slate-500 font-bold text-[10px]">Kapasiti</span>
@@ -259,7 +264,10 @@ function isStaffAssigned(staffId){ const s=staffList.find(x=>x.id===staffId); if
 function renderNamelist(){
   const cont=document.getElementById('namelistContainer'); if(!cont) return;
   const q=(document.getElementById('searchRoomingJemaah')?.value||'').toLowerCase();
-  let filtered=[...allRoomingJemaah]; if(q) filtered=filtered.filter(r=>getJemaahName(r.fields).toLowerCase().includes(q));
+  const pakejFilter=(document.getElementById('filterPakejRooming')?.value||'').toUpperCase();
+  let filtered=[...allRoomingJemaah];
+  if(q) filtered=filtered.filter(r=>getJemaahName(r.fields).toLowerCase().includes(q));
+  if(pakejFilter) filtered=filtered.filter(r=>getPakejVal(r.fields).toUpperCase()===pakejFilter);
   const total=allRoomingJemaah.length;
   const belumGlobal=allRoomingJemaah.filter(r=>!isJemaahAssigned(r.id)).length;
   const belumInLoc=allRoomingJemaah.filter(r=>!isJemaahAssignedInLocation(r.id, activeLocation)).length;
@@ -274,7 +282,25 @@ function renderNamelist(){
     const drag=assignedInLoc?'':`draggable="true" ondragstart="dragJemaah(event,'${r.id}')" ondragend="dragEnd(event)"`;
     let statusIcon = assignedInLoc? '<span class="text-[10px] text-slate-400">✓</span>' : `<button onclick="quickAssign('${r.id}')" class="w-5 h-5 rounded-full border bg-slate-100 hover:bg-slate-200 text-[10px]">+</button>`;
     if(!assignedInLoc && assignedGlobal) statusIcon = `<button onclick="quickAssign('${r.id}')" class="w-5 h-5 rounded-full border bg-amber-100 hover:bg-amber-200 text-[10px]" title="Sudah ada di lokasi lain, boleh tambah di ${activeLocation} juga">+</button>`;
-    return `<div ${drag} class="grid grid-cols-12 items-center px-2.5 py-2 text-[11px] border-b border-slate-50 ${rowCls}"><div class="col-span-1 text-slate-400 text-[10px]">${String(i+1).padStart(2,'0')}</div><div class="col-span-7 font-medium truncate">${name}</div><div class="col-span-1 text-center">-</div><div class="col-span-2 text-center"><span class="px-1.5 py-0.5 rounded-full border text-[9px]">${r.fields['PAKEJ']||'EKONOMI'}</span></div><div class="col-span-1 text-center">${statusIcon}</div></div>`;
+    const fb = getFullboardVal(r.fields);
+    const tr = formatCheckbox(isTrainChecked(r.fields));
+    const ins = formatCheckbox(isInsuranChecked(r.fields));
+    const pk = getPakejVal(r.fields);
+    // warna fullboard: kalau FULLBOARD hijau, NO FULLBOARD kelabu
+    let fbCls = 'bg-slate-100 border-slate-200';
+    if(fb.includes('FULLBOARD (MEKAH)')) fbCls='bg-orange-100 border-orange-200 text-orange-800';
+    else if(fb.includes('FULLBOARD (MADINAH)')) fbCls='bg-blue-100 border-blue-200 text-blue-800';
+    else if(fb==='FULLBOARD') fbCls='bg-emerald-100 border-emerald-200 text-emerald-800';
+    else if(fb==='NO FULLBOARD') fbCls='bg-slate-100 border-slate-200 text-slate-500';
+    return `<div ${drag} class="grid grid-cols-12 items-center px-2.5 py-2 text-[11px] border-b border-slate-50 ${rowCls}">
+      <div class="col-span-1 text-slate-400 text-[10px]">${String(i+1).padStart(2,'0')}</div>
+      <div class="col-span-4 font-medium truncate" title="${name}">${name}</div>
+      <div class="col-span-2 text-center"><span class="px-1.5 py-0.5 rounded-full border text-[8px] font-bold truncate ${fbCls}">${fb}</span></div>
+      <div class="col-span-1 text-center text-[11px] ${isTrainChecked(r.fields)?'text-emerald-600 font-bold':'text-slate-300'}">${tr}</div>
+      <div class="col-span-1 text-center text-[11px] ${isInsuranChecked(r.fields)?'text-emerald-600 font-bold':'text-slate-300'}">${ins}</div>
+      <div class="col-span-2 text-center"><span class="px-1.5 py-0.5 rounded-full border text-[8px] font-bold bg-white">${pk}</span></div>
+      <div class="col-span-1 text-center">${statusIcon}</div>
+    </div>`;
   }).join('');
 }
 
@@ -297,7 +323,7 @@ function renderRoomingGrid(){
         <div class="flex items-center gap-1.5 flex-1 min-w-0">
           <button class="w-6 h-6 rounded-full bg-slate-100 border flex items-center justify-center cursor-grab shrink-0" draggable="true" ondragstart="handleRoomDragStart(event,'${rec.id}')" ondragend="handleRoomDragEnd(event)"><i class="fa-solid fa-grip-lines text-[9px]"></i></button>
           <span class="font-bold text-[11px] shrink-0">${roomId}</span>
-          <input id="hotelInput-${rec.id}" value="${hotel}" placeholder="Nama Hotel (SNOOD AJYAD)" onchange="updateHotelInline('${rec.id}', this.value)" onfocus="this.select()" class="flex-1 min-w-0 px-2 py-1 bg-slate-50 border border-slate-200 rounded-full text-[11px] font-bold truncate focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#7A0C2E]/30" title="Klik untuk tukar nama hotel">
+          <input id="hotelInput-${rec.id}" value="${hotel}" placeholder="Nama Hotel" onchange="updateHotelInline('${rec.id}', this.value)" onfocus="this.select()" class="flex-1 min-w-0 px-2 py-1 bg-slate-50 border border-slate-200 rounded-full text-[11px] font-bold truncate focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#7A0C2E]/30" title="Klik untuk tukar nama hotel">
         </div>
         <button onclick="deleteRoom('${rec.id}','${roomId}')" class="w-6 h-6 rounded-full bg-slate-50 hover:bg-red-50 border text-[10px] shrink-0"><i class="fa-solid fa-trash"></i></button>
       </div>
@@ -444,7 +470,7 @@ function quickAssignStaff(staffId){ if(isStaffAssignedInLocation(staffId, active
 async function assignStaffToRoom(staffId,roomId){ const staff=staffList.find(s=>s.id===staffId); if(!staff) return; const rec=allRoomingRecords.find(r=>r.id===roomId); if(!rec) return; const cur=(rec.fields['STAFF / EXTRA']||'').trim(); const newVal=cur?cur+','+staff.name:staff.name; await updateRoomField(roomId,'STAFF / EXTRA',newVal,true); }
 function removeStaff(roomId,staffName){ const rec=allRoomingRecords.find(r=>r.id===roomId); const arr=(rec.fields['STAFF / EXTRA']||'').split(',').map(s=>s.trim()).filter(s=>s&&s!==staffName); updateRoomField(roomId,'STAFF / EXTRA',arr.join(','),true); }
 
-// V23 PRINT - tanpa EJEN, tanpa Lokasi ada bilik, include semua staff walaupun takde bilik sebagai NA
+// V24 PRINT - Page1 namelist centered, Page2+ per lokasi, tanpa EJEN, include semua staff NA, placeholder umum
 function generateRoomingPrint(){
   const tripNameRaw=window.selectedTripRecord?.fields?.Trip||document.getElementById('roomingTripSelect')?.selectedOptions[0]?.text||'Trip';
   const tripName=cleanTripNameForRooming(tripNameRaw);
@@ -458,9 +484,14 @@ function generateRoomingPrint(){
   allRoomingRecords.forEach(r=> (r.fields['STAFF / EXTRA']||'').split(',').filter(Boolean).forEach(s=>{ if(!staffInAnyRoom.includes(s)) staffInAnyRoom.push(s); }));
   const combinedStaff = [...new Set([...allStaffNames, ...staffInAnyRoom])];
 
+  // NAMELIST - baca field Airtable jika ada, fallback jika belum ada (FULLBOARD, TRAIN, PAKEJ, INSURAN)
   let namelistRows=allRoomingJemaah.map((j,idx)=>{
-    const name=getJemaahName(j.fields); const board=j.fields['BOARD']||'NO FULLBOARD'; const pakej=j.fields['PAKEJ']||'EKONOMI';
-    return `<tr><td>${idx+1}</td><td>${name}</td><td>${board}</td><td>-</td><td>${pakej}</td><td></td></tr>`;
+    const name=getJemaahName(j.fields);
+    const board=getFullboardVal(j.fields);
+    const train=isTrainChecked(j.fields) ? '✓ TRAIN' : '-';
+    const pakej=getPakejVal(j.fields);
+    const insuran=isInsuranChecked(j.fields) ? '✓' : '-';
+    return `<tr><td>${idx+1}</td><td>${name}</td><td>${board}</td><td>${train}</td><td>${pakej}</td><td>${insuran}</td></tr>`;
   }).join('');
 
   combinedStaff.forEach(sName=>{
@@ -468,8 +499,9 @@ function generateRoomingPrint(){
     namelistRows+=`<tr><td>NA</td><td>${cleanName} (EFFAH)</td><td>-</td><td>-</td><td>-</td><td>-</td></tr>`;
   });
 
-  let locationBoxes='';
-  activeLocsWithRooms.forEach(loc=>{
+  // Build per location pages
+  let locationPages='';
+  activeLocsWithRooms.forEach((loc, locIndex)=>{
     let rooms=[...allRoomingRecords].filter(r=>(r.fields['LOKASI / CITY']||'MEKAH').toUpperCase()===loc.toUpperCase());
     if(rooms.length===0) return;
     rooms=getRoomOrderedList(rooms);
@@ -479,30 +511,49 @@ function generateRoomingPrint(){
       return `${hotel}: ${Object.keys(capCount).map(c=>`B${c}-${capCount[c]}`).join(', ')}`;
     }).join(' | ');
     const roomBlocks=rooms.map(r=>{
-      const f=r.fields; const rid=f['Room ID / Nama Bilik']||generateRoomIdFromCap(f['KAPASITI']); const pakej=f['PAKEJ / HOTEL']||'EKONOMI'; const hotel=f['HOTEL NAME']||''; const jIds=f['JEMAAH']||[]; const staff=(f['STAFF / EXTRA']||'').split(',').filter(Boolean);
+      const f=r.fields; const rid=f['Room ID / Nama Bilik']||generateRoomIdFromCap(f['KAPASITI']); const pakej=f['PAKEJ / HOTEL']||'EKONOMI'; const hotel=f['HOTEL NAME']||'TANPA HOTEL'; const jIds=f['JEMAAH']||[]; const staff=(f['STAFF / EXTRA']||'').split(',').filter(Boolean);
       let rows=jIds.map((jId,idx)=>{ const rec=allRoomingJemaah.find(j=>j.id===jId); const name=getJemaahName(rec?.fields); return name && name!=='-'? `<div>${idx+1}. ${name}</div>` : ''; }).filter(Boolean).join('');
       staff.forEach((s)=>{ const clean=s.replace(/\(EFFAH\)/i,'').trim(); rows+=`<div style="color:#7A0C2E">NA ${clean} (EFFAH)</div>`; });
-      return `<div style="border:1px solid #000;margin-bottom:6px;padding:5px 7px"><div style="display:flex;justify-content:space-between;font-weight:bold;font-size:10px;border-bottom:1px solid #000;padding-bottom:3px;margin-bottom:4px"><span>${rid} (${pakej}) - ${hotel}</span><span>${jIds.length+staff.length}/${f['KAPASITI']||4}</span></div><div style="font-size:9px;line-height:1.5">${rows||'- Kosong -'}</div></div>`;
+      return `<div style="border:1px solid #000;margin-bottom:8px;padding:6px 8px;background:#fff;break-inside:avoid"><div style="display:flex;justify-content:space-between;font-weight:bold;font-size:10px;border-bottom:1px solid #000;padding-bottom:3px;margin-bottom:4px"><span>${rid} (${pakej}) - ${hotel}</span><span>${jIds.length+staff.length}/${f['KAPASITI']||4}</span></div><div style="font-size:9px;line-height:1.6">${rows||'- Kosong -'}</div></div>`;
     }).join('');
     const icon = loc==='MEKAH'?'🕋':loc==='MADINAH'?'🕌':loc==='TAIF'?'⛰️':loc==='JEDDAH'?'🏙️':'📍';
-    locationBoxes+=`<div style="border:2px solid #000;margin-bottom:12px;page-break-inside:avoid"><div style="background:#7A0C2E;color:#fff;padding:5px 8px;font-weight:bold;font-size:11px">${icon} ${loc} (${rooms.length} BILIK) <span style="font-weight:normal;font-size:9px;margin-left:8px">${overviewMini}</span></div><div style="padding:8px">${roomBlocks}</div></div>`;
+    locationPages+=`
+      <div class="page-break"></div>
+      <div class="location-page">
+        <div class="header"><span>ROOMING LIST ${tripName} - ${icon} ${loc} (${rooms.length} BILIK)</span><span>${overviewMini}</span></div>
+        <div style="font-size:9px;margin-bottom:8px;background:#f5f5f5;border:1px solid #000;padding:5px 8px"><b>${icon} ${loc} OVERVIEW:</b> ${overviewMini} | Total: ${rooms.length} bilik, ${rooms.reduce((s,r)=>s+(r.fields['JEMAAH']?.length||0),0)} jemaah</div>
+        <div style="columns:2; column-gap:12px">${roomBlocks}</div>
+      </div>
+    `;
   });
 
   const html=`<html><head><title>Rooming ${tripName}</title><style>
-    body{font-family:Arial;font-size:10px;margin:12px;color:#000}
+    body{font-family:Arial, Helvetica, sans-serif;font-size:10px;margin:12px;color:#000}
     table{border-collapse:collapse;width:100%}
-    th,td{border:1px solid #000;padding:4px 5px;font-size:9px}
-    th{background:#e5e5e5;font-weight:bold}
-   .header{display:flex;justify-content:space-between;font-weight:bold;font-size:13px;border-bottom:2px solid #000;padding-bottom:6px;margin-bottom:10px}
-   .container{display:flex;gap:12px;align-items:flex-start}
-   .left{width:58%}.right{width:42%}
-   .overview-box{border:1px solid #000;padding:6px 8px;margin-bottom:10px;font-size:9px;background:#f5f5f5}
-    @media print{@page{size:A4 landscape;margin:8mm} body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+    th,td{border:1px solid #000;padding:4px 6px;font-size:9px}
+    th{background:#e5e5e5;font-weight:bold;text-transform:uppercase}
+   .header{display:flex;justify-content:space-between;font-weight:bold;font-size:12px;border-bottom:2px solid #000;padding-bottom:6px;margin-bottom:8px}
+   .page-break{page-break-before:always}
+   .namelist-page{max-width:900px;margin:0 auto}
+   .location-page{max-width:100%}
+    @media print{
+      @page{size:A4 landscape;margin:10mm}
+      body{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+      .page-break{page-break-before:always}
+    }
   </style></head><body>
-    <div class="header"><span>NAMELIST ${tripName}</span><span>ROOMING LIST ${tripName}</span></div>
-    <div style="font-size:10px;margin-bottom:8px"><b>Trip:</b> ${tripName} | <b>Total:</b> ${allRoomingJemaah.length} Jemaah + ${combinedStaff.length} Staff</div>
-    <div class="container"><div class="left"><table><tr><th style="width:25px">NO</th><th>NAMA JEMAAH</th><th style="width:90px">FULLBOARD</th><th style="width:35px">TRAIN</th><th style="width:65px">PAKEJ</th><th style="width:55px">INSURAN</th></tr>${namelistRows}</table></div><div class="right">${locationBoxes||'<div style="border:1px dashed #000;padding:12px;text-align:center">Tiada bilik</div>'}</div></div>
-    <script>window.onload=function(){setTimeout(()=>window.print(),400)}</script>
+    <!-- PAGE 1: NAMELIST CENTERED -->
+    <div class="namelist-page">
+      <div class="header"><span>NAMELIST ${tripName}</span><span>Total: ${allRoomingJemaah.length} Jemaah + ${combinedStaff.length} Staff</span></div>
+      <div style="font-size:9px;margin-bottom:8px"><b>Trip:</b> ${tripName} | <b>Tarikh Cetak:</b> ${new Date().toLocaleDateString('ms-MY')} | <b>Nota:</b> Column EJEN dibuang, hanya FULLBOARD/TRAIN/PAKEJ/INSURAN. Field akan link bila tambah di Airtable DATA JEMAAH UMRAH.</div>
+      <table>
+        <tr><th style="width:30px">NO</th><th>NAMA JEMAAH</th><th style="width:110px">FULLBOARD</th><th style="width:50px">TRAIN</th><th style="width:75px">PAKEJ</th><th style="width:70px">INSURAN</th></tr>
+        ${namelistRows}
+      </table>
+      <div style="margin-top:10px;font-size:8px;color:#666">* Jika column FULLBOARD/TRAIN/PAKEJ/INSURAN masih kosong, tambah field baru di Airtable: FULLBOARD (Single select: FULLBOARD/NO FULLBOARD), TRAIN (Single line), PAKEJ (dari existing), INSURAN (Single line). Code sudah ready baca field tersebut.</div>
+    </div>
+    ${locationPages||'<div class="page-break"></div><div style="border:1px dashed #000;padding:20px;text-align:center">Tiada bilik untuk trip ini</div>'}
+    <script>window.onload=function(){setTimeout(()=>window.print(),500)}</script>
   </body></html>`;
   const w=window.open('','_blank'); if(w){ w.document.write(html); w.document.close(); }
 }
