@@ -81,7 +81,7 @@ function renderRoomingHTML(){
           </div>
         </div>
         <div class="px-3 py-2 bg-slate-50/70 border-b grid grid-cols-12 text-[10px] font-bold text-slate-500 tracking-wider">
-          <div class="col-span-1">NO</div><div class="col-span-5">NAMA JEMAAH</div><div class="col-span-1 text-center">BOARD</div><div class="col-span-1 text-center">TRAIN</div><div class="col-span-2 text-center">PAKEJ</div><div class="col-span-1 text-center">INSUR</div><div class="col-span-1 text-center">+</div>
+          <div class="col-span-1">NO</div><div class="col-span-7">NAMA JEMAAH</div><div class="col-span-1 text-center">BOARD</div><div class="col-span-2 text-center">PAKEJ</div><div class="col-span-1 text-center">+</div>
         </div>
         <div id="namelistContainer" class="flex-1 overflow-y-auto max-h-[45vh] divide-y divide-slate-50">
           <div class="p-8 text-center text-xs text-slate-400">Pilih Trip dari dropdown di atas</div>
@@ -172,34 +172,36 @@ function getRoomOrderedList(rooms){
   return ordered;
 }
 function saveRoomOrder(ids){
-  // Immediate local save for real-time UI
+  // Immediate local save
   localStorage.setItem(getRoomOrderKey(), JSON.stringify(ids));
-  // Re-render instantly without waiting Airtable
-  const grid = document.getElementById('roomingGrid');
-  if(grid){
-    // update DOM order instantly without full re-render for speed
-    const cards = Array.from(grid.querySelectorAll('[data-room-id]'));
-    const map = {};
-    cards.forEach(c=>map[c.dataset.roomId]=c);
-    grid.innerHTML='';
-    ids.forEach(id=>{ if(map[id]) grid.appendChild(map[id]); });
-  }
-  // Background sync to Airtable (non-blocking)
+  // Reorder in-memory allRoomingRecords to match ids for current location
+  const loc = activeLocation.toUpperCase();
+  const locRooms = allRoomingRecords.filter(r=> (r.fields['LOKASI / CITY']||'MEKAH').toUpperCase()===loc);
+  const otherRooms = allRoomingRecords.filter(r=> (r.fields['LOKASI / CITY']||'MEKAH').toUpperCase()!==loc);
+  const map = {};
+  locRooms.forEach(r=>map[r.id]=r);
+  const reorderedLoc = [];
+  ids.forEach(id=>{ if(map[id]){ reorderedLoc.push(map[id]); delete map[id]; } });
+  Object.values(map).forEach(r=>reorderedLoc.push(r));
+  allRoomingRecords = [...otherRooms, ...reorderedLoc];
+  
+  // Background sync to Airtable
   const base = window.AIRTABLE_BASE_ID || localStorage.getItem('effah_api_base') || localStorage.getItem('effah_base_id');
   const pat = window.AIRTABLE_PAT || localStorage.getItem('effah_api_pat');
-  if(!base || !pat) return Promise.resolve();
-  return (async()=>{
-    try{
-      for(let i=0;i<ids.length;i++){
-        const roomId = ids[i];
-        await fetch(`https://api.airtable.com/v0/${base}/ROOMING%20LIST/${roomId}`,{
-          method:'PATCH',
-          headers:{Authorization:`Bearer ${pat}`,'Content-Type':'application/json'},
-          body: JSON.stringify({fields:{'SORT ORDER': i+1}})
-        });
-      }
-    }catch(e){ console.warn('Airtable order save fail', e); }
-  })();
+  if(base && pat){
+    (async()=>{
+      try{
+        for(let i=0;i<ids.length;i++){
+          const roomId = ids[i];
+          await fetch(`https://api.airtable.com/v0/${base}/ROOMING%20LIST/${roomId}`,{
+            method:'PATCH',
+            headers:{Authorization:`Bearer ${pat}`,'Content-Type':'application/json'},
+            body: JSON.stringify({fields:{'SORT ORDER': i+1}})
+          });
+        }
+      }catch(e){ console.warn('Airtable order save fail', e); }
+    })();
+  }
 }
 
 let draggedRoomId = null;
@@ -228,7 +230,7 @@ function handleRoomDragLeave(e){
 }
 function handleRoomDrop(e, targetId){
   e.preventDefault();
-  const fromId = draggedRoomId || e.dataTransfer.getData('text/room-id');
+  const fromId = draggedRoomId || e.dataTransfer.getData('text/room-id') || e.dataTransfer.getData('text/plain');
   if(!fromId || fromId===targetId) return;
   const grid = document.getElementById('roomingGrid');
   const cards = Array.from(grid.querySelectorAll('[data-room-id]'));
@@ -239,8 +241,7 @@ function handleRoomDrop(e, targetId){
     ids.splice(fromIdx,1);
     ids.splice(toIdx,0,fromId);
     saveRoomOrder(ids);
-    // instant reorder already done by saveRoomOrder DOM move, then full render after short delay for consistency
-    setTimeout(()=>{ renderRoomingGrid(); }, 150);
+    renderRoomingGrid();
   }
 }
 function moveRoomUp(roomId){
@@ -476,23 +477,18 @@ function renderNamelist(){
       const assigned = isJemaahAssigned(r.id);
       const boardRaw = (f['BOARD']||'').toString();
       const isFB = boardRaw.toUpperCase().includes('FB');
-      const trainRaw = (f['TRAIN']||'').toString();
-      const isTR = trainRaw.toUpperCase().includes('TR');
       const pakej = f['PAKEJ']||'EKONOMI';
-      const insur = f['INSURAN'] ? true : false;
       const pakejCls = pakej.includes('PREMIUM')?'bg-blue-50 text-blue-700 border-blue-200': pakej.includes('JIMAT')?'bg-amber-50 text-amber-700 border-amber-200':'bg-slate-100 text-slate-700 border-slate-200';
       
       const rowCls = assigned ? 'opacity-40 bg-slate-50 pointer-events-none' : 'hover:bg-slate-50 cursor-grab';
       const dragAttr = assigned ? '' : `draggable="true" ondragstart="dragJemaah(event,'${r.id}')"`;
-      const plusBtn = assigned ? `<span class="text-[10px] text-slate-400">✓ Assigned</span>` : `<button onclick="quickAssign('${r.id}')" class="w-6 h-6 rounded-full border border-slate-300 hover:bg-slate-900 hover:text-white text-[10px] font-bold">+</button>`;
+      const plusBtn = assigned ? `<span class="text-[10px] text-slate-400">✓</span>` : `<button onclick="quickAssign('${r.id}')" class="w-6 h-6 rounded-full border border-slate-300 hover:bg-slate-900 hover:text-white text-[10px] font-bold">+</button>`;
       
       return `<div ${dragAttr} class="grid grid-cols-12 items-center px-3 py-2.5 text-xs border-b border-slate-50 last:border-0 ${rowCls}">
         <div class="col-span-1 flex items-center gap-1 text-slate-400"><i class="fa-solid fa-grip text-[10px]"></i> ${String(i+1).padStart(2,'0')}</div>
-        <div class="col-span-5 font-semibold truncate" title="${name}">${name} ${assigned ? '<span class="ml-1 text-[9px] bg-slate-200 px-1 rounded">ASSIGNED</span>' : ''}</div>
+        <div class="col-span-7 font-semibold truncate" title="${name}">${name} ${assigned ? '<span class="ml-1 text-[9px] bg-slate-200 px-1 rounded">ASSIGNED</span>' : ''}</div>
         <div class="col-span-1 text-center"><span class="inline-flex w-7 justify-center px-1.5 py-0.5 rounded-full text-[10px] border font-bold ${isFB?'bg-emerald-50 text-emerald-700 border-emerald-200':'bg-slate-50 text-slate-400 border-slate-200'}">${isFB?'FB':'-'}</span></div>
-        <div class="col-span-1 text-center"><span class="inline-flex w-6 justify-center px-1.5 py-0.5 rounded-full text-[10px] border font-bold ${isTR?'bg-blue-50 text-blue-700 border-blue-200':'bg-slate-50 text-slate-400 border-slate-200'}">${isTR?'TR':'-'}</span></div>
         <div class="col-span-2 text-center"><span class="px-2 py-0.5 rounded-full text-[10px] border font-bold ${pakejCls}">${pakej}</span></div>
-        <div class="col-span-1 text-center"><span class="w-5 h-5 inline-flex items-center justify-center rounded-full ${insur?'bg-slate-900 text-white':'bg-slate-100 text-slate-400'} text-[10px]">${insur?'✔':'✕'}</span></div>
         <div class="col-span-1 text-center">${plusBtn}</div>
       </div>`;
     }).join('') || '<div class="p-8 text-center text-slate-400 text-xs">Tiada jemaah ditemui</div>';
@@ -549,13 +545,9 @@ function renderRoomingGrid(){
 
     return `<div data-room-id="${rec.id}" ondragover="handleRoomDragOver(event)" ondragleave="handleRoomDragLeave(event)" ondrop="handleRoomDrop(event,'${rec.id}')" class="bg-white rounded-2xl border border-slate-200 p-3 shadow-sm flex flex-col gap-2.5 h-fit group/room transition-all">
       <div class="flex items-center justify-between">
-        <div class="flex items-center gap-1">
-          <div class="flex flex-col gap-0.5">
-            <button onclick="moveRoomUp('${rec.id}')" class="w-5 h-3 rounded-t bg-slate-100 hover:bg-slate-900 hover:text-white flex items-center justify-center" title="Move up"><i class="fa-solid fa-chevron-up text-[7px]"></i></button>
-            <button onclick="moveRoomDown('${rec.id}')" class="w-5 h-3 rounded-b bg-slate-100 hover:bg-slate-900 hover:text-white flex items-center justify-center" title="Move down"><i class="fa-solid fa-chevron-down text-[7px]"></i></button>
-          </div>
-          <button class="drag-handle w-6 h-6 rounded-full bg-slate-100 hover:bg-slate-900 hover:text-white flex items-center justify-center cursor-grab active:cursor-grabbing" draggable="true" ondragstart="handleRoomDragStart(event,'${rec.id}')" ondragend="handleRoomDragEnd(event)" title="Drag untuk susun"><i class="fa-solid fa-grip-lines text-[10px]"></i></button>
-          <span class="font-bold text-sm tracking-wide ml-1">${roomId}</span>
+        <div class="flex items-center gap-2">
+          <button class="drag-handle w-7 h-7 rounded-full bg-slate-100 hover:bg-slate-900 hover:text-white flex items-center justify-center cursor-grab active:cursor-grabbing shadow-sm" draggable="true" ondragstart="handleRoomDragStart(event,'${rec.id}')" ondragend="handleRoomDragEnd(event)" title="Drag untuk susun"><i class="fa-solid fa-grip-lines text-[11px]"></i></button>
+          <span class="font-bold text-sm tracking-wide">${roomId}</span>
           <button onclick="editRoomId('${rec.id}')" class="text-slate-400 hover:text-slate-900"><i class="fa-solid fa-pen text-[11px]"></i></button>
           <span class="px-2 py-0.5 rounded-full bg-slate-100 text-[10px] font-bold border">${pakej}</span>
         </div>
