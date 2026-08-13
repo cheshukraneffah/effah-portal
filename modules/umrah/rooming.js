@@ -1,4 +1,4 @@
-// ROOMING V18 - FIX computed field error, formal alerts, remake copy bilik, fix grayed staff
+// ROOMING V19 - Copy dengan option struktur / dengan jemaah, fix computed field, font standard 11px
 let allRoomingRecords = [];
 let allRoomingJemaah = [];
 let activeLocation = localStorage.getItem('effah_active_location') || 'MEKAH';
@@ -31,16 +31,16 @@ function renderRoomingHTML(){
   c.innerHTML=`
   <div class="flex flex-col gap-3 p-2">
     <div class="bg-white rounded-2xl border border-slate-200 p-3 flex flex-wrap items-center justify-between gap-3">
-      <div class="flex items-center gap-3 text-xs flex-wrap">
+      <div class="flex items-center gap-3 flex-wrap">
         <span class="font-bold tracking-widest text-slate-800 text-">ROOMING LIST</span>
-        <select id="roomingTripSelect" onchange="onRoomingTripChange(this.value)" class="px-3 py-1.5 border border-slate-300 rounded-full bg-white text-xs font-bold min-w- max-w- truncate">
+        <select id="roomingTripSelect" onchange="onRoomingTripChange(this.value)" class="px-3 py-1.5 border border-slate-300 rounded-full bg-white text- font-bold min-w- max-w- truncate">
           <option value="">Pilih Trip...</option>
         </select>
       </div>
       <div class="flex items-center gap-2 text-">
-        <span id="belumAssignTop" class="px-2.5 py-1 bg-amber-100 rounded-full font-bold">0 Unassigned</span>
-        <span id="assignedTop" class="px-2.5 py-1 bg-emerald-50 rounded-full font-bold">0 Assigned</span>
-        <button onclick="fetchRoomingData()" class="w-7 h-7 rounded-full border bg-white hover:bg-slate-50"><i class="fa-solid fa-rotate"></i></button>
+        <span id="belumAssignTop" class="px-2.5 py-1 bg-amber-100 rounded-full font-bold text-">0 Unassigned</span>
+        <span id="assignedTop" class="px-2.5 py-1 bg-emerald-50 rounded-full font-bold text-">0 Assigned</span>
+        <button onclick="fetchRoomingData()" class="w-7 h-7 rounded-full border bg-white hover:bg-slate-50 text-"><i class="fa-solid fa-rotate"></i></button>
       </div>
     </div>
 
@@ -86,7 +86,7 @@ function renderRoomingHTML(){
               <h3 class="font-bold text- tracking-widest">ROOMING LIST</h3>
               <div class="flex items-center gap-2 mt-1 text-">
                 <span id="roomingBiliks" class="px-2 py-0.5 bg-slate-100 border border-slate-200 text-slate-700 rounded-full font-bold">0 Bilik</span>
-                <span id="roomingOccupancy" class="text-slate-500">0 Jemaah + 0 Staff • ${activeLocation}</span>
+                <span id="roomingOccupancy" class="text-slate-500 text-">0 Jemaah + 0 Staff • ${activeLocation}</span>
               </div>
             </div>
             <div class="flex items-center gap-1.5 flex-wrap">
@@ -111,21 +111,21 @@ function renderRoomingHTML(){
         <div>
           <label class="text- font-bold text-slate-500">ROOM ID (Auto)</label>
           <input id="newRoomId" readonly class="w-full p-2.5 border border-slate-200 rounded-xl bg-slate-100 font-bold text-slate-700 text-" value="B4">
-          <p class="text- text-slate-400 mt-1">Akan dijana automatik mengikut kapasiti: 4=B4, 6=B6 (Formula Airtable)</p>
+          <p class="text- text-slate-400 mt-1">Dijana automatik oleh Airtable: B + Kapasiti</p>
         </div>
         <select id="newRoomLokasi" class="w-full p-2.5 border border-slate-200 rounded-xl bg-white text-"><option value="MEKAH">MEKAH</option><option value="MADINAH">MADINAH</option><option value="TAIF">TAIF</option><option value="JEDDAH">JEDDAH</option></select>
         <select id="newRoomPakej" class="w-full p-2.5 border border-slate-200 rounded-xl bg-white text-"><option>EKONOMI</option><option>PREMIUM</option><option>JIMAT</option></select>
         <input id="newRoomHotel" placeholder="Nama Hotel" class="w-full p-2.5 border border-slate-200 rounded-xl bg-white text-">
         <div class="flex gap-2 items-center">
-          <input id="newRoomCap" type="number" value="4" min="1" max="8" oninput="updateNewRoomIdFromCap()" onchange="updateNewRoomIdFromCap()" class="flex-1 p-2.5 border border-slate-200 rounded-xl font-bold bg-white text-">
+          <input id="newRoomCap" type="number" value="4" min="1" max="8" oninput="updateNewRoomIdFromCap()" class="flex-1 p-2.5 border border-slate-200 rounded-xl font-bold bg-white text-">
           <span class="py-2.5 text-slate-500 font-bold text-">Kapasiti</span>
-          <button type="button" onclick="changeNewRoomCap(-1)" class="w-8 h-8 rounded-full bg-slate-100 border border-slate-200 hover:bg-slate-200 text-">−</button>
-          <button type="button" onclick="changeNewRoomCap(1)" class="w-8 h-8 rounded-full bg-slate-100 border border-slate-200 hover:bg-slate-200 text-">+</button>
+          <button type="button" onclick="changeNewRoomCap(-1)" class="w-7 h-7 rounded-full bg-slate-100 border">−</button>
+          <button type="button" onclick="changeNewRoomCap(1)" class="w-7 h-7 rounded-full bg-slate-100 border">+</button>
         </div>
         <textarea id="newRoomNote" placeholder="Catatan bilik..." class="w-full p-2.5 border border-slate-200 rounded-xl h-16 bg-white text-"></textarea>
         <div class="flex gap-2 pt-2">
-          <button onclick="closeNewRoomModal()" class="flex-1 py-2.5 bg-slate-100 border border-slate-200 rounded-xl font-bold hover:bg-slate-200 text-">Batal</button>
-          <button onclick="submitNewRoom()" id="btnCiptaBilik" class="flex-1 py-2.5 bg-slate-900 text-white rounded-xl font-bold hover:bg-black text-">Cipta Bilik</button>
+          <button onclick="closeNewRoomModal()" class="flex-1 py-2.5 bg-slate-100 border border-slate-200 rounded-xl font-bold text-">Batal</button>
+          <button onclick="submitNewRoom()" id="btnCiptaBilik" class="flex-1 py-2.5 bg-slate-900 text-white rounded-xl font-bold text-">Cipta Bilik</button>
         </div>
       </div>
     </div>
@@ -134,9 +134,22 @@ function renderRoomingHTML(){
   <div id="copyRoomsModal" class="fixed inset-0 bg-black/50 z-50 hidden flex items-center justify-center p-4">
     <div class="bg-white rounded-2xl p-5 max-w-md w-full shadow-2xl">
       <h3 class="font-bold mb-2 text-">Salin Bilik Dari Lokasi Lain</h3>
-      <p class="text- text-slate-500 mb-4">Salin struktur bilik dari <span id="copyTargetLoc" class="font-bold">${activeLocation}</span> ke lokasi semasa. Jemaah tidak akan disalin, hanya bilik.</p>
+      <p class="text- text-slate-500 mb-3">Salin bilik dari lokasi sumber ke <b id="copyTargetLoc">${activeLocation}</b></p>
+
+      <div class="mb-3 p-3 bg-slate-50 rounded-xl border border-slate-200">
+        <div class="text- font-bold text-slate-600 mb-2">Pilihan Salinan:</div>
+        <label class="flex items-start gap-2 p-2 rounded-lg hover:bg-white border border-transparent hover:border-slate-200 cursor-pointer">
+          <input type="radio" name="copyMode" value="structure" checked class="mt-0.5">
+          <div><div class="text- font-bold">Struktur bilik sahaja</div><div class="text- text-slate-500">Hanya kapasiti, pakej & hotel. Jemaah tidak disalin.</div></div>
+        </label>
+        <label class="flex items-start gap-2 p-2 rounded-lg hover:bg-white border border-transparent hover:border-slate-200 cursor-pointer mt-2">
+          <input type="radio" name="copyMode" value="withJemaah" class="mt-0.5">
+          <div><div class="text- font-bold">Struktur + Jemaah & Staff</div><div class="text- text-slate-500">Bilik beserta jemaah dan staff di dalamnya akan disalin ke lokasi baharu.</div></div>
+        </label>
+      </div>
+
       <div id="copySourceList" class="space-y-2 mb-4 max-h- overflow-y-auto"></div>
-      <div class="flex gap-2"><button onclick="closeCopyRoomsModal()" class="flex-1 py-2.5 bg-slate-100 border border-slate-200 rounded-xl font-bold text- hover:bg-slate-200">Batal</button><button onclick="executeCopyRooms()" class="flex-1 py-2.5 bg-slate-900 text-white rounded-xl font-bold text- hover:bg-black">Salin Sekarang</button></div>
+      <div class="flex gap-2"><button onclick="closeCopyRoomsModal()" class="flex-1 py-2.5 bg-slate-100 border border-slate-200 rounded-xl font-bold text-">Batal</button><button onclick="executeCopyRooms()" class="flex-1 py-2.5 bg-slate-900 text-white rounded-xl font-bold text-">Salin Sekarang</button></div>
     </div>
   </div>
   `;
@@ -272,8 +285,6 @@ function dropJemaah(e,roomId){
 function quickAssign(jId){ if(isJemaahAssigned(jId)) return; const rooms=allRoomingRecords.filter(r=>(r.fields['LOKASI / CITY']||'MEKAH').toUpperCase()===activeLocation); const target=rooms.find(r=>{ const j=r.fields['JEMAAH']?.length||0; const s=(r.fields['STAFF / EXTRA']||'').split(',').filter(Boolean).length; return (j+s)<(r.fields['KAPASITI']||4); }); if(target) assignJemaahToRoom(jId,target.id); }
 async function assignJemaahToRoom(jId,roomId){ if(isJemaahAssigned(jId)) return; const rec=allRoomingRecords.find(r=>r.id===roomId); if(!rec) return; await updateRoomField(roomId,'JEMAAH',[...(rec.fields['JEMAAH']||[]),jId],true); }
 async function removeJemaahFromRoom(roomId,jId){ const rec=allRoomingRecords.find(r=>r.id===roomId); await updateRoomField(roomId,'JEMAAH',(rec.fields['JEMAAH']||[]).filter(id=>id!==jId),true); }
-
-// FIX V18: jangan hantar Room ID, hanya KAPASITI sahaja sebab field computed
 async function updateCap(roomId,delta){
   const rec=allRoomingRecords.find(r=>r.id===roomId); if(!rec) return;
   const newCap=Math.max(1,Math.min(8,(rec.fields['KAPASITI']||4)+delta));
@@ -281,11 +292,9 @@ async function updateCap(roomId,delta){
   try{
     await fetch(`https://api.airtable.com/v0/${base}/ROOMING%20LIST/${roomId}`,{method:'PATCH',headers:{Authorization:`Bearer ${pat}`,'Content-Type':'application/json'},body:JSON.stringify({fields:{'KAPASITI':newCap}})});
     rec.fields['KAPASITI']=newCap;
-    // Room ID akan auto update oleh formula Airtable B & KAPASITI
     renderRoomingGrid(); renderLocationTabs(); renderNamelist(); renderStaffList();
   }catch(e){ console.error(e); alert('Gagal mengemaskini kapasiti bilik: '+e.message); }
 }
-
 async function updateRoomField(roomId,field,value,doRender=true){
   const base=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base')||localStorage.getItem('effah_base_id'); const pat=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
   try{
@@ -307,8 +316,6 @@ function updateNewRoomIdFromCap(){ const cap=parseInt(document.getElementById('n
 function changeNewRoomCap(d){ const i=document.getElementById('newRoomCap'); let v=parseInt(i.value)||4; v=Math.max(1,Math.min(8,v+d)); i.value=v; updateNewRoomIdFromCap(); }
 function openNewRoomModal(){ const m=document.getElementById('newRoomModal'); if(!m) return; m.classList.remove('hidden'); document.getElementById('newRoomLokasi').value=activeLocation; document.getElementById('newRoomCap').value=roomingDefaultCap; updateNewRoomIdFromCap(); }
 function closeNewRoomModal(){ document.getElementById('newRoomModal').classList.add('hidden'); }
-
-// FIX V18: tidak hantar Room ID kerana computed field
 async function submitNewRoom(){
   const btn=document.getElementById('btnCiptaBilik'); if(btn){ btn.textContent='Mencipta...'; btn.disabled=true; }
   const lokasi=document.getElementById('newRoomLokasi').value; const pakej=document.getElementById('newRoomPakej').value;
@@ -316,8 +323,7 @@ async function submitNewRoom(){
   const note=document.getElementById('newRoomNote').value.trim(); const tripId=window.selectedTripRecord?.id||localStorage.getItem('effah_active_trip_id')||localStorage.getItem('selectedTripId')||localStorage.getItem('effah_last_selected_trip');
   if(!tripId){ alert('Sila pilih trip terlebih dahulu.'); if(btn){ btn.textContent='Cipta Bilik'; btn.disabled=false; } return; }
   const base=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base')||localStorage.getItem('effah_base_id'); const pat=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
-  // Penting: jangan hantar Room ID kerana field computed
-  const payload={fields:{'PAKEJ / HOTEL':pakej,'KAPASITI':cap,'HOTEL NAME':hotel||'','CATATAN BILIK':note||'','TRIP':[tripId],'LOKASI / CITY':lokasi,'SORT ORDER':allRoomingRecords.length+1}};
+  const payload={fields:{'PAKEJ / HOTEL':pakej,'KAPASITI':cap,'HOTEL NAME':hotel||'','CATATAN BILIK':note||'','TRIP':[tripId],'LOKASI / CITY':lokasi}};
   try{
     let res=await fetch(`https://api.airtable.com/v0/${base}/ROOMING%20LIST`,{method:'POST',headers:{Authorization:`Bearer ${pat}`,'Content-Type':'application/json'},body:JSON.stringify(payload)});
     let newRec=await res.json();
@@ -328,8 +334,6 @@ async function submitNewRoom(){
 }
 function openAddLocationModal(){ const loc=prompt('Sila masukkan nama lokasi baharu (contoh: TAIF, JEDDAH):'); if(loc&&loc.trim()){ const up=loc.trim().toUpperCase(); if(!customLocations.includes(up)) customLocations.push(up); localStorage.setItem('effah_custom_locations',JSON.stringify(customLocations)); activeLocation=up; localStorage.setItem('effah_active_location',activeLocation); renderLocationTabs(); renderRoomingGrid(); } }
 function deleteCustomLocation(loc){ if(!confirm(`Adakah anda pasti ingin memadamkan lokasi ${loc}?`)) return; customLocations=customLocations.filter(l=>l!==loc); localStorage.setItem('effah_custom_locations',JSON.stringify(customLocations)); if(activeLocation===loc) activeLocation='MEKAH'; renderLocationTabs(); renderRoomingGrid(); }
-
-// REMAKE COPY BILIK V18 - salin tanpa Room ID, tanpa jemaah
 function openCopyRoomsModal(){
   const m=document.getElementById('copyRoomsModal'); if(!m) return; const list=document.getElementById('copySourceList');
   const allLocs=['MEKAH','MADINAH','TAIF','JEDDAH',...customLocations].filter(l=>l!==activeLocation);
@@ -345,17 +349,25 @@ function openCopyRoomsModal(){
   document.getElementById('copyTargetLoc').textContent=activeLocation; m.classList.remove('hidden');
 }
 function closeCopyRoomsModal(){ document.getElementById('copyRoomsModal').classList.add('hidden'); }
+
+// V19: copy dengan option struktur atau dengan jemaah
 async function executeCopyRooms(){
   const sel=document.querySelector('input[name="copySource"]:checked'); if(!sel) return alert('Sila pilih lokasi sumber untuk disalin.');
+  const modeEl=document.querySelector('input[name="copyMode"]:checked'); const mode=modeEl?modeEl.value:'structure';
   const src=sel.value; const srcRooms=allRoomingRecords.filter(r=>(r.fields['LOKASI / CITY']||'MEKAH').toUpperCase()===src);
   if(srcRooms.length===0) return alert('Tiada bilik di lokasi '+src+' untuk disalin.');
-  if(!confirm(`Adakah anda pasti ingin menyalin ${srcRooms.length} bilik dari ${src} ke ${activeLocation}? Struktur bilik sahaja akan disalin, jemaah tidak akan disalin.`)) return;
+  const modeText=mode==='withJemaah'?'bilik beserta jemaah & staff':'struktur bilik sahaja tanpa jemaah';
+  if(!confirm(`Adakah anda pasti ingin menyalin ${srcRooms.length} bilik dari ${src} ke ${activeLocation}?\n\nPilihan: ${modeText}`)) return;
   const base=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base')||localStorage.getItem('effah_base_id'); const pat=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat'); const tripId=localStorage.getItem('effah_active_trip_id')||localStorage.getItem('selectedTripId')||localStorage.getItem('effah_last_selected_trip');
   if(!tripId) return alert('Sila pilih trip terlebih dahulu.');
   let created=0; let failed=0;
   for(let r of srcRooms){
     const f=r.fields; const cap=f['KAPASITI']||4;
-    const payload={fields:{'PAKEJ / HOTEL':f['PAKEJ / HOTEL']||'EKONOMI','KAPASITI':cap,'HOTEL NAME':f['HOTEL NAME']||'','CATATAN BILIK':f['CATATAN BILIK']||'','TRIP':[tripId],'LOKASI / CITY':activeLocation,'SORT ORDER':allRoomingRecords.length+1+created}};
+    const payload={fields:{'PAKEJ / HOTEL':f['PAKEJ / HOTEL']||'EKONOMI','KAPASITI':cap,'HOTEL NAME':f['HOTEL NAME']||'','CATATAN BILIK':f['CATATAN BILIK']||'','TRIP':[tripId],'LOKASI / CITY':activeLocation}};
+    if(mode==='withJemaah'){
+      if(f['JEMAAH'] && f['JEMAAH'].length>0) payload.fields['JEMAAH']=f['JEMAAH'];
+      if(f['STAFF / EXTRA']) payload.fields['STAFF / EXTRA']=f['STAFF / EXTRA'];
+    }
     try{
       const res=await fetch(`https://api.airtable.com/v0/${base}/ROOMING%20LIST`,{method:'POST',headers:{Authorization:`Bearer ${pat}`,'Content-Type':'application/json'},body:JSON.stringify(payload)});
       const newRec=await res.json();
@@ -364,7 +376,7 @@ async function executeCopyRooms(){
     }catch(e){ failed++; console.error(e); }
   }
   closeCopyRoomsModal(); renderRoomingGrid(); renderLocationTabs(); renderNamelist(); renderStaffList();
-  if(created>0) alert(`Berjaya menyalin ${created} bilik dari ${src} ke ${activeLocation}.` + (failed>0?` ${failed} bilik gagal.`:''));
+  if(created>0) alert(`Berjaya menyalin ${created} bilik dari ${src} ke ${activeLocation} (${modeText}).` + (failed>0?` ${failed} bilik gagal disalin.`:''));
   else alert('Gagal menyalin bilik. Sila cuba semula.');
 }
 function getStaffStorageKey(){ return `effah_staff_list_${localStorage.getItem('effah_active_trip_id')||'default'}`; }
