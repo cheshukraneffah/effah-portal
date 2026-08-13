@@ -2,7 +2,7 @@
 let allRoomingRecords = [];
 let allRoomingJemaah = [];
 let activeLocation = localStorage.getItem('effah_active_location') || 'MEKAH';
-let roomingDefaultCap = 3;
+let roomingDefaultCap = 4;
 let customLocations = JSON.parse(localStorage.getItem('effah_custom_locations')||'[]');
 let isRoomingLoading = false;
 let staffList = JSON.parse(localStorage.getItem('effah_staff_list')||'[]');
@@ -111,7 +111,6 @@ function renderRoomingHTML(){
               </div>
             </div>
             <div class="flex items-center gap-1.5">
-              <div class="flex items-center gap-1 px-2 py-1 bg-slate-50 rounded-full border text-xs"><span>Default</span><button onclick="changeDefaultCap(-1)" class="w-5 h-5 rounded-full bg-white border">−</button><span id="defaultCapLabel" class="font-bold w-4 text-center">3</span><button onclick="changeDefaultCap(1)" class="w-5 h-5 rounded-full bg-white border">+</button></div>
               <button onclick="generateRoomingPrint()" class="px-3 py-1.5 bg-white border border-slate-300 rounded-full text-xs font-bold hover:bg-slate-50"><i class="fa-solid fa-print mr-1"></i> Print / PDF</button>
               <button onclick="autoAssignRooming()" class="px-3 py-1.5 bg-slate-900 text-white rounded-full text-xs font-bold">Auto Assign</button>
               <button onclick="openNewRoomModal()" class="px-3 py-1.5 bg-white border rounded-full text-xs font-bold">+ Bilik Baru</button>
@@ -150,26 +149,23 @@ function renderRoomingHTML(){
 // Room order with Airtable persistence
 function getRoomOrderKey(){ const tripId = window.selectedTripRecord?.id || localStorage.getItem('effah_active_trip_id') || 'default'; return `effah_room_order_${tripId}_${activeLocation}`; }
 function getRoomOrderedList(rooms){
-  // Sort by SORT ORDER field if exists, then by localStorage order
-  const sortedByAirtable = [...rooms].sort((a,b)=>{
-    const ao = a.fields['SORT ORDER']||a.fields['Sort Order']||a.fields['ORDER']||9999;
-    const bo = b.fields['SORT ORDER']||b.fields['Sort Order']||b.fields['ORDER']||9999;
+  // Priority: localStorage order first (real-time), then Airtable SORT ORDER
+  const key = getRoomOrderKey();
+  const localOrder = JSON.parse(localStorage.getItem(key)||'[]');
+  if(localOrder.length>0){
+    const map = {}; rooms.forEach(r=>map[r.id]=r);
+    const ordered = [];
+    localOrder.forEach(id=>{ if(map[id]){ ordered.push(map[id]); delete map[id]; } });
+    Object.values(map).forEach(r=>ordered.push(r));
+    return ordered;
+  }
+  // Fallback to Airtable SORT ORDER
+  const sorted = [...rooms].sort((a,b)=>{
+    const ao = a.fields['SORT ORDER']||a.fields['Sort Order']||9999;
+    const bo = b.fields['SORT ORDER']||b.fields['Sort Order']||9999;
     return ao - bo;
   });
-  const hasOrder = sortedByAirtable.some(r=> (r.fields['SORT ORDER']||r.fields['Sort Order']||r.fields['ORDER'])!==undefined);
-  if(hasOrder){
-    const withOrder = sortedByAirtable.filter(r=> r.fields['SORT ORDER']!==undefined || r.fields['Sort Order']!==undefined);
-    const withoutOrder = sortedByAirtable.filter(r=> r.fields['SORT ORDER']===undefined && r.fields['Sort Order']===undefined);
-    return [...withOrder, ...withoutOrder];
-  }
-  const key = getRoomOrderKey();
-  const order = JSON.parse(localStorage.getItem(key)||'[]');
-  if(order.length===0) return rooms;
-  const map = {}; rooms.forEach(r=>map[r.id]=r);
-  const ordered = [];
-  order.forEach(id=>{ if(map[id]){ ordered.push(map[id]); delete map[id]; } });
-  Object.values(map).forEach(r=>ordered.push(r));
-  return ordered;
+  return sorted;
 }
 function saveRoomOrder(ids){
   // Immediate local save
@@ -529,8 +525,8 @@ function renderRoomingGrid(){
     const countJ = jemaahIds.length;
     const countStaff = staffArr.length;
     const count = countJ + countStaff;
-    const status = f['STATUS BILIK']|| (count===0?'🔴 Kosong': count<cap?'🟡 Ada Slot': count===cap?'🟢 Penuh':'⚠ Overbook!');
-    const statusCls = status.includes('Kosong')?'bg-slate-100 text-slate-600': status.includes('Ada Slot')?'bg-amber-50 text-amber-700 border border-amber-200': status.includes('Penuh')?'bg-emerald-50 text-emerald-700 border border-emerald-200':'bg-red-50 text-red-700 border border-red-200';
+    const status = '';
+    const statusCls = 'hidden';
     const pakejDot = pakej==='PREMIUM'?'bg-blue-500': pakej==='JIMAT'?'bg-amber-500':'bg-slate-500';
     const jemaahSlots = jemaahIds.map(jId=>{
       const jRec = allRoomingJemaah.find(j=>j.id===jId);
@@ -551,7 +547,7 @@ function renderRoomingGrid(){
           <button onclick="editRoomId('${rec.id}')" class="text-slate-400 hover:text-slate-900"><i class="fa-solid fa-pen text-[11px]"></i></button>
           <span class="px-2 py-0.5 rounded-full bg-slate-100 text-[10px] font-bold border">${pakej}</span>
         </div>
-        <div class="flex items-center gap-1.5"><span class="px-2 py-1 rounded-full text-[10px] font-bold ${statusCls}">${status.replace('🔴','').replace('🟡','').replace('🟢','').replace('⚠','').trim() || 'Kosong'}</span><button onclick="deleteRoom('${rec.id}','${roomId}')" class="w-7 h-7 rounded-full bg-slate-50 hover:bg-red-50 text-slate-400 hover:text-red-600 border"><i class="fa-solid fa-trash text-[11px]"></i></button></div>
+        <div class="flex items-center gap-1.5"><button onclick="deleteRoom('${rec.id}','${roomId}')" class="w-7 h-7 rounded-full bg-slate-50 hover:bg-red-50 text-slate-400 hover:text-red-600 border"><i class="fa-solid fa-trash text-[11px]"></i></button></div>
       </div>
       <div class="flex items-center gap-2 text-xs">
         <div class="flex items-center gap-1.5 px-2.5 py-1 bg-slate-50 rounded-full border"><span class="w-2 h-2 rounded-full ${pakejDot}"></span><select onchange="updateRoomField('${rec.id}','PAKEJ / HOTEL',this.value)" class="bg-transparent text-[11px] font-bold outline-none cursor-pointer"><option ${pakej==='EKONOMI'?'selected':''}>EKONOMI</option><option ${pakej==='PREMIUM'?'selected':''}>PREMIUM</option><option ${pakej==='JIMAT'?'selected':''}>JIMAT</option></select></div>
@@ -629,7 +625,7 @@ async function updateRoomField(roomId, field, value, doRender=true){
     await fetch(url,{method:'PATCH',headers:{Authorization:`Bearer ${pat}`,'Content-Type':'application/json'},body:JSON.stringify({fields:{[field]:value}})});
     const rec = allRoomingRecords.find(r=>r.id===roomId);
     if(rec) rec.fields[field]=value;
-    if(doRender){ renderRoomingGrid(); renderNamelist(); renderLocationTabs(); }
+    if(doRender){ renderRoomingGrid(); renderNamelist(); renderLocationTabs(); renderStaffList(); }
   }catch(e){ console.error(e); alert('Gagal update: '+e.message); }
 }
 function editRoomId(roomId){ const nv = prompt('Room ID baru (contoh B4, M1):'); if(nv && nv.trim()) updateRoomField(roomId,'Room ID / Nama Bilik',nv.trim(),true); }
@@ -737,60 +733,67 @@ function deleteCustomLocation(loc){
 
 
 function generateRoomingPrint(){
-  const tripName = document.getElementById('roomingTripName')?.textContent || cleanTripNameForRooming(window.selectedTripRecord?.fields?.Trip||'Trip');
+  const tripNameRaw = window.selectedTripRecord?.fields?.Trip || document.getElementById('roomingTripSelect')?.selectedOptions[0]?.text || 'Trip';
+  const tripName = cleanTripNameForRooming(tripNameRaw);
   const loc = activeLocation;
-  const rooms = [...allRoomingRecords].filter(r=> (r.fields['LOKASI / CITY']||'MEKAH').toUpperCase()===loc.toUpperCase());
-  const ordered = getRoomOrderedList(rooms);
+  const rooms = getRoomOrderedList([...allRoomingRecords].filter(r=> (r.fields['LOKASI / CITY']||'MEKAH').toUpperCase()===loc.toUpperCase()));
   
-  // Build namelist table
+  // Build namelist + staff NA at bottom
   let namelistRows = allRoomingJemaah.map((j, idx)=>{
     const f = j.fields;
     const name = f['NAMA']||f['NAME']||'-';
-    const ejen = f['EJEN']||f['Ejen']||'-';
-    const fullboard = f['FULLBOARD']||f['BOARD']||'NO FULLBOARD';
+    const ejen = f['EJEN']||'-';
+    const fullboard = f['BOARD']||f['FULLBOARD']||'NO FULLBOARD';
     const train = f['TRAIN']||'-';
     const pakej = f['PAKEJ']||'EKONOMI';
     const insuran = f['INSURAN'] ? 'TAKAFUL' : '';
     return `<tr><td>${idx+1}</td><td>${name}</td><td>${ejen}</td><td>${fullboard}</td><td>${train}</td><td>${pakej}</td><td>${insuran}</td></tr>`;
   }).join('');
+  // Staff as NA rows
+  const allStaffInRooms = [];
+  rooms.forEach(r=>{ (r.fields['STAFF / EXTRA']||'').split(',').filter(Boolean).forEach(s=>allStaffInRooms.push(s)); });
+  staffList.forEach(s=>{ if(!allStaffInRooms.includes(s.name)) allStaffInRooms.push(s.name); });
+  let staffNaRows = allStaffInRooms.map((sName, idx)=>{
+    const num = allRoomingJemaah.length + idx + 1;
+    return `<tr><td>${num}</td><td>NA ${sName}</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td></tr>`;
+  }).join('');
   
-  let roomingCols = '';
-  // Split rooms into columns of 4 per location for horizontal layout
-  const roomBlocks = ordered.map(r=>{
+  const roomBlocks = rooms.map(r=>{
     const f = r.fields;
     const rid = f['Room ID / Nama Bilik']||'?';
     const pakej = f['PAKEJ / HOTEL']||'EKONOMI';
     const hotel = f['HOTEL NAME']||'';
     const jIds = f['JEMAAH']||[];
     const staff = (f['STAFF / EXTRA']||'').split(',').filter(Boolean);
-    const cap = f['KAPASITI']||3;
     let rows = jIds.map(jId=>{
       const rec = allRoomingJemaah.find(j=>j.id===jId);
-      return `<div>${rec?.fields?.['NAMA']||jId.slice(0,8)}</div>`;
-    }).join('');
+      const name = rec?.fields?.['NAMA']||rec?.fields?.['NAME']||'';
+      return name ? `<div>${name}</div>` : '';
+    }).filter(Boolean).join('');
     staff.forEach(s=>{ rows += `<div>NA ${s}</div>`; });
-    return `<div style="margin-bottom:20px"><b>${rid} (${pakej}) - ${hotel}</b><div style="margin-left:10px">${rows}</div></div>`;
+    if(!rows) rows = '<div style="color:#999">- Kosong -</div>';
+    return `<div style="margin-bottom:18px"><b>${rid} (${pakej}) - ${hotel}</b><div style="margin-left:8px; margin-top:4px; line-height:1.5">${rows}</div></div>`;
   }).join('');
   
   const html = `
   <html><head><title>Rooming List ${tripName}</title>
   <style>
-  body{font-family:Arial, sans-serif; font-size:10px; margin:20px;}
+  body{font-family:Arial, sans-serif; font-size:10px; margin:15px;}
   table{border-collapse:collapse; width:100%;}
-  th,td{border:1px solid #000; padding:4px 6px; text-align:left; font-size:9px;}
-  th{background:#f0f0f0; font-weight:bold;}
-  .header{display:flex; justify-content:space-between; font-weight:bold; font-size:12px; margin-bottom:10px; border-bottom:2px solid #000; padding-bottom:5px;}
-  .container{display:flex; gap:20px;}
-  .left{width:65%;}
-  .right{width:35%;}
-  @media print{ @page{size:landscape;} }
+  th,td{border:1px solid #000; padding:3px 5px; text-align:left; font-size:9px;}
+  th{background:#eee; font-weight:bold;}
+  .header{display:flex; justify-content:space-between; font-weight:bold; font-size:13px; margin-bottom:12px; border-bottom:2px solid #000; padding-bottom:6px;}
+  .container{display:flex; gap:15px;}
+  .left{width:68%;}
+  .right{width:32%; border-left:1px solid #000; padding-left:10px;}
+  @media print{ @page{size:A4 landscape; margin:10mm;} }
   </style></head><body>
   <div class="header"><span>NAMELIST ${tripName}</span><span>ROOMING LIST ${tripName}</span></div>
   <div class="container">
-    <div class="left"><table><tr><th>NO</th><th>NAMA JEMAAH</th><th>EJEN</th><th>FULLBOARD</th><th>TRAIN</th><th>PAKEJ</th><th>INSURAN</th></tr>${namelistRows}</table></div>
+    <div class="left"><table><tr><th>NO</th><th>NAMA JEMAAH</th><th>EJEN</th><th>FULLBOARD</th><th>TRAIN</th><th>PAKEJ</th><th>INSURAN</th></tr>${namelistRows}${staffNaRows}</table></div>
     <div class="right">${roomBlocks}</div>
   </div>
-  <script>window.onload=function(){ window.print(); }</script>
+  <script>window.onload=function(){ setTimeout(()=>window.print(), 300); }</script>
   </body></html>
   `;
   const w = window.open('', '_blank');
