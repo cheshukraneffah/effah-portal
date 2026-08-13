@@ -14,8 +14,8 @@ function cleanTripNameForRooming(name){
 }
 function getJemaahName(f){ if(!f) return '-'; return f['NAMA'] || f['NAME'] || f['NAMA JEMAAH'] || f['NAMA PENUH'] || f['Name'] || '-'; }
 function generateRoomIdFromCap(cap){ return `B${parseInt(cap)||4}`; }
-function getFullboardVal(f){ return f['FULLBOARD'] || f['BOARD'] || 'NO FULLBOARD'; }
-function getPakejVal(f){ return f['PAKEJ'] || f['PAKEJ / HOTEL'] || 'EKONOMI'; }
+function getFullboardVal(f){ return f['FULLBOARD'] || ''; }
+function getPakejVal(f){ return f['PAKEJ'] || ''; }
 function isTrainChecked(f){ return !!f['TRAIN']; }
 function isInsuranChecked(f){ return !!f['INSURAN']; }
 function formatCheckbox(v){ return v ? '✓' : '-'; }
@@ -278,27 +278,48 @@ function renderNamelist(){
   if(total===0){ cont.innerHTML='<div class="p-6 text-center text-[11px] text-slate-400">Tiada jemaah untuk trip ini</div>'; return; }
   cont.innerHTML=filtered.map((r,i)=>{
     const name=getJemaahName(r.fields); const assignedInLoc=isJemaahAssignedInLocation(r.id, activeLocation); const assignedGlobal=isJemaahAssigned(r.id);
-    const rowCls=assignedInLoc?'opacity-40 bg-slate-50 pointer-events-none':'hover:bg-slate-50 cursor-grab';
+    const rowCls=assignedInLoc?'opacity-40 bg-slate-50 pointer-events-none':'hover:bg-slate-50';
     const drag=assignedInLoc?'':`draggable="true" ondragstart="dragJemaah(event,'${r.id}')" ondragend="dragEnd(event)"`;
     let statusIcon = assignedInLoc? '<span class="text-[10px] text-slate-400">✓</span>' : `<button onclick="quickAssign('${r.id}')" class="w-5 h-5 rounded-full border bg-slate-100 hover:bg-slate-200 text-[10px]">+</button>`;
     if(!assignedInLoc && assignedGlobal) statusIcon = `<button onclick="quickAssign('${r.id}')" class="w-5 h-5 rounded-full border bg-amber-100 hover:bg-amber-200 text-[10px]" title="Sudah ada di lokasi lain, boleh tambah di ${activeLocation} juga">+</button>`;
-    const fb = getFullboardVal(r.fields);
-    const tr = formatCheckbox(isTrainChecked(r.fields));
-    const ins = formatCheckbox(isInsuranChecked(r.fields));
-    const pk = getPakejVal(r.fields);
-    // warna fullboard: kalau FULLBOARD hijau, NO FULLBOARD kelabu
-    let fbCls = 'bg-slate-100 border-slate-200';
+    const fb = getFullboardVal(r.fields) || '-';
+    const pk = getPakejVal(r.fields) || '-';
+    const trChecked = isTrainChecked(r.fields);
+    const insChecked = isInsuranChecked(r.fields);
+    let fbCls = 'bg-white border-slate-200';
     if(fb.includes('FULLBOARD (MEKAH)')) fbCls='bg-orange-100 border-orange-200 text-orange-800';
     else if(fb.includes('FULLBOARD (MADINAH)')) fbCls='bg-blue-100 border-blue-200 text-blue-800';
     else if(fb==='FULLBOARD') fbCls='bg-emerald-100 border-emerald-200 text-emerald-800';
     else if(fb==='NO FULLBOARD') fbCls='bg-slate-100 border-slate-200 text-slate-500';
-    return `<div ${drag} class="grid grid-cols-12 items-center px-2.5 py-2 text-[11px] border-b border-slate-50 ${rowCls}">
+    else if(fb==='-') fbCls='bg-white border-dashed border-slate-300 text-slate-400';
+
+    return `<div ${drag} class="grid grid-cols-12 items-center px-1.5 py-1.5 text-[11px] border-b border-slate-50 ${rowCls}">
       <div class="col-span-1 text-slate-400 text-[10px]">${String(i+1).padStart(2,'0')}</div>
-      <div class="col-span-4 font-medium truncate" title="${name}">${name}</div>
-      <div class="col-span-2 text-center"><span class="px-1.5 py-0.5 rounded-full border text-[8px] font-bold truncate ${fbCls}">${fb}</span></div>
-      <div class="col-span-1 text-center text-[11px] ${isTrainChecked(r.fields)?'text-emerald-600 font-bold':'text-slate-300'}">${tr}</div>
-      <div class="col-span-1 text-center text-[11px] ${isInsuranChecked(r.fields)?'text-emerald-600 font-bold':'text-slate-300'}">${ins}</div>
-      <div class="col-span-2 text-center"><span class="px-1.5 py-0.5 rounded-full border text-[8px] font-bold bg-white">${pk}</span></div>
+      <div class="col-span-3 font-medium truncate text-[10px]" title="${name}">${name}</div>
+      <div class="col-span-3 flex items-center gap-0.5">
+        <select onchange="updateJemaahField('${r.id}','FULLBOARD',this.value)" class="text-[8px] border rounded-full px-1 py-0.5 bg-white font-bold ${fbCls} outline-none w-full truncate" title="FULLBOARD">
+          <option value="" ${!fb || fb==='-'?'selected':''}>- FB</option>
+          <option value="FULLBOARD" ${fb==='FULLBOARD'?'selected':''}>FULLBOARD</option>
+          <option value="FULLBOARD (MEKAH)" ${fb==='FULLBOARD (MEKAH)'?'selected':''}>FB MEKAH</option>
+          <option value="FULLBOARD (MADINAH)" ${fb==='FULLBOARD (MADINAH)'?'selected':''}>FB MADINAH</option>
+          <option value="NO FULLBOARD" ${fb==='NO FULLBOARD'?'selected':''}>NO FB</option>
+        </select>
+      </div>
+      <div class="col-span-1 text-center">
+        <input type="checkbox" ${trChecked?'checked':''} onchange="updateJemaahCheckbox('${r.id}','TRAIN',this.checked)" class="w-3.5 h-3.5 accent-[#7A0C2E] rounded" title="TRAIN">
+      </div>
+      <div class="col-span-1 text-center">
+        <input type="checkbox" ${insChecked?'checked':''} onchange="updateJemaahCheckbox('${r.id}','INSURAN',this.checked)" class="w-3.5 h-3.5 accent-[#7A0C2E] rounded" title="INSURAN">
+      </div>
+      <div class="col-span-2 flex items-center gap-0.5">
+        <select onchange="updateJemaahField('${r.id}','PAKEJ',this.value)" class="text-[8px] border rounded-full px-1 py-0.5 bg-white font-bold outline-none w-full ${pk==='-'?'border-dashed text-slate-400':'bg-slate-50'}" title="PAKEJ">
+          <option value="" ${!pk || pk==='-'?'selected':''}>- Pakej</option>
+          <option value="JIMAT" ${pk==='JIMAT'?'selected':''}>JIMAT</option>
+          <option value="EKONOMI" ${pk==='EKONOMI'?'selected':''}>EKONOMI</option>
+          <option value="STANDARD" ${pk==='STANDARD'?'selected':''}>STANDARD</option>
+          <option value="PREMIUM" ${pk==='PREMIUM'?'selected':''}>PREMIUM</option>
+        </select>
+      </div>
       <div class="col-span-1 text-center">${statusIcon}</div>
     </div>`;
   }).join('');
@@ -370,6 +391,31 @@ async function updateRoomField(roomId,field,value,doRender=true){
     const rec=allRoomingRecords.find(r=>r.id===roomId); if(rec) rec.fields[field]=value;
     if(doRender){ renderRoomingGrid(); renderNamelist(); renderStaffList(); renderLocationTabs(); }
   }catch(e){ console.error(e); alert('Gagal mengemaskini data bilik: '+e.message); }
+}
+// UPDATE JEMAAH FIELD DIRECT DARI ROOMING PAGE - PAKEJ, FULLBOARD, TRAIN, INSURAN
+async function updateJemaahField(jemaahId, field, value){
+  const base=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base')||localStorage.getItem('effah_base_id'); const pat=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
+  if(!base||!pat) return alert('Airtable config missing');
+  // Optimistic UI update
+  const rec=allRoomingJemaah.find(r=>r.id===jemaahId); if(rec) rec.fields[field]=value||'';
+  renderNamelist();
+  try{
+    const payload = value ? {[field]: value} : {[field]: null};
+    const res=await fetch(`https://api.airtable.com/v0/${base}/DATA%20JEMAAH%20UMRAH/${jemaahId}`,{method:'PATCH',headers:{Authorization:`Bearer ${pat}`,'Content-Type':'application/json'},body:JSON.stringify({fields: payload})});
+    const data=await res.json();
+    if(!data.id && data.error) throw new Error(data.error.message);
+  }catch(e){ console.error(e); alert('Gagal update jemaah '+field+': '+e.message); fetchRoomingData(); }
+}
+async function updateJemaahCheckbox(jemaahId, field, checked){
+  const base=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base')||localStorage.getItem('effah_base_id'); const pat=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
+  if(!base||!pat) return alert('Airtable config missing');
+  const rec=allRoomingJemaah.find(r=>r.id===jemaahId); if(rec) rec.fields[field]=checked;
+  renderNamelist();
+  try{
+    const res=await fetch(`https://api.airtable.com/v0/${base}/DATA%20JEMAAH%20UMRAH/${jemaahId}`,{method:'PATCH',headers:{Authorization:`Bearer ${pat}`,'Content-Type':'application/json'},body:JSON.stringify({fields: {[field]: checked}})});
+    const data=await res.json();
+    if(!data.id && data.error) throw new Error(data.error.message);
+  }catch(e){ console.error(e); alert('Gagal update checkbox '+field+': '+e.message); fetchRoomingData(); }
 }
 function updateHotelInline(roomId, newName){
   const name = (newName||'').trim().toUpperCase();
@@ -545,12 +591,11 @@ function generateRoomingPrint(){
     <!-- PAGE 1: NAMELIST CENTERED -->
     <div class="namelist-page">
       <div class="header"><span>NAMELIST ${tripName}</span><span>Total: ${allRoomingJemaah.length} Jemaah + ${combinedStaff.length} Staff</span></div>
-      <div style="font-size:9px;margin-bottom:8px"><b>Trip:</b> ${tripName} | <b>Tarikh Cetak:</b> ${new Date().toLocaleDateString('ms-MY')} | <b>Nota:</b> Column EJEN dibuang, hanya FULLBOARD/TRAIN/PAKEJ/INSURAN. Field akan link bila tambah di Airtable DATA JEMAAH UMRAH.</div>
+      <div style="font-size:9px;margin-bottom:8px"><b>Trip:</b> ${tripName} | <b>Tarikh Cetak:</b> ${new Date().toLocaleDateString('ms-MY')}</div>
       <table>
         <tr><th style="width:30px">NO</th><th>NAMA JEMAAH</th><th style="width:110px">FULLBOARD</th><th style="width:50px">TRAIN</th><th style="width:75px">PAKEJ</th><th style="width:70px">INSURAN</th></tr>
         ${namelistRows}
       </table>
-      <div style="margin-top:10px;font-size:8px;color:#666">* Jika column FULLBOARD/TRAIN/PAKEJ/INSURAN masih kosong, tambah field baru di Airtable: FULLBOARD (Single select: FULLBOARD/NO FULLBOARD), TRAIN (Single line), PAKEJ (dari existing), INSURAN (Single line). Code sudah ready baca field tersebut.</div>
     </div>
     ${locationPages||'<div class="page-break"></div><div style="border:1px dashed #000;padding:20px;text-align:center">Tiada bilik untuk trip ini</div>'}
     <script>window.onload=function(){setTimeout(()=>window.print(),500)}</script>
