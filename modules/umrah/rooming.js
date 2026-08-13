@@ -20,15 +20,18 @@ function renderRoomingHTML(){
   if(!c) return;
   c.innerHTML = `
   <div class="flex flex-col gap-3 p-2">
-    <div class="bg-white rounded-2xl border border-slate-200 p-3 flex flex-wrap items-center justify-between gap-2">
-      <div class="flex items-center gap-2 text-xs">
+    <div class="bg-white rounded-2xl border border-slate-200 p-3 flex flex-wrap items-center justify-between gap-3">
+      <div class="flex items-center gap-3 text-xs flex-wrap">
         <span class="font-black tracking-widest text-slate-800">ROOMING MODULE V2</span>
-        <span id="roomingTripLabel" class="text-slate-500">07-19 JULAI 2026 • 22 Jemaah • <span id="roomingHeaderCount">6 Bilik</span></span>
+        <select id="roomingTripSelect" onchange="onRoomingTripChange(this.value)" class="px-3 py-1.5 border border-slate-300 rounded-full bg-white text-xs font-bold min-w-[220px]">
+          <option value="">Pilih Trip...</option>
+        </select>
+        <span id="roomingTripLabel" class="text-slate-500 hidden md:inline">• <span id="roomingHeaderCount">0 Bilik</span></span>
       </div>
       <div class="flex items-center gap-2 text-xs">
-        <span id="belumAssignTop" class="px-2.5 py-1 bg-amber-100 rounded-full font-bold">12 Belum Assign</span>
+        <span id="belumAssignTop" class="px-2.5 py-1 bg-amber-100 rounded-full font-bold">0 Belum</span>
         <span id="assignedTop" class="px-2.5 py-1 bg-emerald-50 rounded-full font-bold">0 Assigned</span>
-        <button onclick="fetchRoomingData()" class="w-7 h-7 rounded-full border bg-white"><i class="fa-solid fa-rotate"></i></button>
+        <button onclick="fetchRoomingData()" class="w-7 h-7 rounded-full border bg-white hover:bg-slate-50"><i class="fa-solid fa-rotate"></i></button>
         <span class="w-7 h-7 rounded-full bg-slate-900 text-white flex items-center justify-center font-bold">OP</span>
       </div>
     </div>
@@ -264,18 +267,31 @@ function renderRoomingGrid(){
 
 function updateLocationTabs(){
   const counts = {MEKAH:0,MADINAH:0,TAIF:0,JEDDAH:0,TANPA:0,SEMUA:allRoomingRecords.length};
-  allRoomingRecords.forEach(r=>{ const l = (r.fields['LOKASI / CITY']||'').trim(); if(!l) counts.TANPA++; else if(counts[l]!==undefined) counts[l]++; else counts[l]= (counts[l]||0)+1; });
+  allRoomingRecords.forEach(r=>{ const l = (r.fields['LOKASI / CITY']||'').trim().toUpperCase(); if(!l) counts.TANPA++; else if(counts[l]!==undefined) counts[l]++; else counts[l]= (counts[l]||0)+1; });
   document.querySelectorAll('.loc-tab').forEach(btn=>{
     const loc = btn.dataset.loc;
     if(!loc) return;
-    const baseTxt = loc==='SEMUA'?'SEMUA': loc==='TANPA'?'Tanpa Lokasi': loc==='MEKAH'?'🕋 MEKAH': loc==='MADINAH'?'🕌 MADINAH': loc==='TAIF'?'⛰️ TAIF':'🏨 '+loc;
+    // keep original label without overwriting emoji
+    let baseLabel = '';
+    if(loc==='SEMUA') baseLabel='SEMUA';
+    else if(loc==='TANPA') baseLabel='Tanpa Lokasi';
+    else if(loc==='MEKAH') baseLabel='🕋 MEKAH';
+    else if(loc==='MADINAH') baseLabel='🕌 MADINAH';
+    else if(loc==='TAIF') baseLabel='🏕️ TAIF';
+    else if(loc==='JEDDAH') baseLabel='🏙️ JEDDAH';
+    else baseLabel = loc;
     const c = counts[loc]||0;
-    btn.innerHTML = `${baseTxt} (${c})`;
-    if(loc===activeLocation){ btn.classList.add('bg-slate-900','text-white'); btn.classList.remove('bg-white','text-slate-700'); } else { btn.classList.remove('bg-slate-900','text-white'); btn.classList.add('bg-white'); }
+    btn.textContent = `${baseLabel} (${c})`;
+    // fix active state - ensure text color visible
+    if(loc===activeLocation){
+      btn.className = 'loc-tab px-3 py-1 rounded-full text-[11px] font-bold bg-slate-900 text-white border border-slate-900';
+    } else {
+      btn.className = 'loc-tab px-3 py-1 rounded-full text-[11px] font-bold bg-white text-slate-700 border border-slate-200 hover:bg-slate-50';
+    }
   });
 }
 
-function setActiveLocation(loc){ activeLocation=loc; document.querySelectorAll('.loc-tab').forEach(b=>{ b.classList.remove('bg-slate-900','text-white'); if(b.dataset.loc===loc) b.classList.add('bg-slate-900','text-white'); }); renderNamelist(); renderRoomingGrid(); }
+function setActiveLocation(loc){ activeLocation=loc; updateLocationTabs(); renderNamelist(); renderRoomingGrid(); }
 function filterRoomingNamelist(){ renderNamelist(); }
 function allowDrop(e){ e.preventDefault(); }
 function dragJemaah(e,jId){ e.dataTransfer.setData('text/plain', jId); }
@@ -391,4 +407,38 @@ async function autoAssignRooming(){
   }
   setTimeout(fetchRoomingData,800);
 }
-function openAddLocationModal(){ const loc = prompt('Nama Lokasi baru (contoh: TAIF, JEDDAH, MEDAN):'); if(loc && loc.trim()){ activeLocation = loc.trim().toUpperCase(); renderRoomingGrid(); renderNamelist(); updateLocationTabs(); } }
+function openAddLocationModal(){ const loc = prompt('Nama Lokasi baru (contoh: TAIF, JEDDAH):'); if(loc && loc.trim()){ const upper = loc.trim().toUpperCase(); if(['MEKAH','MADINAH','TAIF','JEDDAH'].includes(upper) || confirm(`Tambah lokasi baru "${upper}"?`)){ activeLocation = upper; renderRoomingGrid(); renderNamelist(); updateLocationTabs(); } } }
+
+// Trip dropdown for rooming tab
+function populateRoomingTripDropdown(){
+  const sel = document.getElementById('roomingTripSelect');
+  if(!sel) return;
+  const trips = window.allTripRecords || window.allTrips || [];
+  const currentId = window.selectedTripRecord?.id || localStorage.getItem('effah_active_trip_id') || '';
+  sel.innerHTML = '<option value="">Pilih Trip...</option>' + trips.map(t=>{
+    const name = t.fields?.['TRIP NAME']||t.fields?.Trip||t.fields?.Name||t.id;
+    const id = t.id;
+    return `<option value="${id}" ${id===currentId?'selected':''}>${name}</option>`;
+  }).join('');
+  if(currentId) sel.value = currentId;
+}
+function onRoomingTripChange(tripId){
+  if(!tripId) return;
+  const trips = window.allTripRecords || window.allTrips || [];
+  const found = trips.find(t=>t.id===tripId);
+  if(found){
+    window.selectedTripRecord = found;
+    localStorage.setItem('effah_active_trip_id', tripId);
+    localStorage.setItem('selectedTripId', tripId);
+    if(typeof window.selectTrip==='function') window.selectTrip(found);
+  }
+  fetchRoomingData();
+}
+
+// override fetchRoomingData to populate dropdown first
+const _origFetchRoomingData = fetchRoomingData;
+fetchRoomingData = async function(){
+  populateRoomingTripDropdown();
+  return _origFetchRoomingData();
+}
+
