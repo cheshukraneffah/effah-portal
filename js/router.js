@@ -9,6 +9,7 @@ document.addEventListener('DOMContentLoaded',()=>{
   if(outside) outside.onclick=toggleSidebar;
   if(typeof fetchTripUmrahData==='function') fetchTripUmrahData();
   if(typeof fetchJemaahUmrahData==='function') fetchJemaahUmrahData();
+  if(typeof fetchRoomingData==='function') setTimeout(fetchRoomingData, 800);
   const last=localStorage.getItem(STORAGE_TIME_KEY);
   const saved=localStorage.getItem(STORAGE_TAB_KEY);
   let target='home';
@@ -23,7 +24,11 @@ function switchTab(tabName,saveState=true){
   if(activeTab) activeTab.classList.remove('hidden');
   if(activeNav){ activeNav.classList.remove('text-slate-400'); activeNav.classList.add('text-white','bg-slate-800/80','font-bold'); }
   const bc=document.getElementById('breadcrumbCurrent');
-  if(bc){ const names={'home':'Overview','pakej-umrah':'Trip Umrah','jemaah-umrah':'Maklumat Jemaah Umrah','trip-luar':'Trip Luar Negara','peserta-luar':'Maklumat Peserta Luar','rooming':'Rooming List','ejen':'Ejen Tracker','settings':'Settings API'}; bc.textContent=names[tabName]||'Overview'; }
+  if(bc){ const names={'home':'Overview','pakej-umrah':'Trip Umrah','jemaah-umrah':'Maklumat Jemaah Umrah','trip-luar':'Trip Luar Negara','peserta-luar':'Maklumat Peserta Luar','rooming':'Rooming List V2','ejen':'Ejen Tracker','settings':'Settings API'}; bc.textContent=names[tabName]||'Overview'; }
+  if(tabName==='rooming'){
+    if(typeof renderRoomingHTML==='function') renderRoomingHTML();
+    if(typeof fetchRoomingData==='function') fetchRoomingData();
+  }
   if(window.innerWidth<768){ const sb=document.getElementById('sidebar'); if(sb) sb.classList.add('-translate-x-full'); }
   if(saveState) try{localStorage.setItem(STORAGE_TAB_KEY,tabName);}catch(e){}
   try{localStorage.setItem(STORAGE_TIME_KEY,Date.now());}catch(e){}
