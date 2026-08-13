@@ -1,9 +1,9 @@
 // ROOMING MODULE V4.5 - Fix trip dropdown clean + sort + remove SEMUA/Tanpa Lokasi default
 let allRoomingRecords = [];
 let allRoomingJemaah = [];
-let activeLocation = 'MEKAH';
+let activeLocation = localStorage.getItem('effah_active_location') || 'MEKAH';
 let roomingDefaultCap = 3;
-let customLocations = [];
+let customLocations = JSON.parse(localStorage.getItem('effah_custom_locations')||'[]');
 
 function cleanTripNameForRooming(name){
   if(!name) return 'TBC';
@@ -132,7 +132,9 @@ function renderLocationTabs(){
     const c = counts[loc]||0;
     const active = loc===activeLocation;
     const cls = active ? 'bg-slate-900 text-white border border-slate-900' : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-50';
-    return `<button onclick="setActiveLocation('${loc}')" data-loc="${loc}" class="loc-tab px-3 py-1 rounded-full text-[11px] font-bold ${cls}">${label} (${c})</button>`;
+    const isCustom = !['MEKAH','MADINAH','TAIF'].includes(loc);
+    const delBtn = isCustom ? `<button onclick="event.stopPropagation(); deleteCustomLocation('${loc}')" class="ml-1 w-4 h-4 rounded-full bg-black/10 hover:bg-red-500 hover:text-white flex items-center justify-center text-[9px]">✕</button>` : '';
+    return `<div class="inline-flex items-center ${active ? 'bg-slate-900 rounded-full' : 'bg-white rounded-full border border-slate-200'}"><button onclick="setActiveLocation('${loc}')" data-loc="${loc}" class="loc-tab px-3 py-1 rounded-full text-[11px] font-bold ${active ? 'text-white' : 'text-slate-700'}">${label} (${c})</button>${delBtn}</div>`;
   }).join('');
   html += `<button onclick="openAddLocationModal()" class="px-3 py-1 rounded-full text-[11px] font-bold border-dashed border border-slate-300 text-slate-500 hover:bg-slate-50">+ Lokasi</button>`;
   container.innerHTML = html;
@@ -151,17 +153,59 @@ async function fetchRoomingData(){
     const pat = window.AIRTABLE_PAT || window.APP_CONFIG?.AIRTABLE_PAT || localStorage.getItem('effah_api_pat');
     if(!base || !pat) return;
 
-    const roomUrl = `https://api.airtable.com/v0/${base}/ROOMING%20LIST?filterByFormula=SEARCH("${tripId}",ARRAYJOIN({TRIP}))&pageSize=100`;
-    const jUrl = `https://api.airtable.com/v0/${base}/DATA%20JEMAAH%20UMRAH?filterByFormula=SEARCH("${tripId}",ARRAYJOIN({TRIP}))&pageSize=100`;
+    // FIX: Fetch ALL then filter locally - SEARCH on linked field fails for ID
+    let allRooms = [];
+    let allJems = [];
+    let offset = '';
+    try{
+      do{
+        let url = `https://api.airtable.com/v0/${base}/ROOMING%20LIST?pageSize=100` + (offset?`&offset=${offset}`:'');
+        const res = await fetch(url, {headers:{Authorization:`Bearer ${pat}`}});
+        const data = await res.json();
+        if(data.records) allRooms = allRooms.concat(data.records);
+        offset = data.offset||'';
+      }while(offset);
+    }catch(e){ console.warn('room fetch all error', e); }
+    offset = '';
+    try{
+      do{
+        let url = `https://api.airtable.com/v0/${base}/DATA%20JEMAAH%20UMRAH?pageSize=100` + (offset?`&offset=${offset}`:'');
+        const res = await fetch(url, {headers:{Authorization:`Bearer ${pat}`}});
+        const data = await res.json();
+        if(data.records) allJems = allJems.concat(data.records);
+        offset = data.offset||'';
+      }while(offset);
+    }catch(e){ console.warn('jemaah fetch all error', e); }
 
-    const [rRes, jRes] = await Promise.all([
-      fetch(roomUrl, {headers:{Authorization:`Bearer ${pat}`}}),
-      fetch(jUrl, {headers:{Authorization:`Bearer ${pat}`}})
-    ]);
-    const rData = await rRes.json();
-    const jData = await jRes.json();
-    allRoomingRecords = rData.records || [];
-    allRoomingJemaah = jData.records || [];
+    // Filter by TRIP link containing tripId
+    allRoomingRecords = allRooms.filter(r=>{
+      const tripField = r.fields['TRIP']||[];
+      return Array.isArray(tripField) ? tripField.includes(tripId) : String(tripField).includes(tripId);
+    });
+    allRoomingJemaah = allJems.filter(r=>{
+      const tripField = r.fields['TRIP']||[];
+      if(Array.isArray(tripField)) return tripField.includes(tripId);
+      // also support if TRIP field stores names
+      const tripName = window.selectedTripRecord?.fields?.Trip||'';
+      const cleanSel = cleanTripNameForRooming(tripName);
+      const recTripNames = Array.isArray(r.fields['TRIP NAME']||r.fields['Trip']) ? (r.fields['TRIP NAME']||r.fields['Trip']) : [r.fields['Trip']||''];
+      return String(tripField).includes(tripId) || JSON.stringify(r.fields).includes(tripId);
+    });
+    // Fallback if still 0: try filter by trip name contains
+    if(allRoomingJemaah.length===0 && allJems.length>0){
+      const selTripName = cleanTripNameForRooming(window.selectedTripRecord?.fields?.Trip||'');
+      const selTripDate = window.selectedTripRecord?.fields?.['Mula Pakej']||'';
+      allRoomingJemaah = allJems.filter(r=>{
+        const tf = r.fields['TRIP']||[];
+        // check if any trip record name matches selected
+        const mapped = window.allTripUmrahRecords?.find(tr=> tf.includes(tr.id));
+        if(mapped){
+          const mName = cleanTripNameForRooming(mapped.fields?.Trip||'');
+          return mName===selTripName;
+        }
+        return false;
+      });
+    }
 
     // update customLocations from existing records that are not base
     const baseSet = ['MEKAH','MADINAH','TAIF','JEDDAH'];
@@ -342,7 +386,7 @@ function renderRoomingGrid(){
   }).join('');
 }
 
-function setActiveLocation(loc){ activeLocation=loc.toUpperCase(); renderLocationTabs(); renderNamelist(); renderRoomingGrid(); }
+function setActiveLocation(loc){ activeLocation=loc.toUpperCase(); localStorage.setItem('effah_active_location', activeLocation); renderLocationTabs(); renderNamelist(); renderRoomingGrid(); }
 function filterRoomingNamelist(){ renderNamelist(); }
 function allowDrop(e){ e.preventDefault(); }
 function dragJemaah(e,jId){ e.dataTransfer.setData('text/plain', jId); }
@@ -452,11 +496,21 @@ function openAddLocationModal(){
   const loc = prompt('Nama Lokasi baru (contoh: TAIF, JEDDAH):');
   if(loc && loc.trim()){
     const upper = loc.trim().toUpperCase();
+    if(upper==='SEMUA' || upper==='TANPA LOKASI'){ alert('Nama lokasi tidak dibenarkan'); return; }
     if(['MEKAH','MADINAH','TAIF','JEDDAH'].includes(upper) || confirm(`Tambah lokasi baru "${upper}"?`)){
       if(!customLocations.includes(upper)) customLocations.push(upper);
+      localStorage.setItem('effah_custom_locations', JSON.stringify(customLocations));
       activeLocation = upper;
       renderLocationTabs();
       renderRoomingGrid();
     }
   }
+}
+function deleteCustomLocation(loc){
+  if(!confirm(`Padam lokasi ${loc}? Bilik dalam lokasi ini akan jadi tanpa lokasi.`)) return;
+  customLocations = customLocations.filter(l=>l!==loc);
+  localStorage.setItem('effah_custom_locations', JSON.stringify(customLocations));
+  if(activeLocation===loc) activeLocation='MEKAH';
+  renderLocationTabs();
+  renderRoomingGrid();
 }
