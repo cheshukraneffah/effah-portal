@@ -20,19 +20,24 @@ function showRoomingLoading(){
   isRoomingLoading = true;
   const grid = document.getElementById('roomingGrid');
   const list = document.getElementById('namelistContainer');
-  const logo = 'assets/logo-effah.png';
-  const skeleton = `
-  <div class="flex flex-col items-center justify-center py-20 gap-4">
-    <img src="${logo}" class="w-16 h-16 animate-spin" style="animation: spin 1.5s linear infinite;" onerror="this.outerHTML='<i class=\\'fa-solid fa-spinner fa-spin text-3xl text-slate-400\\'></i>'">
-    <span class="text-xs font-bold text-slate-500 tracking-widest animate-pulse">LOADING ROOMING...</span>
-    <div class="w-full max-w-sm space-y-2 mt-4">
-      <div class="h-3 bg-slate-100 rounded-full animate-pulse"></div>
-      <div class="h-3 bg-slate-100 rounded-full animate-pulse w-5/6"></div>
+  const skeletonList = `
+  <div class="p-4 space-y-3 animate-pulse">
+    <div class="h-4 bg-slate-200 rounded w-3/4"></div>
+    <div class="space-y-2">
+      <div class="h-8 bg-slate-100 rounded-xl"></div>
+      <div class="h-8 bg-slate-100 rounded-xl"></div>
+      <div class="h-8 bg-slate-100 rounded-xl"></div>
+      <div class="h-8 bg-slate-100 rounded-xl w-5/6"></div>
+      <div class="h-8 bg-slate-100 rounded-xl"></div>
     </div>
-  </div>
-  <style>@keyframes spin{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}</style>`;
-  if(grid) grid.innerHTML = `<div class="col-span-2 bg-white rounded-2xl border p-4">${skeleton}</div>`;
-  if(list) list.innerHTML = skeleton;
+  </div>`;
+  const skeletonGrid = `
+  <div class="col-span-2 grid grid-cols-1 lg:grid-cols-2 gap-3">
+    <div class="bg-white rounded-2xl border p-4 space-y-3 animate-pulse"><div class="h-5 bg-slate-200 rounded w-1/3"></div><div class="h-20 bg-slate-100 rounded-xl"></div><div class="h-10 bg-slate-100 rounded-xl"></div></div>
+    <div class="bg-white rounded-2xl border p-4 space-y-3 animate-pulse"><div class="h-5 bg-slate-200 rounded w-1/3"></div><div class="h-20 bg-slate-100 rounded-xl"></div><div class="h-10 bg-slate-100 rounded-xl"></div></div>
+  </div>`;
+  if(grid) grid.innerHTML = skeletonGrid;
+  if(list) list.innerHTML = skeletonList;
 }
 
 function renderRoomingHTML(){
@@ -49,7 +54,7 @@ function renderRoomingHTML(){
         <span id="roomingHeaderCount" class="text-slate-500 text-[11px]">0 Bilik</span>
       </div>
       <div class="flex items-center gap-2 text-xs">
-        <span id="belumAssignTop" class="px-2.5 py-1 bg-amber-100 rounded-full font-bold">0 Belum</span>
+        <span id="belumAssignTop" class="px-2.5 py-1 bg-amber-100 rounded-full font-bold">0 Unassigned</span>
         <span id="assignedTop" class="px-2.5 py-1 bg-emerald-50 rounded-full font-bold">0 Assigned</span>
         <button onclick="fetchRoomingData()" class="w-7 h-7 rounded-full border bg-white hover:bg-slate-50"><i class="fa-solid fa-rotate"></i></button>
       </div>
@@ -61,7 +66,7 @@ function renderRoomingHTML(){
           <div class="flex items-center justify-between mb-3">
             <h3 class="font-extrabold text-[11px] tracking-[0.15em] text-slate-700">NAMELIST JEMAAH</h3>
             <div class="flex gap-1.5">
-              <span id="belumAssignBadge" class="px-2.5 py-1 bg-amber-100 text-amber-800 rounded-full text-[11px] font-bold">0 Belum</span>
+              <span id="belumAssignBadge" class="px-2.5 py-1 bg-amber-100 text-amber-800 rounded-full text-[11px] font-bold">0 Unassigned</span>
               <span id="totalJemaahBadge" class="px-2.5 py-1 bg-slate-900 text-white rounded-full text-[11px] font-bold">0 Total</span>
             </div>
           </div>
@@ -85,7 +90,7 @@ function renderRoomingHTML(){
         <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-3">
           <div class="flex items-center justify-between gap-2 flex-wrap">
             <div>
-              <h3 class="font-extrabold text-[11px] tracking-widest">ROOMING LIST <span id="roomingTripName">-</span></h3>
+              <h3 class="font-extrabold text-[11px] tracking-widest">ROOMING LIST <span id="roomingTripName" class="font-bold text-slate-900">-</span></h3>
               <div class="flex items-center gap-2 mt-1 text-[11px]">
                 <span id="roomingBiliks" class="px-2.5 py-0.5 bg-slate-900 text-white rounded-full font-bold">0 Bilik</span>
                 <span id="roomingOccupancy" class="text-slate-500">0 Jemaah + 0 Staff • ${activeLocation}</span>
@@ -93,6 +98,7 @@ function renderRoomingHTML(){
             </div>
             <div class="flex items-center gap-1.5">
               <div class="flex items-center gap-1 px-2 py-1 bg-slate-50 rounded-full border text-xs"><span>Default</span><button onclick="changeDefaultCap(-1)" class="w-5 h-5 rounded-full bg-white border">−</button><span id="defaultCapLabel" class="font-bold w-4 text-center">3</span><button onclick="changeDefaultCap(1)" class="w-5 h-5 rounded-full bg-white border">+</button></div>
+              <button onclick="generateRoomingPrint()" class="px-3 py-1.5 bg-white border border-slate-300 rounded-full text-xs font-bold hover:bg-slate-50"><i class="fa-solid fa-print mr-1"></i> Print / PDF</button>
               <button onclick="autoAssignRooming()" class="px-3 py-1.5 bg-slate-900 text-white rounded-full text-xs font-bold">Auto Assign</button>
               <button onclick="openNewRoomModal()" class="px-3 py-1.5 bg-white border rounded-full text-xs font-bold">+ Bilik Baru</button>
             </div>
@@ -170,8 +176,17 @@ async function saveRoomOrder(ids){
 }
 
 let draggedRoomId = null;
-function handleRoomDragStart(e, roomId){ draggedRoomId = roomId; e.dataTransfer.effectAllowed='move'; setTimeout(()=>{ e.target.style.opacity='0.4'; },0); }
-function handleRoomDragEnd(e){ e.target.style.opacity='1'; draggedRoomId=null; }
+function handleRoomDragStart(e, roomId){
+  draggedRoomId = roomId;
+  e.dataTransfer.effectAllowed='move';
+  const card = document.querySelector(`[data-room-id="${roomId}"]`);
+  if(card){ setTimeout(()=>{ card.style.opacity='0.4'; card.style.transform='scale(0.98)'; },0); }
+}
+function handleRoomDragEnd(e){
+  const card = document.querySelector(`[data-room-id="${draggedRoomId}"]`);
+  if(card){ card.style.opacity='1'; card.style.transform='scale(1)'; }
+  draggedRoomId=null;
+}
 function handleRoomDragOver(e){ e.preventDefault(); e.dataTransfer.dropEffect='move'; }
 function handleRoomDrop(e, targetId){
   e.preventDefault();
@@ -184,8 +199,7 @@ function handleRoomDrop(e, targetId){
   if(fromIdx>-1 && toIdx>-1){
     ids.splice(fromIdx,1);
     ids.splice(toIdx,0,draggedRoomId);
-    saveRoomOrder(ids);
-    renderRoomingGrid();
+    saveRoomOrder(ids).then(()=>{ renderRoomingGrid(); });
   }
 }
 
@@ -391,8 +405,8 @@ function renderNamelist(){
     let belumAll = total;
     try{ belumAll = allRoomingJemaah.filter(r=> !isJemaahAssigned(r.id)).length; }catch(e){}
     const elTotal = document.getElementById('totalJemaahBadge'); if(elTotal) elTotal.textContent = total + ' Total';
-    const elBelum = document.getElementById('belumAssignBadge'); if(elBelum) elBelum.textContent = belumAll + ' Belum';
-    const elBelumTop = document.getElementById('belumAssignTop'); if(elBelumTop) elBelumTop.textContent = belumAll + ' Belum';
+    const elBelum = document.getElementById('belumAssignBadge'); if(elBelum) elBelum.textContent = belumAll + ' Unassigned';
+    const elBelumTop = document.getElementById('belumAssignTop'); if(elBelumTop) elBelumTop.textContent = belumAll + ' Unassigned';
     const elAssignedTop = document.getElementById('assignedTop'); if(elAssignedTop) elAssignedTop.textContent = (total - belumAll) + ' Assigned';
 
     if(total===0){
@@ -588,14 +602,12 @@ function openNewRoomModal(){
   document.getElementById('newRoomLokasi').value = activeLocation;
   const capInput = document.getElementById('newRoomCap');
   capInput.value = roomingDefaultCap;
-  const existing = allRoomingRecords.filter(r=> (r.fields['LOKASI / CITY']||'MEKAH').toUpperCase()===activeLocation.toUpperCase());
-  let maxNum = 0;
-  existing.forEach(r=>{
-    const rid = r.fields['Room ID / Nama Bilik']||'';
-    const m = rid.match(/B(\d+)/i);
-    if(m) maxNum = Math.max(maxNum, parseInt(m[1])||0);
-  });
-  document.getElementById('newRoomId').value = `B${maxNum+1 || existing.length+1}`;
+  // Auto ID = B + capacity (user request)
+  document.getElementById('newRoomId').value = `B${roomingDefaultCap}`;
+  capInput.oninput = function(){
+    const capVal = parseInt(this.value)||roomingDefaultCap;
+    document.getElementById('newRoomId').value = `B${capVal}`;
+  };
 }
 function closeNewRoomModal(){ document.getElementById('newRoomModal').classList.add('hidden'); }
 async function submitNewRoom(){
@@ -660,4 +672,66 @@ function deleteCustomLocation(loc){
   localStorage.setItem('effah_active_location', activeLocation);
   renderLocationTabs();
   renderRoomingGrid();
+}
+
+
+function generateRoomingPrint(){
+  const tripName = document.getElementById('roomingTripName')?.textContent || cleanTripNameForRooming(window.selectedTripRecord?.fields?.Trip||'Trip');
+  const loc = activeLocation;
+  const rooms = [...allRoomingRecords].filter(r=> (r.fields['LOKASI / CITY']||'MEKAH').toUpperCase()===loc.toUpperCase());
+  const ordered = getRoomOrderedList(rooms);
+  
+  // Build namelist table
+  let namelistRows = allRoomingJemaah.map((j, idx)=>{
+    const f = j.fields;
+    const name = f['NAMA']||f['NAME']||'-';
+    const ejen = f['EJEN']||f['Ejen']||'-';
+    const fullboard = f['FULLBOARD']||f['BOARD']||'NO FULLBOARD';
+    const train = f['TRAIN']||'-';
+    const pakej = f['PAKEJ']||'EKONOMI';
+    const insuran = f['INSURAN'] ? 'TAKAFUL' : '';
+    return `<tr><td>${idx+1}</td><td>${name}</td><td>${ejen}</td><td>${fullboard}</td><td>${train}</td><td>${pakej}</td><td>${insuran}</td></tr>`;
+  }).join('');
+  
+  let roomingCols = '';
+  // Split rooms into columns of 4 per location for horizontal layout
+  const roomBlocks = ordered.map(r=>{
+    const f = r.fields;
+    const rid = f['Room ID / Nama Bilik']||'?';
+    const pakej = f['PAKEJ / HOTEL']||'EKONOMI';
+    const hotel = f['HOTEL NAME']||'';
+    const jIds = f['JEMAAH']||[];
+    const staff = (f['STAFF / EXTRA']||'').split(',').filter(Boolean);
+    const cap = f['KAPASITI']||3;
+    let rows = jIds.map(jId=>{
+      const rec = allRoomingJemaah.find(j=>j.id===jId);
+      return `<div>${rec?.fields?.['NAMA']||jId.slice(0,8)}</div>`;
+    }).join('');
+    staff.forEach(s=>{ rows += `<div>NA ${s}</div>`; });
+    return `<div style="margin-bottom:20px"><b>${rid} (${pakej}) - ${hotel}</b><div style="margin-left:10px">${rows}</div></div>`;
+  }).join('');
+  
+  const html = `
+  <html><head><title>Rooming List ${tripName}</title>
+  <style>
+  body{font-family:Arial, sans-serif; font-size:10px; margin:20px;}
+  table{border-collapse:collapse; width:100%;}
+  th,td{border:1px solid #000; padding:4px 6px; text-align:left; font-size:9px;}
+  th{background:#f0f0f0; font-weight:bold;}
+  .header{display:flex; justify-content:space-between; font-weight:bold; font-size:12px; margin-bottom:10px; border-bottom:2px solid #000; padding-bottom:5px;}
+  .container{display:flex; gap:20px;}
+  .left{width:65%;}
+  .right{width:35%;}
+  @media print{ @page{size:landscape;} }
+  </style></head><body>
+  <div class="header"><span>NAMELIST ${tripName}</span><span>ROOMING LIST ${tripName}</span></div>
+  <div class="container">
+    <div class="left"><table><tr><th>NO</th><th>NAMA JEMAAH</th><th>EJEN</th><th>FULLBOARD</th><th>TRAIN</th><th>PAKEJ</th><th>INSURAN</th></tr>${namelistRows}</table></div>
+    <div class="right">${roomBlocks}</div>
+  </div>
+  <script>window.onload=function(){ window.print(); }</script>
+  </body></html>
+  `;
+  const w = window.open('', '_blank');
+  if(w){ w.document.write(html); w.document.close(); }
 }
