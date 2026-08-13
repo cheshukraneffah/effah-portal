@@ -302,14 +302,25 @@ async function fetchRoomingData(){
     let allRooms=[], allJems=[], offset='';
     do{ const res=await fetch(`https://api.airtable.com/v0/${base}/ROOMING%20LIST?pageSize=100${offset?`&offset=${offset}`:''}`,{headers:{Authorization:`Bearer ${pat}`}}); const data=await res.json(); if(data.records) allRooms=allRooms.concat(data.records); offset=data.offset||''; }while(offset);
     offset=''; do{ const res=await fetch(`https://api.airtable.com/v0/${base}/DATA%20JEMAAH%20UMRAH?pageSize=100${offset?`&offset=${offset}`:''}`,{headers:{Authorization:`Bearer ${pat}`}}); const data=await res.json(); if(data.records) allJems=allJems.concat(data.records); offset=data.offset||''; }while(offset);
-    allRoomingRecords = allRooms.filter(r=> (r.fields['TRIP']||[]).includes(tripId));
-    allRoomingJemaah = allJems.filter(r=> (r.fields['TRIP']||[]).includes(tripId));
+    allRoomingRecords = allRooms.filter(r=>{
+      const tf = r.fields['TRIP']||[];
+      return Array.isArray(tf) ? tf.includes(tripId) : String(tf).includes(tripId);
+    });
+    allRoomingJemaah = allJems.filter(r=>{
+      const tf = r.fields['TRIP']||[];
+      return Array.isArray(tf) ? tf.includes(tripId) : String(tf).includes(tripId);
+    });
     const baseSet=['MEKAH','MADINAH','TAIF','JEDDAH'];
     allRoomingRecords.forEach(r=>{ const l=(r.fields['LOKASI / CITY']||'').trim().toUpperCase(); if(l&&!baseSet.includes(l)&&!customLocations.includes(l)) customLocations.push(l); });
     if(customLocations.length>0) localStorage.setItem('effah_custom_locations', JSON.stringify(customLocations));
-    const tripLabelRaw = window.selectedTripRecord?.fields?.Trip || 'Trip';
+    const tripLabelRaw = window.selectedTripRecord?.fields?.Trip || window.selectedTripRecord?.fields?.['TRIP NAME'] || document.getElementById('roomingTripSelect')?.selectedOptions[0]?.text || '';
     const tripLabel = cleanTripNameForRooming(tripLabelRaw);
-    const elTripName = document.getElementById('roomingListHeader'); if(elTripName) elTripName.textContent = tripLabel ? `ROOMING LIST ${tripLabel}` : 'ROOMING LIST';
+    const elTripName = document.getElementById('roomingListHeader'); 
+    if(elTripName) elTripName.textContent = tripLabel ? `ROOMING LIST ${tripLabel}` : 'ROOMING LIST';
+    // also update small trip name if exists
+    const elTripNameSmall = document.getElementById('roomingTripName');
+    if(elTripNameSmall) elTripNameSmall.textContent = tripLabel || '';
+
     loadStaffList();
     renderNamelist();
     renderRoomingGrid();
@@ -320,14 +331,22 @@ async function fetchRoomingData(){
 function populateRoomingTripDropdown(){
   const sel=document.getElementById('roomingTripSelect');
   if(!sel) return;
-  let trips=[...(window.allTripUmrahRecords||[])];
-  const currentId=window.selectedTripRecord?.id||localStorage.getItem('effah_active_trip_id')||'';
-  if(trips.length===0){ sel.innerHTML='<option>Loading...</option>'; return; }
+  let trips=[...(window.allTripUmrahRecords||window.allTripRecords||window.allTrips||[])];
+  const currentId=window.selectedTripRecord?.id||localStorage.getItem('effah_active_trip_id')||localStorage.getItem('selectedTripId')||localStorage.getItem('effah_last_selected_trip')||'';
+  if(trips.length===0){
+    sel.innerHTML='<option value="">Loading trips...</option>';
+    if(typeof fetchTripUmrahData==='function'){
+      fetchTripUmrahData().then(()=> setTimeout(populateRoomingTripDropdown, 800));
+    }
+    return;
+  }
   trips.sort((a,b)=> (a.fields['Mula Pakej']||'').localeCompare(b.fields['Mula Pakej']||''));
   sel.innerHTML='<option value="">Pilih Trip...</option>'+trips.map(t=>{
-    const raw=t.fields?.Trip||t.id; const clean=cleanTripNameForRooming(raw);
+    const raw=t.fields?.Trip||t.fields?.['TRIP NAME']||t.fields?.Name||t.id;
+    const clean=cleanTripNameForRooming(raw) || raw;
     return `<option value="${t.id}" ${t.id===currentId?'selected':''}>${clean}</option>`;
   }).join('');
+  if(currentId) sel.value=currentId;
 }
 
 function onRoomingTripChange(tripId){
@@ -354,7 +373,7 @@ function renderNamelist(){
   document.getElementById('belumAssignBadge').textContent=belum+' Unassigned';
   document.getElementById('belumAssignTop').textContent=belum+' Unassigned';
   document.getElementById('assignedTop').textContent=(total-belum)+' Assigned';
-  if(total===0){ cont.innerHTML='<div class="p-8 text-center text-xs text-slate-400">Tiada jemaah</div>'; return; }
+  if(total===0){ cont.innerHTML='<div class="p-8 text-center text-xs text-slate-400">Tiada jemaah untuk trip ini. Pilih trip lain atau check Airtable DATA JEMAAH UMRAH TRIP link.</div>'; return; }
   cont.innerHTML=filtered.map((r,i)=>{
     const f=r.fields; const name=f['NAMA']||'-'; const assigned=isJemaahAssigned(r.id);
     const board=(f['BOARD']||'').includes('FB')?'FB':'-';
@@ -380,10 +399,11 @@ function renderRoomingGrid(){
   grid.innerHTML=rooms.map(rec=>{
     const f=rec.fields; const roomId=f['Room ID / Nama Bilik']||'?'; const pakej=f['PAKEJ / HOTEL']||'EKONOMI'; const cap=f['KAPASITI']||4; const hotel=f['HOTEL NAME']||'Tanpa Hotel'; const note=f['CATATAN BILIK']||''; const staffRaw=f['STAFF / EXTRA']||''; const staffArr=staffRaw.split(',').filter(Boolean); const jIds=f['JEMAAH']||[]; const count=jIds.length+staffArr.length;
     const jSlots=jIds.map(jId=>{
-      const jRec=allRoomingJemaah.find(j=>j.id===jId); const jName=jRec?.fields?.['NAMA']||'';
-      return `<div class="flex items-center justify-between px-2.5 py-2.5 bg-[#0F172A] text-white rounded-xl text-[11px]"><span class="truncate">${jName}</span><button onclick="removeJemaahFromRoom('${rec.id}','${jId}')" class="ml-2 opacity-70">✕</button></div>`;
+      const jRec=allRoomingJemaah.find(j=>j.id===jId); const jName=jRec?.fields?.['NAMA']||jRec?.fields?.['NAME']||'';
+      const displayName = jName || jId.slice(0,8);
+      return `<div class="flex items-center justify-between px-2.5 py-2.5 bg-[#475569] text-white rounded-xl text-[11px] shadow-sm"><span class="truncate font-medium">${displayName}</span><button onclick="removeJemaahFromRoom('${rec.id}','${jId}')" class="ml-2 w-5 h-5 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center">✕</button></div>`;
     }).join('');
-    const sSlots=staffArr.map(s=>`<div class="flex items-center justify-between px-2.5 py-2.5 bg-[#800020] text-white rounded-xl text-[11px] border border-[#800020]"><span class="truncate">👤 ${s}</span><button onclick="removeStaff('${rec.id}','${s.replace(/'/g,"\\'")}')" class="ml-2 opacity-70">✕</button></div>`).join('');
+    const sSlots=staffArr.map(s=>`<div class="flex items-center justify-between px-2.5 py-2.5 bg-[#B76E79] text-white rounded-xl text-[11px] border border-[#B76E79] shadow-sm"><span class="truncate font-medium">👤 ${s}</span><button onclick="removeStaff('${rec.id}','${s.replace(/'/g,"\\'")}')" class="ml-2 w-5 h-5 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center">✕</button></div>`).join('');
     const emptyCount=Math.max(0,cap-(jIds.length+staffArr.length));
     const emptySlots=Array.from({length:emptyCount}).map((_,i)=>`<div ondragover="allowDrop(event)" ondrop="dropJemaah(event,'${rec.id}')" class="px-2 py-2.5 border border-dashed rounded-xl text-[11px] text-slate-400 text-center">Slot Kosong ${jIds.length+staffArr.length+i+1}</div>`).join('');
     return `<div data-room-id="${rec.id}" ondragover="handleRoomDragOver(event)" ondragleave="handleRoomDragLeave(event)" ondrop="handleRoomDrop(event,'${rec.id}')" class="bg-white rounded-2xl border p-3 shadow-sm flex flex-col gap-2.5">
