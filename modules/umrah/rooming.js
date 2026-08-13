@@ -1,4 +1,4 @@
-// ROOMING V15 FINAL FIXED - no overlap, fix Loading trip, remove 0 Bilik, auto B+kapasiti, Cipta Bilik responsive, copy bilik fix, staff drag fix, print NA layout lama
+// ROOMING V16 FINAL - FIXED LAYOUT lg:flex-row side-by-side, no overlap, fix all bugs V15
 let allRoomingRecords = [];
 let allRoomingJemaah = [];
 let activeLocation = localStorage.getItem('effah_active_location') || 'MEKAH';
@@ -6,6 +6,7 @@ let roomingDefaultCap = 4;
 let customLocations = JSON.parse(localStorage.getItem('effah_custom_locations')||'[]');
 let staffList = [];
 let staffIdCounter = parseInt(localStorage.getItem('effah_staff_counter')||'1000');
+
 function cleanTripNameForRooming(name){
   if(!name) return '';
   if(typeof cleanTripName==='function') return cleanTripName(name);
@@ -15,23 +16,27 @@ function cleanTripNameForRooming(name){
 }
 function getJemaahName(f){ if(!f) return '-'; return f['NAMA'] || f['NAME'] || f['NAMA JEMAAH'] || f['NAMA PENUH'] || f['Name'] || '-'; }
 function generateRoomIdFromCap(cap){ return `B${parseInt(cap)||4}`; }
+
 document.addEventListener('DOMContentLoaded', () => {
   if(document.getElementById('modul-rooming')) renderRoomingHTML();
-  setTimeout(()=>populateRoomingTripDropdown(), 600);
+  setTimeout(()=>populateRoomingTripDropdown(), 700);
 });
+
 function showRoomingLoading(){
   const g=document.getElementById('roomingGrid'); const l=document.getElementById('namelistContainer');
   if(g) g.innerHTML=`<div class="col-span-2 p-8 text-center text-xs text-slate-400">Loading bilik...</div>`;
   if(l) l.innerHTML=`<div class="p-8 text-center text-xs text-slate-400">Loading jemaah...</div>`;
 }
+
 function renderRoomingHTML(){
   const c=document.getElementById('modul-rooming'); if(!c) return;
   c.innerHTML=`
   <div class="flex flex-col gap-3 p-2">
+    <!-- HEADER - 0 Bilik removed as requested -->
     <div class="bg-white rounded-2xl border border-slate-200 p-3 flex flex-wrap items-center justify-between gap-3">
       <div class="flex items-center gap-3 text-xs flex-wrap">
         <span class="font-black tracking-widest text-slate-800">ROOMING LIST</span>
-        <select id="roomingTripSelect" onchange="onRoomingTripChange(this.value)" class="px-3 py-1.5 border border-slate-300 rounded-full bg-white text-xs font-bold min-w-[240px] max-w-[320px] truncate">
+        <select id="roomingTripSelect" onchange="onRoomingTripChange(this.value)" class="px-3 py-1.5 border border-slate-300 rounded-full bg-white text-xs font-bold min-w- max-w- truncate">
           <option value="">Pilih Trip...</option>
         </select>
       </div>
@@ -41,14 +46,17 @@ function renderRoomingHTML(){
         <button onclick="fetchRoomingData()" class="w-7 h-7 rounded-full border bg-white hover:bg-slate-50"><i class="fa-solid fa-rotate"></i></button>
       </div>
     </div>
+
+    <!-- MAIN LAYOUT - lg:flex-row side by side -->
     <div class="flex flex-col lg:flex-row gap-3 items-start">
+      <!-- LEFT: NAMELIST 52% -->
       <div class="w-full lg:w-[52%] bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col overflow-hidden">
         <div class="p-3 border-b border-slate-200">
           <div class="flex items-center justify-between mb-3">
-            <h3 class="font-extrabold text-[11px] tracking-[0.15em] text-slate-700">NAMELIST JEMAAH</h3>
+            <h3 class="font-extrabold text- tracking-[0.15em] text-slate-700">NAMELIST JEMAAH</h3>
             <div class="flex gap-1.5">
-              <span id="belumAssignBadge" class="px-2.5 py-1 bg-amber-100 text-amber-800 rounded-full text-[11px] font-bold">0 Unassigned</span>
-              <span id="totalJemaahBadge" class="px-2.5 py-1 bg-slate-100 border border-slate-200 text-slate-700 rounded-full text-[11px] font-bold">0 Total</span>
+              <span id="belumAssignBadge" class="px-2.5 py-1 bg-amber-100 text-amber-800 rounded-full text- font-bold">0 Unassigned</span>
+              <span id="totalJemaahBadge" class="px-2.5 py-1 bg-slate-100 border border-slate-200 text-slate-700 rounded-full text- font-bold">0 Total</span>
             </div>
           </div>
           <div class="flex gap-2">
@@ -59,27 +67,29 @@ function renderRoomingHTML(){
             <select id="filterPakejRooming" onchange="filterRoomingNamelist()" class="text-xs border border-slate-200 rounded-xl px-3 py-2.5 bg-white font-medium"><option value="">Semua Pakej</option><option>EKONOMI</option><option>PREMIUM</option><option>JIMAT</option></select>
           </div>
         </div>
-        <div class="px-3 py-2 bg-slate-50/70 border-b border-slate-200 grid grid-cols-12 text-[10px] font-bold text-slate-500 tracking-wider">
+        <div class="px-3 py-2 bg-slate-50/70 border-b border-slate-200 grid grid-cols-12 text- font-bold text-slate-500 tracking-wider">
           <div class="col-span-1">NO</div><div class="col-span-7">NAMA JEMAAH</div><div class="col-span-1 text-center">BOARD</div><div class="col-span-2 text-center">PAKEJ</div><div class="col-span-1 text-center">+</div>
         </div>
-        <div id="namelistContainer" class="flex-1 overflow-y-auto max-h-[42vh] divide-y divide-slate-50 bg-white"></div>
+        <div id="namelistContainer" class="flex-1 overflow-y-auto max-h- divide-y divide-slate-50 bg-white min-h-"></div>
         <div class="border-t border-slate-200 bg-slate-50/50">
           <div class="p-3 flex items-center justify-between">
-            <h4 class="font-extrabold text-[11px] tracking-widest text-slate-700">STAFF / EXTRA LIST</h4>
-            <span id="staffTotalBadge" class="px-2.5 py-1 bg-slate-100 border border-slate-200 text-slate-700 rounded-full text-[11px] font-bold">0 Staff</span>
+            <h4 class="font-extrabold text- tracking-widest text-slate-700">STAFF / EXTRA LIST</h4>
+            <span id="staffTotalBadge" class="px-2.5 py-1 bg-slate-100 border border-slate-200 text-slate-700 rounded-full text- font-bold">0 Staff</span>
           </div>
           <div class="px-3 pb-3 flex gap-2">
             <input id="newStaffInput" placeholder="Taip nama staff" class="flex-1 text-xs px-3 py-2 border border-slate-200 rounded-xl bg-white focus:outline-none" onkeydown="if(event.key==='Enter'){ addNewStaff(); }">
             <button onclick="addNewStaff()" class="px-3 py-2 bg-slate-100 border border-slate-200 text-slate-700 rounded-xl text-xs font-bold hover:bg-slate-200">+ Add</button>
           </div>
-          <div id="staffListContainer" class="px-2 pb-3 max-h-[25vh] overflow-y-auto space-y-1 bg-slate-50/50"></div>
+          <div id="staffListContainer" class="px-2 pb-3 max-h- overflow-y-auto space-y-1 bg-slate-50/50 min-h-"></div>
         </div>
+      </div>
+      <!-- RIGHT: ROOMING GRID 48% - CLOSED PROPERLY NOW -->
       <div class="w-full lg:w-[48%] flex flex-col gap-3">
         <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-3">
           <div class="flex items-center justify-between gap-2 flex-wrap">
             <div>
-              <h3 class="font-extrabold text-[11px] tracking-widest">ROOMING LIST</h3>
-              <div class="flex items-center gap-2 mt-1 text-[11px]">
+              <h3 class="font-extrabold text- tracking-widest">ROOMING LIST</h3>
+              <div class="flex items-center gap-2 mt-1 text-">
                 <span id="roomingBiliks" class="px-2.5 py-0.5 bg-slate-100 border border-slate-200 text-slate-700 rounded-full font-bold">0 Bilik</span>
                 <span id="roomingOccupancy" class="text-slate-500">0 Jemaah + 0 Staff • ${activeLocation}</span>
               </div>
@@ -90,21 +100,22 @@ function renderRoomingHTML(){
               <button onclick="autoAssignRooming()" class="px-3 py-1.5 bg-slate-100 border border-slate-200 text-slate-700 rounded-full text-xs font-bold hover:bg-slate-200">Auto Assign</button>
               <button onclick="openNewRoomModal()" class="px-3 py-1.5 bg-slate-900 text-white rounded-full text-xs font-bold hover:bg-black">+ Bilik Baru</button>
             </div>
-          </div>
           <div id="roomingOverview" class="mt-3 p-3 bg-white border border-slate-200 rounded-xl"></div>
           <div id="locationTabs" class="flex flex-wrap gap-1.5 mt-3"></div>
         </div>
-        <div id="roomingGrid" class="grid grid-cols-1 lg:grid-cols-2 gap-3 overflow-y-auto max-h-[78vh] pr-1 content-start"></div>
+        <div id="roomingGrid" class="grid grid-cols-1 lg:grid-cols-2 gap-3 overflow-y-auto max-h- pr-1 content-start min-h-"></div>
       </div>
     </div>
+  </div>
+
   <div id="newRoomModal" class="fixed inset-0 bg-black/50 z-50 hidden flex items-center justify-center p-4">
     <div class="bg-white rounded-2xl p-5 max-w-sm w-full shadow-2xl">
       <h3 class="font-bold mb-4 text-sm">Tambah Bilik Baru - Auto B + Kapasiti</h3>
       <div class="space-y-3 text-xs">
         <div>
-          <label class="text-[11px] font-bold text-slate-500">ROOM ID (Auto)</label>
+          <label class="text- font-bold text-slate-500">ROOM ID (Auto)</label>
           <input id="newRoomId" readonly class="w-full p-2.5 border border-slate-200 rounded-xl bg-slate-100 font-bold text-slate-700" value="B4">
-          <p class="text-[10px] text-slate-400 mt-1">Auto ikut kapasiti: 4=B4, 6=B6</p>
+          <p class="text- text-slate-400 mt-1">Auto ikut kapasiti: 4=B4, 6=B6</p>
         </div>
         <select id="newRoomLokasi" class="w-full p-2.5 border border-slate-200 rounded-xl bg-white"><option value="MEKAH">MEKAH</option><option value="MADINAH">MADINAH</option><option value="TAIF">TAIF</option><option value="JEDDAH">JEDDAH</option></select>
         <select id="newRoomPakej" class="w-full p-2.5 border border-slate-200 rounded-xl bg-white"><option>EKONOMI</option><option>PREMIUM</option><option>JIMAT</option></select>
@@ -123,13 +134,15 @@ function renderRoomingHTML(){
       </div>
     </div>
   </div>
+
   <div id="copyRoomsModal" class="fixed inset-0 bg-black/50 z-50 hidden flex items-center justify-center p-4">
     <div class="bg-white rounded-2xl p-5 max-w-sm w-full shadow-2xl">
       <h3 class="font-bold mb-2 text-sm">Copy Bilik dari Lokasi Lain</h3>
-      <p class="text-[11px] text-slate-500 mb-4">Pilih lokasi sumber untuk copy ke <b id="copyTargetLoc">${activeLocation}</b></p>
+      <p class="text- text-slate-500 mb-4">Pilih lokasi sumber untuk copy ke <b id="copyTargetLoc">${activeLocation}</b></p>
       <div id="copySourceList" class="space-y-2 mb-4"></div>
       <div class="flex gap-2"><button onclick="closeCopyRoomsModal()" class="flex-1 py-2.5 bg-slate-100 border border-slate-200 rounded-xl font-bold text-xs hover:bg-slate-200">Batal</button><button onclick="executeCopyRooms()" class="flex-1 py-2.5 bg-slate-900 text-white rounded-xl font-bold text-xs hover:bg-black">Copy Sekarang</button></div>
     </div>
+  </div>
   `;
   populateRoomingTripDropdown();
   renderLocationTabs();
@@ -155,10 +168,10 @@ function handleRoomDrop(e,targetId){
 document.addEventListener('dragover',e=>{ const g=document.getElementById('roomingGrid'); if(!g) return; const r=g.getBoundingClientRect(); if(e.clientY>r.bottom-100) g.scrollTop+=14; if(e.clientY<r.top+100) g.scrollTop-=14; });
 function renderRoomingOverview(rooms){
   const el=document.getElementById('roomingOverview'); if(!el) return;
-  if(rooms.length===0){ el.innerHTML='<span class="text-[11px] text-slate-400">Tiada bilik untuk '+activeLocation+'</span>'; return; }
+  if(rooms.length===0){ el.innerHTML='<span class="text- text-slate-400">Tiada bilik untuk '+activeLocation+'</span>'; return; }
   const capCount={}; rooms.forEach(r=>{ const cap=r.fields['KAPASITI']||4; capCount[cap]=(capCount[cap]||0)+1; });
-  let html=`<div class="space-y-1.5"><div class="font-extrabold text-[11px] tracking-widest">BILIK DI ${activeLocation} :</div>`;
-  Object.keys(capCount).sort((a,b)=>a-b).forEach(cap=>{ html+=`<div class="flex justify-between text-[11px]"><span>B${cap} = ${capCount[cap]} BILIK</span><span class="text-slate-400">${capCount[cap]*cap} pax</span></div>`; });
+  let html=`<div class="space-y-1.5"><div class="font-extrabold text- tracking-widest">BILIK DI ${activeLocation} :</div>`;
+  Object.keys(capCount).sort((a,b)=>a-b).forEach(cap=>{ html+=`<div class="flex justify-between text-"><span>B${cap} = ${capCount[cap]} BILIK</span><span class="text-slate-400">${capCount[cap]*cap} pax</span></div>`; });
   html+=`</div>`; el.innerHTML=html;
 }
 function renderLocationTabs(){
@@ -168,11 +181,11 @@ function renderLocationTabs(){
   let html=all.map(loc=>{
     const label=loc==='MEKAH'?'🕋 MEKAH':loc==='MADINAH'?'🕌 MADINAH':loc==='TAIF'?'⛰️ TAIF':loc==='JEDDAH'?'🏙️ JEDDAH':'📍 '+loc;
     const c=counts[loc]||0; const active=loc===activeLocation; const isCustom=!['MEKAH','MADINAH','TAIF'].includes(loc);
-    const delBtn=isCustom?`<button onclick="event.stopPropagation(); deleteCustomLocation('${loc}')" class="ml-1 w-4 h-4 rounded-full bg-black/10 hover:bg-red-500 hover:text-white flex items-center justify-center text-[9px]">✕</button>`:'';
+    const delBtn=isCustom?`<button onclick="event.stopPropagation(); deleteCustomLocation('${loc}')" class="ml-1 w-4 h-4 rounded-full bg-black/10 hover:bg-red-500 hover:text-white flex items-center justify-center text-">✕</button>`:'';
     const wrapCls=active?'bg-slate-800 rounded-full':'bg-white rounded-full border border-slate-200';
-    return `<div class="inline-flex items-center ${wrapCls}"><button onclick="setActiveLocation('${loc}')" class="px-3 py-1 rounded-full text-[11px] font-bold ${active?'text-white':'text-slate-700'}">${label} (${c})</button>${delBtn}</div>`;
+    return `<div class="inline-flex items-center ${wrapCls}"><button onclick="setActiveLocation('${loc}')" class="px-3 py-1 rounded-full text- font-bold ${active?'text-white':'text-slate-700'}">${label} (${c})</button>${delBtn}</div>`;
   }).join('');
-  html+=`<button onclick="openAddLocationModal()" class="px-3 py-1 rounded-full text-[11px] font-bold bg-slate-100 border border-slate-200 text-slate-600 hover:bg-slate-200">+ Lokasi</button>`;
+  html+=`<button onclick="openAddLocationModal()" class="px-3 py-1 rounded-full text- font-bold bg-slate-100 border border-slate-200 text-slate-600 hover:bg-slate-200">+ Lokasi</button>`;
   container.innerHTML=html;
 }
 async function fetchRoomingData(){
@@ -216,8 +229,8 @@ function renderNamelist(){
   cont.innerHTML=filtered.map((r,i)=>{
     const name=getJemaahName(r.fields); const assigned=isJemaahAssigned(r.id);
     const rowCls=assigned?'opacity-40 bg-slate-50 pointer-events-none':'hover:bg-slate-50 cursor-grab'; const drag=assigned?'':`draggable="true" ondragstart="dragJemaah(event,'${r.id}')" ondragend="dragEnd(event)"`;
-    const plus=assigned?'<span class="text-[10px] text-slate-400">✓</span>':`<button onclick="quickAssign('${r.id}')" class="w-6 h-6 rounded-full border bg-slate-100 hover:bg-slate-200">+</button>`;
-    return `<div ${drag} class="grid grid-cols-12 items-center px-3 py-2.5 text-xs border-b border-slate-50 ${rowCls}"><div class="col-span-1 text-slate-400">${String(i+1).padStart(2,'0')}</div><div class="col-span-7 font-semibold truncate">${name}</div><div class="col-span-1 text-center">-</div><div class="col-span-2 text-center"><span class="px-2 py-0.5 rounded-full border text-[10px]">${r.fields['PAKEJ']||'EKONOMI'}</span></div><div class="col-span-1 text-center">${plus}</div></div>`;
+    const plus=assigned?'<span class="text- text-slate-400">✓</span>':`<button onclick="quickAssign('${r.id}')" class="w-6 h-6 rounded-full border bg-slate-100 hover:bg-slate-200">+</button>`;
+    return `<div ${drag} class="grid grid-cols-12 items-center px-3 py-2.5 text-xs border-b border-slate-50 ${rowCls}"><div class="col-span-1 text-slate-400">${String(i+1).padStart(2,'0')}</div><div class="col-span-7 font-semibold truncate">${name}</div><div class="col-span-1 text-center">-</div><div class="col-span-2 text-center"><span class="px-2 py-0.5 rounded-full border text-">${r.fields['PAKEJ']||'EKONOMI'}</span></div><div class="col-span-1 text-center">${plus}</div></div>`;
   }).join('');
 }
 function renderRoomingGrid(){
@@ -231,12 +244,12 @@ function renderRoomingGrid(){
   if(rooms.length===0){ grid.innerHTML=`<div class="col-span-2 p-12 text-center text-xs border border-dashed rounded-2xl bg-white">Tiada bilik untuk <b>${activeLocation}</b><br><button onclick="openNewRoomModal()" class="mt-3 px-4 py-2 bg-slate-900 text-white rounded-full text-xs">+ Bilik Baru untuk ${activeLocation}</button></div>`; return; }
   grid.innerHTML=rooms.map(rec=>{
     const f=rec.fields; const roomId=f['Room ID / Nama Bilik']||generateRoomIdFromCap(f['KAPASITI']); const pakej=f['PAKEJ / HOTEL']||'EKONOMI'; const cap=f['KAPASITI']||4; const hotel=f['HOTEL NAME']||'Tanpa Hotel'; const staffArr=(f['STAFF / EXTRA']||'').split(',').filter(Boolean); const jIds=f['JEMAAH']||[]; const count=jIds.length+staffArr.length;
-    const jSlots=jIds.map(jId=>{ const jRec=allRoomingJemaah.find(j=>j.id===jId); const jName=getJemaahName(jRec?.fields); return `<div class="flex items-center justify-between px-2.5 py-2.5 bg-slate-100 text-slate-800 border border-slate-200 rounded-xl text-[11px]"><span class="truncate font-medium">${jName}</span><button onclick="removeJemaahFromRoom('${rec.id}','${jId}')" class="ml-2 w-5 h-5 rounded-full bg-white hover:bg-slate-200">✕</button></div>`; }).join('');
-    const sSlots=staffArr.map(s=>`<div class="flex items-center justify-between px-2.5 py-2.5 bg-[#FADBD8] text-[#7A0C2E] border border-[#F5B7B1] rounded-xl text-[11px]"><span class="truncate">👤 ${s}</span><button onclick="removeStaff('${rec.id}','${s.replace(/'/g,"\\'")}')" class="ml-2 w-5 h-5 rounded-full bg-white/70">✕</button></div>`).join('');
-    const emptyCount=Math.max(0,cap-count); const emptySlots=Array.from({length:emptyCount}).map((_,i)=>`<div ondragover="allowDrop(event)" ondrop="dropJemaah(event,'${rec.id}')" class="px-2 py-2.5 border border-dashed border-slate-300 rounded-xl text-[11px] text-slate-400 text-center">Slot Kosong ${count+i+1}</div>`).join('');
+    const jSlots=jIds.map(jId=>{ const jRec=allRoomingJemaah.find(j=>j.id===jId); const jName=getJemaahName(jRec?.fields); return `<div class="flex items-center justify-between px-2.5 py-2.5 bg-slate-100 text-slate-800 border border-slate-200 rounded-xl text-"><span class="truncate font-medium">${jName}</span><button onclick="removeJemaahFromRoom('${rec.id}','${jId}')" class="ml-2 w-5 h-5 rounded-full bg-white hover:bg-slate-200">✕</button></div>`; }).join('');
+    const sSlots=staffArr.map(s=>`<div class="flex items-center justify-between px-2.5 py-2.5 bg-[#FADBD8] text-[#7A0C2E] border border-[#F5B7B1] rounded-xl text-"><span class="truncate">👤 ${s}</span><button onclick="removeStaff('${rec.id}','${s.replace(/'/g,"\\'")}')" class="ml-2 w-5 h-5 rounded-full bg-white/70">✕</button></div>`).join('');
+    const emptyCount=Math.max(0,cap-count); const emptySlots=Array.from({length:emptyCount}).map((_,i)=>`<div ondragover="allowDrop(event)" ondrop="dropJemaah(event,'${rec.id}')" class="px-2 py-2.5 border border-dashed border-slate-300 rounded-xl text- text-slate-400 text-center">Slot Kosong ${count+i+1}</div>`).join('');
     return `<div data-room-id="${rec.id}" ondragover="allowDropRoom(event)" ondragleave="handleRoomDragLeave(event)" ondrop="dropJemaah(event,'${rec.id}')" class="bg-white rounded-2xl border border-slate-200 p-3 shadow-sm flex flex-col gap-2.5 h-fit">
-      <div class="flex items-center justify-between"><div class="flex items-center gap-2"><button class="w-7 h-7 rounded-full bg-slate-100 border flex items-center justify-center cursor-grab" draggable="true" ondragstart="handleRoomDragStart(event,'${rec.id}')" ondragend="handleRoomDragEnd(event)"><i class="fa-solid fa-grip-lines text-[10px]"></i></button><span class="font-bold text-sm">${roomId}</span><span class="px-2 py-0.5 rounded-full bg-slate-100 text-[10px] border">${pakej}</span></div><button onclick="deleteRoom('${rec.id}','${roomId}')" class="w-7 h-7 rounded-full bg-slate-50 hover:bg-red-50 border"><i class="fa-solid fa-trash text-[11px]"></i></button></div>
-      <div class="flex items-center gap-2 text-xs"><div class="flex items-center gap-1 px-2.5 py-1 bg-slate-50 rounded-full border"><select onchange="updateRoomField('${rec.id}','PAKEJ / HOTEL',this.value)" class="bg-transparent text-[11px] font-bold outline-none"><option ${pakej==='EKONOMI'?'selected':''}>EKONOMI</option><option ${pakej==='PREMIUM'?'selected':''}>PREMIUM</option><option ${pakej==='JIMAT'?'selected':''}>JIMAT</option></select></div><div class="ml-auto flex items-center gap-1 bg-slate-50 rounded-full px-1 py-0.5 border"><button onclick="updateCap('${rec.id}',-1)" class="w-6 h-6 rounded-full bg-white border">−</button><span class="font-bold w-4 text-center">${cap}</span><button onclick="updateCap('${rec.id}',1)" class="w-6 h-6 rounded-full bg-white border">+</button><span class="text-[10px] ml-1">${count}/${cap}</span></div></div>
+      <div class="flex items-center justify-between"><div class="flex items-center gap-2"><button class="w-7 h-7 rounded-full bg-slate-100 border flex items-center justify-center cursor-grab" draggable="true" ondragstart="handleRoomDragStart(event,'${rec.id}')" ondragend="handleRoomDragEnd(event)"><i class="fa-solid fa-grip-lines text-"></i></button><span class="font-bold text-sm">${roomId}</span><span class="px-2 py-0.5 rounded-full bg-slate-100 text- border">${pakej}</span></div><button onclick="deleteRoom('${rec.id}','${roomId}')" class="w-7 h-7 rounded-full bg-slate-50 hover:bg-red-50 border"><i class="fa-solid fa-trash text-"></i></button></div>
+      <div class="flex items-center gap-2 text-xs"><div class="flex items-center gap-1 px-2.5 py-1 bg-slate-50 rounded-full border"><select onchange="updateRoomField('${rec.id}','PAKEJ / HOTEL',this.value)" class="bg-transparent text- font-bold outline-none"><option ${pakej==='EKONOMI'?'selected':''}>EKONOMI</option><option ${pakej==='PREMIUM'?'selected':''}>PREMIUM</option><option ${pakej==='JIMAT'?'selected':''}>JIMAT</option></select></div><div class="ml-auto flex items-center gap-1 bg-slate-50 rounded-full px-1 py-0.5 border"><button onclick="updateCap('${rec.id}',-1)" class="w-6 h-6 rounded-full bg-white border">−</button><span class="font-bold w-4 text-center">${cap}</span><button onclick="updateCap('${rec.id}',1)" class="w-6 h-6 rounded-full bg-white border">+</button><span class="text- ml-1">${count}/${cap}</span></div></div>
       <div class="space-y-1.5">${jSlots}${sSlots}${emptySlots}</div>
       <div class="h-1.5 bg-slate-100 rounded-full overflow-hidden"><div class="h-full bg-slate-300" style="width:${Math.min(100,(count/cap)*100)}%"></div></div>
     </div>`;
@@ -343,10 +356,10 @@ function saveStaffList(){ localStorage.setItem(getStaffStorageKey(),JSON.stringi
 function addNewStaff(){ const input=document.getElementById('newStaffInput'); if(!input) return; let name=input.value.trim().toUpperCase(); if(!name) return; if(!name.includes('(')) name=`${name} (EFFAH)`; const id=`staff_${Date.now()}_${++staffIdCounter}`; localStorage.setItem('effah_staff_counter',staffIdCounter); staffList.push({id,name}); saveStaffList(); renderStaffList(); input.value=''; }
 function renderStaffList(){
   const cont=document.getElementById('staffListContainer'); const badge=document.getElementById('staffTotalBadge'); if(!cont) return; if(badge) badge.textContent=staffList.length+' Staff';
-  if(staffList.length===0){ cont.innerHTML='<div class="p-3 text-center text-[11px] text-slate-400">Tiada staff</div>'; return; }
+  if(staffList.length===0){ cont.innerHTML='<div class="p-3 text-center text- text-slate-400">Tiada staff</div>'; return; }
   cont.innerHTML=staffList.map((s,idx)=>{
     const assigned=isStaffAssigned(s.id); const cls=assigned?'opacity-40 bg-slate-50 pointer-events-none':'bg-white hover:bg-amber-50 cursor-grab'; const drag=assigned?'':`draggable="true" ondragstart="dragStaff(event,'${s.id}')" ondragend="dragStaffEnd(event)"`;
-    return `<div ${drag} class="flex items-center justify-between px-3 py-2 rounded-xl border text-[11px] ${cls}"><div class="flex gap-2"><span class="text-slate-400">${String(idx+1).padStart(2,'0')}</span><span class="font-bold">${s.name}</span>${assigned?'<span class="ml-1 px-1.5 py-0.5 bg-slate-200 rounded text-[9px]">ASSIGNED</span>':''}</div><div class="flex gap-1"><button onclick="quickAssignStaff('${s.id}')" class="w-6 h-6 rounded-full border ${assigned?'opacity-30':'hover:bg-slate-900 hover:text-white'}">+</button><button onclick="deleteStaff('${s.id}')" class="w-6 h-6 rounded-full border hover:bg-red-50"><i class="fa-solid fa-trash text-[9px]"></i></button></div></div>`;
+    return `<div ${drag} class="flex items-center justify-between px-3 py-2 rounded-xl border text- ${cls}"><div class="flex gap-2"><span class="text-slate-400">${String(idx+1).padStart(2,'0')}</span><span class="font-bold">${s.name}</span>${assigned?'<span class="ml-1 px-1.5 py-0.5 bg-slate-200 rounded text-">ASSIGNED</span>':''}</div><div class="flex gap-1"><button onclick="quickAssignStaff('${s.id}')" class="w-6 h-6 rounded-full border ${assigned?'opacity-30':'hover:bg-slate-900 hover:text-white'}">+</button><button onclick="deleteStaff('${s.id}')" class="w-6 h-6 rounded-full border hover:bg-red-50"><i class="fa-solid fa-trash text-"></i></button></div></div>`;
   }).join('');
 }
 function isStaffAssigned(staffId){ const s=staffList.find(x=>x.id===staffId); if(!s) return false; return allRoomingRecords.some(r=>(r.fields['STAFF / EXTRA']||'').split(',').map(x=>x.trim()).includes(s.name)); }
