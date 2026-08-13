@@ -351,7 +351,7 @@
     </div>
 </div>
 
-    <!-- SCRIPT MODULES LOADING - FINAL CLEAN ORDER -->
+    <!-- SCRIPT MODULES LOADING - FINAL CLEAN ORDER V4.1 -->
     <script src="js/config.js"></script>
     <script src="js/auth.js"></script>
     <script src="js/router.js"></script>
@@ -359,6 +359,14 @@
     <script src="modules/umrah/trip-umrah.js"></script>
     <script src="modules/umrah/jemaah-umrah.js"></script>
     <script src="modules/umrah/rooming.js"></script>
+    <!-- Fallback flat path for final folder testing -->
+    <script src="config.js"></script>
+    <script src="auth.js"></script>
+    <script src="router.js"></script>
+    <script src="settings.js"></script>
+    <script src="trip-umrah.js"></script>
+    <script src="jemaah-umrah.js"></script>
+    <script src="rooming.js"></script>
 
 <script>
 // FINAL: Status API Online hijau - clean version
@@ -388,7 +396,7 @@
 </script>
 
 <script>
-// ===== FINAL OVERRIDE V20: Preview Modal - Fixed layout clean, no rename button =====
+// ===== FINAL OVERRIDE V21.1: Preview Modal - Fix tall passport white blank =====
 (function(){
   function getGlobalModal(){
     const all = document.querySelectorAll('#attachmentPreviewModal');
@@ -413,17 +421,28 @@
     
     const lowerUrl = (url||'').toLowerCase();
     const lowerTitle = (title||'').toLowerCase();
+    
+    // V21.1 Logic: PASSPORT COPY & PICTURE force IMAGE, VISA force PDF
     let pdfMode = false;
-    if(lowerUrl.includes('.pdf') || lowerTitle.includes('.pdf')) pdfMode = true;
-    else if(lowerUrl.match(/\.(jpg|jpeg|png|gif|webp)(\?|$)/)) pdfMode = false;
-    else if(lowerTitle.includes('visa') || lowerTitle.includes('passport') || lowerTitle.includes('picture')) pdfMode = false;
+    const isImageExt = lowerUrl.match(/\.(jpg|jpeg|png|gif|webp)(\?|$)/);
+    const isPdfExt = lowerUrl.includes('.pdf') || lowerTitle.includes('.pdf');
+    
+    if(isPdfExt) {
+      pdfMode = true;
+    } else if(isImageExt) {
+      pdfMode = false;
+    } else if(lowerTitle.includes('passport copy') || lowerTitle.includes('picture') || lowerTitle.includes('gambar') || lowerTitle.includes('ic') || lowerTitle.includes('mofa')) {
+      pdfMode = false; // force image
+    } else if(lowerTitle.includes('visa')) {
+      pdfMode = true; // force pdf for VISA only
+    } else {
+      pdfMode = false; // default image
+    }
     
     // Reset both completely
     if(img){ 
       img.classList.add('hidden'); 
       img.style.display='none'; 
-      img.style.width='auto';
-      img.style.height='auto';
       img.removeAttribute('src'); 
     }
     if(pdf){ 
@@ -439,6 +458,7 @@
         pdf.style.display='block';
         pdf.style.width='100%';
         pdf.style.height='100%';
+        pdf.style.minHeight='70vh';
       }
     } else {
       if(img){ 
@@ -447,8 +467,17 @@
         img.style.display='block';
         img.style.maxWidth='100%';
         img.style.height='auto';
+        img.style.objectFit='contain';
         img.style.margin='auto';
-        img.onerror = function(){ this.style.display='none'; };
+        img.onerror = function(){ 
+          // fallback to pdf if image fails
+          this.style.display='none';
+          if(pdf){
+            pdf.src = url;
+            pdf.classList.remove('hidden');
+            pdf.style.display='block';
+          }
+        };
       }
     }
     modal.classList.remove('hidden');
@@ -479,7 +508,7 @@
     }
   });
   
-  console.log('✅ V20 Modal clean - no rename, fixed layout');
+  console.log('✅ V21.1 Modal - Tall passport fix, PASSPORT COPY/PICTURE=image, VISA=pdf');
 })();
 </script>
 
