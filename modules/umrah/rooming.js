@@ -396,13 +396,25 @@ function renderRoomingGrid(){
       const jRec=allRoomingJemaah.find(j=>j.id===jId); 
       const jName=getJemaahName(jRec?.fields);
       const fb=(jRec?.fields?.['FULLBOARD']||'').trim();
+      const roomLoc = (f['LOKASI / CITY']||activeLocation||'').toUpperCase();
       let fbBadge='';
-      if(fb){
+      if(fb && fb!=='-' && fb.toUpperCase()!=='NO FULLBOARD'){
         const up=fb.toUpperCase();
-        if(up.includes('MEKAH')) fbBadge=`<span class="ml-1 px-1.5 py-0.5 bg-amber-200 text-amber-900 border border-amber-300 rounded-full text-[8px] font-bold">FB MEKAH</span>`;
-        else if(up.includes('MADINAH')) fbBadge=`<span class="ml-1 px-1.5 py-0.5 bg-blue-200 text-blue-900 border border-blue-300 rounded-full text-[8px] font-bold">FB MADINAH</span>`;
-        else if(up==='FULLBOARD') fbBadge=`<span class="ml-1 px-1.5 py-0.5 bg-emerald-200 text-emerald-900 border border-emerald-300 rounded-full text-[8px] font-bold">FB</span>`;
-        else if(up!=='NO FULLBOARD') fbBadge=`<span class="ml-1 px-1.5 py-0.5 bg-slate-200 text-slate-700 rounded-full text-[8px] font-bold">${fb}</span>`;
+        // Special logic: MEKAH bilik tunjuk MEKAH je, MADINAH tunjuk MADINAH je
+        if(roomLoc==='MEKAH'){
+          if(up.includes('MEKAH')) fbBadge=`<span class="ml-1 px-1.5 py-0.5 bg-amber-200 text-amber-900 border border-amber-300 rounded-full text-[8px] font-bold">FB MEKAH</span>`;
+          else if(up==='FULLBOARD') fbBadge=`<span class="ml-1 px-1.5 py-0.5 bg-emerald-200 text-emerald-900 border border-emerald-300 rounded-full text-[8px] font-bold">FB</span>`;
+          // FB MADINAH hide kalau bilik MEKAH
+        } else if(roomLoc==='MADINAH'){
+          if(up.includes('MADINAH')) fbBadge=`<span class="ml-1 px-1.5 py-0.5 bg-blue-200 text-blue-900 border border-blue-300 rounded-full text-[8px] font-bold">FB MADINAH</span>`;
+          else if(up==='FULLBOARD') fbBadge=`<span class="ml-1 px-1.5 py-0.5 bg-emerald-200 text-emerald-900 border border-emerald-300 rounded-full text-[8px] font-bold">FB</span>`;
+          // FB MEKAH hide kalau bilik MADINAH
+        } else {
+          // TAIF / JEDDAH / lain - tunjuk dua2
+          if(up.includes('MEKAH')) fbBadge=`<span class="ml-1 px-1.5 py-0.5 bg-amber-200 text-amber-900 border border-amber-300 rounded-full text-[8px] font-bold">FB MEKAH</span>`;
+          else if(up.includes('MADINAH')) fbBadge=`<span class="ml-1 px-1.5 py-0.5 bg-blue-200 text-blue-900 border border-blue-300 rounded-full text-[8px] font-bold">FB MADINAH</span>`;
+          else if(up==='FULLBOARD') fbBadge=`<span class="ml-1 px-1.5 py-0.5 bg-emerald-200 text-emerald-900 border border-emerald-300 rounded-full text-[8px] font-bold">FB</span>`;
+        }
       }
       return `<div class="flex items-center justify-between px-2.5 py-2 bg-slate-100 text-slate-800 border border-slate-200 rounded-xl text-[11px]"><span class="truncate font-medium flex items-center">${jName}${fbBadge}</span><button onclick="removeJemaahFromRoom('${rec.id}','${jId}')" class="ml-2 w-4 h-4 rounded-full bg-white hover:bg-slate-200 text-[10px]">✕</button></div>`; 
     }).join('');
@@ -686,6 +698,7 @@ function generateRoomingPrint(){
     }).join(' | ');
     const roomBlocks=rooms.map(r=>{
       const f=r.fields; const rid=f['Room ID / Nama Bilik']||generateRoomIdFromCap(f['KAPASITI']); const pakej=f['PAKEJ / HOTEL']||'EKONOMI'; const hotel=f['HOTEL NAME']||'TANPA HOTEL'; const jIds=f['JEMAAH']||[]; const staff=(f['STAFF / EXTRA']||'').split(',').filter(Boolean);
+      const roomLocPrint = (f['LOKASI / CITY']||loc||'').toUpperCase();
       let rows=jIds.map((jId,idx)=>{ 
         const rec=allRoomingJemaah.find(j=>j.id===jId); 
         const name=getJemaahName(rec?.fields); 
@@ -694,9 +707,17 @@ function generateRoomingPrint(){
         let fbNote='';
         if(fb && fb!=='NO FULLBOARD' && fb!=='-'){
           const up=fb.toUpperCase();
-          if(up.includes('MEKAH')) fbNote=` <span style="background:#FDE68A;border:1px solid #92400E;padding:0 4px;border-radius:8px;font-size:7px;font-weight:bold;">FB MEKAH</span>`;
-          else if(up.includes('MADINAH')) fbNote=` <span style="background:#BFDBFE;border:1px solid #1E40AF;padding:0 4px;border-radius:8px;font-size:7px;font-weight:bold;">FB MADINAH</span>`;
-          else fbNote=` <span style="background:#6EE7B7;border:1px solid #064E3B;padding:0 4px;border-radius:8px;font-size:7px;font-weight:bold;">FB</span>`;
+          if(roomLocPrint==='MEKAH'){
+            if(up.includes('MEKAH')) fbNote=` <span style="background:#FDE68A;border:1px solid #92400E;padding:0 4px;border-radius:8px;font-size:7px;font-weight:bold;">FB MEKAH</span>`;
+            else if(up==='FULLBOARD') fbNote=` <span style="background:#6EE7B7;border:1px solid #064E3B;padding:0 4px;border-radius:8px;font-size:7px;font-weight:bold;">FB</span>`;
+          } else if(roomLocPrint==='MADINAH'){
+            if(up.includes('MADINAH')) fbNote=` <span style="background:#BFDBFE;border:1px solid #1E40AF;padding:0 4px;border-radius:8px;font-size:7px;font-weight:bold;">FB MADINAH</span>`;
+            else if(up==='FULLBOARD') fbNote=` <span style="background:#6EE7B7;border:1px solid #064E3B;padding:0 4px;border-radius:8px;font-size:7px;font-weight:bold;">FB</span>`;
+          } else {
+            if(up.includes('MEKAH')) fbNote=` <span style="background:#FDE68A;border:1px solid #92400E;padding:0 4px;border-radius:8px;font-size:7px;font-weight:bold;">FB MEKAH</span>`;
+            else if(up.includes('MADINAH')) fbNote=` <span style="background:#BFDBFE;border:1px solid #1E40AF;padding:0 4px;border-radius:8px;font-size:7px;font-weight:bold;">FB MADINAH</span>`;
+            else fbNote=` <span style="background:#6EE7B7;border:1px solid #064E3B;padding:0 4px;border-radius:8px;font-size:7px;font-weight:bold;">FB</span>`;
+          }
         }
         return `<div>${idx+1}. ${name}${fbNote}</div>`; 
       }).filter(Boolean).join('');
