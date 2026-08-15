@@ -138,7 +138,7 @@ function renderRoomingHTML(){
           <p class="text-[9px] text-slate-400 mt-0.5">Dijana automatik: B + Kapasiti</p>
         </div>
         <select id="newRoomLokasi" class="w-full p-2 border border-slate-200 rounded-xl bg-white text-[11px]"><option value="MEKAH">MEKAH</option><option value="MADINAH">MADINAH</option><option value="TAIF">TAIF</option><option value="JEDDAH">JEDDAH</option></select>
-        <select id="newRoomPakej" class="w-full p-2 border border-slate-200 rounded-xl bg-white text-[11px]"><option>EKONOMI</option><option>PREMIUM</option><option>JIMAT</option></select>
+        <select id="newRoomPakej" class="w-full p-2 border border-slate-200 rounded-xl bg-white text-[11px]"><option>JIMAT</option><option>EKONOMI</option><option>STANDARD</option><option>PREMIUM</option></select>
         <input id="newRoomHotel" placeholder="Nama Hotel" class="w-full p-2 border border-slate-200 rounded-xl bg-white text-[11px]">
         <div class="flex gap-2 items-center">
           <input id="newRoomCap" type="number" value="4" min="1" max="8" oninput="updateNewRoomIdFromCap()" class="flex-1 p-2 border border-slate-200 rounded-xl font-bold bg-white text-[11px]">
@@ -405,7 +405,7 @@ function renderRoomingGrid(){
         <button onclick="deleteRoom('${rec.id}','${roomId}')" class="w-6 h-6 rounded-full bg-slate-50 hover:bg-red-50 border text-[10px] shrink-0"><i class="fa-solid fa-trash"></i></button>
       </div>
       <div class="flex items-center gap-1.5 text-[10px]">
-        <div class="flex items-center gap-1 px-2.5 py-1 bg-slate-50 rounded-full border"><select onchange="updateRoomField('${rec.id}','PAKEJ / HOTEL',this.value)" class="bg-transparent text-[10px] font-bold outline-none"><option ${pakej==='EKONOMI'?'selected':''}>EKONOMI</option><option ${pakej==='PREMIUM'?'selected':''}>PREMIUM</option><option ${pakej==='JIMAT'?'selected':''}>JIMAT</option></select></div>
+        <div class="flex items-center gap-1 px-2.5 py-1 bg-slate-50 rounded-full border"><select onchange="updateRoomField('${rec.id}','PAKEJ / HOTEL',this.value)" class="bg-transparent text-[10px] font-bold outline-none"><option ${pakej==='JIMAT'?'selected':''}>JIMAT</option><option ${pakej==='EKONOMI'?'selected':''}>EKONOMI</option><option ${pakej==='STANDARD'?'selected':''}>STANDARD</option><option ${pakej==='PREMIUM'?'selected':''}>PREMIUM</option></select></div>
         <div class="ml-auto flex items-center gap-1 bg-slate-50 rounded-full px-1 py-0.5 border"><button onclick="updateCap('${rec.id}',-1)" class="w-5 h-5 rounded-full bg-white border text-[10px]">−</button><span class="font-bold w-4 text-center text-[11px]">${cap}</span><button onclick="updateCap('${rec.id}',1)" class="w-5 h-5 rounded-full bg-white border text-[10px]">+</button><span class="text-[9px] ml-1">${count}/${cap}</span></div>
       </div>
       <div class="space-y-1">${jSlots}${sSlots}${emptySlots}</div>
@@ -707,14 +707,21 @@ function generateRoomingPrint(){
   </style></head><body>
     <div class="namelist-page">
       <div class="header"><span>NAMELIST ${tripName}</span><span>Total: ${allRoomingJemaah.length} Jemaah + ${combinedStaff.length} Staff</span></div>
-      <div style="font-size:9px;margin-bottom:8px"><b>Trip:</b> ${tripName} | <b>Tarikh Cetak:</b> ${new Date().toLocaleDateString('ms-MY')} | <span style="margin-left:10px"><b>LEGENDA:</b> <span style="background:#6EE7B7;padding:1px 6px;border-radius:10px;border:1px solid #064E3B;font-size:8px">FULLBOARD</span> <span style="background:#BFDBFE;padding:1px 6px;border-radius:10px;border:1px solid #1E40AF;font-size:8px">FB MADINAH</span> <span style="background:#FDE68A;padding:1px 6px;border-radius:10px;border:1px solid #92400E;font-size:8px">FB MEKAH / TRAIN</span> <span style="background:#BBF7D0;padding:1px 6px;border-radius:10px;border:1px solid #065F46;font-size:8px">TAKAFUL</span> <span style="background:#FEF08A;padding:1px 6px;border-radius:10px;border:1px solid #854D0E;font-size:8px">ETIQA</span> <span style="background:#BFDBFE;padding:1px 6px;border-radius:10px;border:1px solid #1E40AF;font-size:8px">KHAIRI</span></span></div>
+      <div style="font-size:9px;margin-bottom:8px"><b>Trip:</b> ${tripName} | <b>Tarikh Cetak:</b> ${new Date().toLocaleDateString('ms-MY')}</div>
       <table>
         <tr><th style="width:30px">NO</th><th>NAMA JEMAAH</th><th style="width:130px">FULLBOARD</th><th style="width:60px">TRAIN</th><th style="width:70px">PAKEJ</th><th style="width:190px">INSURAN</th></tr>
         ${namelistRows}
       </table>
     </div>
     ${locationPages||'<div class="page-break"></div><div style="border:1px dashed #000;padding:20px;text-align:center">Tiada bilik untuk trip ini</div>'}
-    <script>window.onload=function(){setTimeout(()=>window.print(),500)}</script>
+    <script>
+      window.onload=function(){setTimeout(()=>window.print(),500)};
+      window.onafterprint=function(){window.close();};
+      // fallback untuk browser yang block afterprint bila cancel
+      setTimeout(()=>{ if(!window.closed) { try{window.close();}catch(e){} } }, 1500);
+      // kalau user tekan Cancel di print dialog, Chrome still trigger afterprint, tapi Firefox kadang tak - so listen juga
+      window.addEventListener('focus', function handler(){ setTimeout(()=>{ window.removeEventListener('focus', handler); try{window.close();}catch(e){} }, 800); }, {once:true});
+    </script>
   </body></html>`;
   const w=window.open('','_blank'); if(w){ w.document.write(html); w.document.close(); }
 }
