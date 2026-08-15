@@ -1,4 +1,5 @@
-// ROOMING V23 - Print tanpa EJEN, staff NA walaupun takde bilik, font kecil 11px, box maroon, hotel rename inline, overview ikut hotel
+// ROOMING V24 - Fix grayed still editable + print highlight (TAKAFUL hijau, ETIQA kuning, KHAIRI biru, TRAIN kuning)
+// Base: V23 exact layout, only 2 patches
 let allRoomingRecords = [];
 let allRoomingJemaah = [];
 let activeLocation = localStorage.getItem('effah_active_location') || 'MEKAH';
@@ -6,7 +7,7 @@ let roomingDefaultCap = 4;
 let customLocations = JSON.parse(localStorage.getItem('effah_custom_locations')||'[]');
 let staffList = [];
 let staffIdCounter = parseInt(localStorage.getItem('effah_staff_counter')||'1000');
-let roomingSortDir = localStorage.getItem('effah_rooming_sort_dir') || 'asc'; // asc = A-Z, desc = Z-A
+let roomingSortDir = localStorage.getItem('effah_rooming_sort_dir') || 'asc';
 let roomingSortActive = localStorage.getItem('effah_rooming_sort_active') === 'true' ? true : false;
 
 function cleanTripNameForRooming(name){
@@ -229,7 +230,7 @@ function renderLocationTabs(){
   const base=['MEKAH','MADINAH','TAIF']; const all=[...base,...customLocations.filter(l=>!base.includes(l))];
   const counts={}; all.forEach(l=>counts[l]=0); allRoomingRecords.forEach(r=>{ const l=(r.fields['LOKASI / CITY']||'').trim().toUpperCase(); if(counts[l]!==undefined) counts[l]++; else if(l){ counts[l]=1; if(!all.includes(l)) all.push(l); } });
   let html=all.map(loc=>{
-    const label=loc==='MEKAH'?'🕋 MEKAH':loc==='MADINAH'?'🕌 MADINAH':loc==='TAIF'?'⛰️ TAIF':loc==='JEDDAH'?'🏙️ JEDDAH':'📍 '+loc;
+    const label=loc==='MEKAH'?'🕋 MEKAH':loc==='MADINAH'?'🕌 MADINAH':loc==='TAIF'?'⛰ TAIF':loc==='JEDDAH'?'🏙 JEDDAH':'📍 '+loc;
     const c=counts[loc]||0; const active=loc===activeLocation; const isCustom=!['MEKAH','MADINAH','TAIF'].includes(loc);
     const delBtn=isCustom?`<button onclick="event.stopPropagation(); deleteCustomLocation('${loc}')" class="ml-1 w-4 h-4 rounded-full bg-white/20 hover:bg-red-500 hover:text-white flex items-center justify-center text-[9px]">✕</button>`:'';
     const wrapCls=active?'bg-[#7A0C2E] rounded-full':'bg-white rounded-full border border-slate-200';
@@ -286,7 +287,6 @@ function renderNamelist(){
   let filtered=[...allRoomingJemaah];
   if(q) filtered=filtered.filter(r=>getJemaahName(r.fields).toLowerCase().includes(q));
   if(pakejFilter) filtered=filtered.filter(r=>getPakejVal(r.fields).toUpperCase()===pakejFilter);
-  // SORT LOGIC - bila header NAMA JEMAAH ditekan
   if(roomingSortActive){
     filtered.sort((a,b)=>{
       const nameA=getJemaahName(a.fields).toUpperCase();
@@ -305,9 +305,10 @@ function renderNamelist(){
   if(total===0){ cont.innerHTML='<div class="p-6 text-center text-[11px] text-slate-400">Tiada jemaah untuk trip ini</div>'; return; }
   cont.innerHTML=filtered.map((r,i)=>{
     const name=getJemaahName(r.fields); const assignedInLoc=isJemaahAssignedInLocation(r.id, activeLocation); const assignedGlobal=isJemaahAssigned(r.id);
-    const rowCls=assignedInLoc?'opacity-40 bg-slate-50 pointer-events-none':'hover:bg-slate-50';
+    // FIX #1: buang pointer-events-none supaya masih boleh edit inline walau dah assigned
+    const rowCls=assignedInLoc?'opacity-60 bg-slate-50':'hover:bg-slate-50';
     const drag=assignedInLoc?'':`draggable="true" ondragstart="dragJemaah(event,'${r.id}')" ondragend="dragEnd(event)"`;
-    let statusIcon = assignedInLoc? '<span class="text-[10px] text-slate-400">✓</span>' : `<button onclick="quickAssign('${r.id}')" class="w-5 h-5 rounded-full border bg-slate-100 hover:bg-slate-200 text-[10px]">+</button>`;
+    let statusIcon = assignedInLoc? `<button onclick="removeJemaahFromCurrentLoc('${r.id}')" class="w-5 h-5 rounded-full bg-amber-100 text-amber-700 text-[10px]" title="Keluarkan dari ${activeLocation}">✕</button>` : `<button onclick="quickAssign('${r.id}')" class="w-5 h-5 rounded-full border bg-slate-100 hover:bg-slate-200 text-[10px]">+</button>`;
     if(!assignedInLoc && assignedGlobal) statusIcon = `<button onclick="quickAssign('${r.id}')" class="w-5 h-5 rounded-full border bg-amber-100 hover:bg-amber-200 text-[10px]" title="Sudah ada di lokasi lain, boleh tambah di ${activeLocation} juga">+</button>`;
     const fb = getFullboardVal(r.fields) || '-';
     const pk = getPakejVal(r.fields) || '-';
@@ -320,17 +321,21 @@ function renderNamelist(){
     else if(fb==='NO FULLBOARD') fbCls='bg-slate-100 border-slate-200 text-slate-500';
     else if(fb==='-') fbCls='bg-white border-dashed border-slate-300 text-slate-400';
 
-    // multi toggle untuk INSURAN - TAKAFUL/ETIQA/AL-KHAIRI
     const insToggle = ['TAKAFUL','ETIQA','AL-KHAIRI'].map(opt=>{
       const active = insArr.includes(opt);
-      const cls = active ? 'bg-[#7A0C2E] text-white border-[#7A0C2E]' : 'bg-white text-slate-400 border-slate-200 hover:border-slate-300';
+      let cls = 'bg-white text-slate-400 border-slate-200 hover:border-slate-300';
+      if(active){
+        if(opt==='TAKAFUL') cls='bg-emerald-500 text-white border-emerald-600';
+        else if(opt==='ETIQA') cls='bg-amber-300 text-amber-900 border-amber-400';
+        else if(opt==='AL-KHAIRI') cls='bg-blue-400 text-white border-blue-500';
+      }
       const label = opt==='TAKAFUL'?'TAK':opt==='AL-KHAIRI'?'KHAIRI':opt;
       return `<button onclick="toggleInsuran('${r.id}','${opt}')" class="px-1 py-0.5 rounded-full border text-[7px] font-bold ${cls}" title="${opt}">${label}</button>`;
     }).join('');
 
     return `<div ${drag} class="grid grid-cols-12 items-center px-1.5 py-1.5 text-[11px] border-b border-slate-50 ${rowCls}">
       <div class="col-span-1 text-slate-400 text-[10px]">${String(i+1).padStart(2,'0')}</div>
-      <div class="col-span-3 font-medium truncate text-[10px]" title="${name}">${name}</div>
+      <div class="col-span-3 font-medium truncate text-[10px] ${assignedInLoc?'text-slate-500 italic':''}" title="${name}">${name}</div>
       <div class="col-span-2 flex items-center gap-0.5">
         <select onchange="updateJemaahField('${r.id}','FULLBOARD',this.value)" class="text-[8px] border rounded-full px-1 py-0.5 bg-white font-bold ${fbCls} outline-none w-full truncate" title="FULLBOARD">
           <option value="" ${!fb || fb==='-'?'selected':''}>- FB</option>
@@ -358,7 +363,6 @@ function renderNamelist(){
       <div class="col-span-1 text-center">${statusIcon}</div>
     </div>`;
   }).join('');
-  // update icon sort
   const sortIconEl=document.getElementById('sortIcon');
   if(sortIconEl) sortIconEl.textContent = roomingSortActive ? (roomingSortDir==='asc'?'↑ A-Z':'↓ Z-A') : '↕';
 }
@@ -423,6 +427,10 @@ function dropJemaah(e,roomId){
   else { if(!isJemaahAssignedInLocation(id, activeLocation)) assignJemaahToRoom(id,roomId); }
 }
 function quickAssign(jId){ if(isJemaahAssignedInLocation(jId, activeLocation)) return; const rooms=allRoomingRecords.filter(r=>(r.fields['LOKASI / CITY']||'MEKAH').toUpperCase()===activeLocation); const target=rooms.find(r=>{ const j=r.fields['JEMAAH']?.length||0; const s=(r.fields['STAFF / EXTRA']||'').split(',').filter(Boolean).length; return (j+s)<(r.fields['KAPASITI']||4); }); if(target) assignJemaahToRoom(jId,target.id); }
+function removeJemaahFromCurrentLoc(jId){
+  const rec = allRoomingRecords.find(r=>(r.fields['LOKASI / CITY']||'MEKAH').toUpperCase()===activeLocation && (r.fields['JEMAAH']||[]).includes(jId));
+  if(rec) removeJemaahFromRoom(rec.id, jId);
+}
 async function assignJemaahToRoom(jId,roomId){ if(isJemaahAssignedInLocation(jId, activeLocation)) return; const rec=allRoomingRecords.find(r=>r.id===roomId); if(!rec) return; await updateRoomField(roomId,'JEMAAH',[...(rec.fields['JEMAAH']||[]),jId],true); }
 async function removeJemaahFromRoom(roomId,jId){ const rec=allRoomingRecords.find(r=>r.id===roomId); await updateRoomField(roomId,'JEMAAH',(rec.fields['JEMAAH']||[]).filter(id=>id!==jId),true); }
 async function updateCap(roomId,delta){
@@ -443,11 +451,9 @@ async function updateRoomField(roomId,field,value,doRender=true){
     if(doRender){ renderRoomingGrid(); renderNamelist(); renderStaffList(); renderLocationTabs(); }
   }catch(e){ console.error(e); alert('Gagal mengemaskini data bilik: '+e.message); }
 }
-// UPDATE JEMAAH FIELD DIRECT DARI ROOMING PAGE - PAKEJ, FULLBOARD, TRAIN, INSURAN
 async function updateJemaahField(jemaahId, field, value){
   const base=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base')||localStorage.getItem('effah_base_id'); const pat=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
   if(!base||!pat) return alert('Airtable config missing');
-  // Optimistic UI update
   const rec=allRoomingJemaah.find(r=>r.id===jemaahId); if(rec) rec.fields[field]=value||'';
   renderNamelist();
   try{
@@ -601,7 +607,7 @@ function quickAssignStaff(staffId){ if(isStaffAssignedInLocation(staffId, active
 async function assignStaffToRoom(staffId,roomId){ const staff=staffList.find(s=>s.id===staffId); if(!staff) return; const rec=allRoomingRecords.find(r=>r.id===roomId); if(!rec) return; const cur=(rec.fields['STAFF / EXTRA']||'').trim(); const newVal=cur?cur+','+staff.name:staff.name; await updateRoomField(roomId,'STAFF / EXTRA',newVal,true); }
 function removeStaff(roomId,staffName){ const rec=allRoomingRecords.find(r=>r.id===roomId); const arr=(rec.fields['STAFF / EXTRA']||'').split(',').map(s=>s.trim()).filter(s=>s&&s!==staffName); updateRoomField(roomId,'STAFF / EXTRA',arr.join(','),true); }
 
-// V24 PRINT - Page1 namelist centered, Page2+ per lokasi, tanpa EJEN, include semua staff NA, placeholder umum
+// V24 PRINT - highlight colors
 function generateRoomingPrint(){
   const tripNameRaw=window.selectedTripRecord?.fields?.Trip||document.getElementById('roomingTripSelect')?.selectedOptions[0]?.text||'Trip';
   const tripName=cleanTripNameForRooming(tripNameRaw);
@@ -615,24 +621,48 @@ function generateRoomingPrint(){
   allRoomingRecords.forEach(r=> (r.fields['STAFF / EXTRA']||'').split(',').filter(Boolean).forEach(s=>{ if(!staffInAnyRoom.includes(s)) staffInAnyRoom.push(s); }));
   const combinedStaff = [...new Set([...allStaffNames, ...staffInAnyRoom])];
 
-  // NAMELIST - baca field Airtable jika ada, fallback jika belum ada (FULLBOARD, TRAIN, PAKEJ, INSURAN)
+  // FIX PRINT: highlight logic
+  function fbPrintCell(val){
+    if(!val || val==='-' || val==='- FB') return `<span style="color:#999">-</span>`;
+    const up=val.toUpperCase();
+    let style='';
+    if(up.includes('MEKAH')) style='background:#FDE68A;color:#92400E;border:1px solid #92400E;font-weight:bold;padding:2px 7px;border-radius:10px;font-size:8px;';
+    else if(up.includes('MADINAH')) style='background:#BFDBFE;color:#1E40AF;border:1px solid #1E40AF;font-weight:bold;padding:2px 7px;border-radius:10px;font-size:8px;';
+    else if(up==='FULLBOARD') style='background:#6EE7B7;color:#064E3B;border:1px solid #064E3B;font-weight:bold;padding:2px 7px;border-radius:10px;font-size:8px;'; // pekat sikit untuk print
+    else style='background:#E5E7EB;color:#000;font-weight:bold;padding:2px 7px;border-radius:10px;font-size:8px;';
+    return `<span style="${style}">${val}</span>`;
+  }
+  function trainPrintCell(checked){
+    if(!checked) return `<span style="color:#999">-</span>`;
+    return `<span style="background:#FDE68A;color:#92400E;border:1px solid #92400E;font-weight:bold;padding:2px 8px;border-radius:10px;font-size:8px;">TRAIN</span>`;
+  }
+  function insuranPrintCell(arr){
+    if(!arr || arr.length===0) return `<span style="color:#999">-</span>`;
+    return arr.map(v=>{
+      const up=v.toUpperCase();
+      if(up.includes('TAKAFUL') || up==='TAK') return `<span style="background:#BBF7D0;color:#065F46;border:1px solid #065F46;padding:1px 5px;border-radius:10px;font-weight:bold;font-size:8px;margin-right:2px;display:inline-block;">${v}</span>`;
+      if(up.includes('ETIQA')) return `<span style="background:#FEF08A;color:#854D0E;border:1px solid #854D0E;padding:1px 5px;border-radius:10px;font-weight:bold;font-size:8px;margin-right:2px;display:inline-block;">${v}</span>`;
+      if(up.includes('KHAIRI') || up.includes('KHAIR')) return `<span style="background:#BFDBFE;color:#1E40AF;border:1px solid #1E40AF;padding:1px 5px;border-radius:10px;font-weight:bold;font-size:8px;margin-right:2px;display:inline-block;">${v}</span>`;
+      return `<span style="background:#E5E7EB;padding:1px 5px;border-radius:10px;font-size:8px;margin-right:2px;">${v}</span>`;
+    }).join('');
+  }
+
   let namelistRows=allRoomingJemaah.map((j,idx)=>{
     const name=getJemaahName(j.fields);
     const board=getFullboardVal(j.fields) || '-';
-    const train=isTrainChecked(j.fields) ? 'TRAIN' : '-';
+    const train=isTrainChecked(j.fields);
     const pakej=getPakejVal(j.fields) || '-';
-    const insuran=getInsuranVal(j.fields) || '-';
-    return `<tr><td>${idx+1}</td><td>${name}</td><td>${board}</td><td>${train}</td><td>${pakej}</td><td>${insuran}</td></tr>`;
+    const insArr=getInsuranArray(j.fields);
+    return `<tr><td>${idx+1}</td><td style="font-weight:600">${name}</td><td style="text-align:center">${fbPrintCell(board)}</td><td style="text-align:center">${trainPrintCell(train)}</td><td style="text-align:center">${pakej==='-'?'<span style="color:#999">-</span>':`<b>${pakej}</b>`}</td><td style="text-align:center">${insuranPrintCell(insArr)}</td></tr>`;
   }).join('');
 
   combinedStaff.forEach(sName=>{
     const cleanName=sName.replace(/\(EFFAH\)/i,'').trim();
-    namelistRows+=`<tr><td>NA</td><td>${cleanName} (EFFAH)</td><td>-</td><td>-</td><td>-</td><td>-</td></tr>`;
+    namelistRows+=`<tr><td>NA</td><td>${cleanName} (EFFAH)</td><td style="text-align:center"><span style="color:#999">-</span></td><td style="text-align:center"><span style="color:#999">-</span></td><td style="text-align:center"><span style="color:#999">-</span></td><td style="text-align:center"><span style="color:#999">-</span></td></tr>`;
   });
 
-  // Build per location pages
   let locationPages='';
-  activeLocsWithRooms.forEach((loc, locIndex)=>{
+  activeLocsWithRooms.forEach((loc)=>{
     let rooms=[...allRoomingRecords].filter(r=>(r.fields['LOKASI / CITY']||'MEKAH').toUpperCase()===loc.toUpperCase());
     if(rooms.length===0) return;
     rooms=getRoomOrderedList(rooms);
@@ -644,10 +674,10 @@ function generateRoomingPrint(){
     const roomBlocks=rooms.map(r=>{
       const f=r.fields; const rid=f['Room ID / Nama Bilik']||generateRoomIdFromCap(f['KAPASITI']); const pakej=f['PAKEJ / HOTEL']||'EKONOMI'; const hotel=f['HOTEL NAME']||'TANPA HOTEL'; const jIds=f['JEMAAH']||[]; const staff=(f['STAFF / EXTRA']||'').split(',').filter(Boolean);
       let rows=jIds.map((jId,idx)=>{ const rec=allRoomingJemaah.find(j=>j.id===jId); const name=getJemaahName(rec?.fields); return name && name!=='-'? `<div>${idx+1}. ${name}</div>` : ''; }).filter(Boolean).join('');
-      staff.forEach((s)=>{ const clean=s.replace(/\(EFFAH\)/i,'').trim(); rows+=`<div style="color:#7A0C2E">NA ${clean} (EFFAH)</div>`; });
+      staff.forEach((s)=>{ const clean=s.replace(/\(EFFAH\)/i,'').trim(); rows+=`<div style="color:#7A0C2E;font-weight:bold">NA ${clean} (EFFAH)</div>`; });
       return `<div style="border:1px solid #000;margin-bottom:8px;padding:6px 8px;background:#fff;break-inside:avoid"><div style="display:flex;justify-content:space-between;font-weight:bold;font-size:10px;border-bottom:1px solid #000;padding-bottom:3px;margin-bottom:4px"><span>${rid} (${pakej}) - ${hotel}</span><span>${jIds.length+staff.length}/${f['KAPASITI']||4}</span></div><div style="font-size:9px;line-height:1.6">${rows||'- Kosong -'}</div></div>`;
     }).join('');
-    const icon = loc==='MEKAH'?'🕋':loc==='MADINAH'?'🕌':loc==='TAIF'?'⛰️':loc==='JEDDAH'?'🏙️':'📍';
+    const icon = loc==='MEKAH'?'🕋':loc==='MADINAH'?'🕌':loc==='TAIF'?'⛰':loc==='JEDDAH'?'🏙':'📍';
     const totalJemaahLoc = rooms.reduce((s,r)=>s+(r.fields['JEMAAH']?.length||0),0);
     const totalStaffLoc = rooms.reduce((s,r)=>s+(r.fields['STAFF / EXTRA']||'').split(',').filter(Boolean).length,0);
     locationPages+=`
@@ -664,7 +694,7 @@ function generateRoomingPrint(){
     body{font-family:Arial, Helvetica, sans-serif;font-size:10px;margin:12px;color:#000}
     table{border-collapse:collapse;width:100%}
     th,td{border:1px solid #000;padding:4px 6px;font-size:9px}
-    th{background:#e5e5e5;font-weight:bold;text-transform:uppercase}
+    th{background:#7A0C2E;color:#fff;font-weight:bold;text-transform:uppercase}
    .header{display:flex;justify-content:space-between;font-weight:bold;font-size:12px;border-bottom:2px solid #000;padding-bottom:6px;margin-bottom:8px}
    .page-break{page-break-before:always}
    .namelist-page{max-width:900px;margin:0 auto}
@@ -675,12 +705,11 @@ function generateRoomingPrint(){
       .page-break{page-break-before:always}
     }
   </style></head><body>
-    <!-- PAGE 1: NAMELIST CENTERED -->
     <div class="namelist-page">
       <div class="header"><span>NAMELIST ${tripName}</span><span>Total: ${allRoomingJemaah.length} Jemaah + ${combinedStaff.length} Staff</span></div>
-      <div style="font-size:9px;margin-bottom:8px"><b>Trip:</b> ${tripName} | <b>Tarikh Cetak:</b> ${new Date().toLocaleDateString('ms-MY')}</div>
+      <div style="font-size:9px;margin-bottom:8px"><b>Trip:</b> ${tripName} | <b>Tarikh Cetak:</b> ${new Date().toLocaleDateString('ms-MY')} | <span style="margin-left:10px"><b>LEGENDA:</b> <span style="background:#6EE7B7;padding:1px 6px;border-radius:10px;border:1px solid #064E3B;font-size:8px">FULLBOARD</span> <span style="background:#BFDBFE;padding:1px 6px;border-radius:10px;border:1px solid #1E40AF;font-size:8px">FB MADINAH</span> <span style="background:#FDE68A;padding:1px 6px;border-radius:10px;border:1px solid #92400E;font-size:8px">FB MEKAH / TRAIN</span> <span style="background:#BBF7D0;padding:1px 6px;border-radius:10px;border:1px solid #065F46;font-size:8px">TAKAFUL</span> <span style="background:#FEF08A;padding:1px 6px;border-radius:10px;border:1px solid #854D0E;font-size:8px">ETIQA</span> <span style="background:#BFDBFE;padding:1px 6px;border-radius:10px;border:1px solid #1E40AF;font-size:8px">KHAIRI</span></span></div>
       <table>
-        <tr><th style="width:30px">NO</th><th>NAMA JEMAAH</th><th style="width:110px">FULLBOARD</th><th style="width:50px">TRAIN</th><th style="width:75px">PAKEJ</th><th style="width:70px">INSURAN</th></tr>
+        <tr><th style="width:30px">NO</th><th>NAMA JEMAAH</th><th style="width:130px">FULLBOARD</th><th style="width:60px">TRAIN</th><th style="width:70px">PAKEJ</th><th style="width:190px">INSURAN</th></tr>
         ${namelistRows}
       </table>
     </div>
