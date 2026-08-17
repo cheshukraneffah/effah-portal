@@ -57,13 +57,14 @@ async function loadStaffList(){
     }
     renderStaffList();
     renderRoomingGrid();
-    renderRoomingOverview(allRoomingRecords.filter(r=>(r.fields['LOKASI / CITY']||'MEKAH').toUpperCase()===activeLocation.toUpperCase()));
+    try{ renderRoomingOverview(allRoomingRecords.filter(r=>(r.fields['LOKASI / CITY']||'MEKAH').toUpperCase()===activeLocation.toUpperCase())); }catch(e){}
   }catch(e){
     console.error('loadStaffList Airtable failed', e);
     staffList=JSON.parse(localStorage.getItem(getStaffStorageKey())||'[]');
     renderStaffList();
   }
 }
+
 async function addNewStaff(){
   const input=document.getElementById('newStaffInput'); if(!input) return;
   let name=input.value.trim().toUpperCase();
@@ -126,7 +127,6 @@ async function updateStaffTrain(staffId, checked){
 async function assignStaffToRoom(staffId,roomId){
   const staff=staffList.find(s=>s.id===staffId||s.airtableId===staffId); if(!staff) return;
   const rec=allRoomingRecords.find(r=>r.id===roomId); if(!rec) return;
-  // Update local
   staff.roomIds = [roomId];
   staff.roomLink = roomId;
   saveStaffList(); renderStaffList(); renderRoomingGrid(); renderLocationTabs();
@@ -134,7 +134,6 @@ async function assignStaffToRoom(staffId,roomId){
   const pat=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
   if(!base||!pat||!staff.airtableId) return;
   try{
-    // Try field ROOMING LIST first, fallback to ROOM
     let fieldName = 'ROOMING LIST';
     let res = await fetch(`https://api.airtable.com/v0/${base}/STAFF%20LIST%20%28ROOMING%29/${staff.airtableId}`,{
       method:'PATCH',
@@ -143,7 +142,6 @@ async function assignStaffToRoom(staffId,roomId){
     });
     let data = await res.json();
     if(data.error){
-      // try alternative field names
       fieldName = 'ROOM';
       await fetch(`https://api.airtable.com/v0/${base}/STAFF%20LIST%20%28ROOMING%29/${staff.airtableId}`,{
         method:'PATCH',
@@ -169,13 +167,11 @@ async function removeStaffFromRoom(roomId, staffId){
     });
   }catch(e){ console.error('removeStaffFromRoom failed', e); }
 }
-function removeStaff(roomId,staffName){ // legacy support for old comma field - now redirect to new
-  // staffName could be id
+function removeStaff(roomId,staffName){
   const s=staffList.find(x=>x.id===staffName||x.airtableId===staffName||x.name===staffName);
   if(s){ removeStaffFromRoom(roomId, s.id); return; }
-  // fallback old logic for STAFF/EXTRA text field (if still used)
   const rec=allRoomingRecords.find(r=>r.id===roomId); if(!rec) return;
-  const arr=(rec.fields['STAFF / EXTRA']||'').split(',').map(s=>s.trim()).filter(s=>s&&s!==staffName);
+  const arr=(rec.fields['STAFF / EXTRA']||'').split(',').map(x=>x.trim()).filter(x=>x&&x!==staffName);
   updateRoomField(roomId,'STAFF / EXTRA',arr.join(','),true);
 }
 
@@ -571,20 +567,20 @@ function isJemaahAssignedInLocation(jId, location){
   const loc = (location||activeLocation).toUpperCase();
   return allRoomingRecords.some(r=> (r.fields['LOKASI / CITY']||'MEKAH').toUpperCase()===loc && (r.fields['JEMAAH']||[]).includes(jId));
 }
-function isJemaahAssigned(jId){ return allRoomingRecords.some(r=>(r.fields['JEMAAH']||[]).includes(jId)); }
-); }catch(e){ return false; }
-}
 function isStaffAssignedInLocation(staffId, location){
   const s=staffList.find(x=>x.id===staffId||x.airtableId===staffId); if(!s) return false;
   if(!s.roomIds || s.roomIds.length===0) return false;
   const loc = (location||activeLocation).toUpperCase();
-  // check if assigned room is in this location
   return allRoomingRecords.some(r=> (r.fields['LOKASI / CITY']||'MEKAH').toUpperCase()===loc && s.roomIds.includes(r.id));
 }
 function getStaffForRoom(roomId){
   return staffList.filter(s=> s.roomIds && s.roomIds.includes(roomId));
 }
+function isJemaahAssigned(jId){ return allRoomingRecords.some(r=>(r.fields['JEMAAH']||[]).includes(jId)); }
 
+function isJemaahAssignedTanpaKatil(jId){
+  try{ return allRoomingRecords.some(r=>{ const arr=r.fields['JEMAAH TANPA KATIL']||r.fields['INFANT']||[]; return arr.includes(jId); }); }catch(e){ return false; }
+}
 function isJemaahAssignedAny(jId){
   return isJemaahAssigned(jId) || isJemaahAssignedTanpaKatil(jId);
 }
@@ -979,7 +975,6 @@ async function executeCopyRooms(){
 function dragStaff(e,staffId){ if(isStaffAssignedInLocation(staffId, activeLocation)) return; e.dataTransfer.effectAllowed='move'; e.dataTransfer.setData('text/staff-id',staffId); e.dataTransfer.setData('text/plain',staffId); const row=e.currentTarget; if(row) setTimeout(()=>row.style.opacity='0.3',0); }
 function dragStaffEnd(e){ e.currentTarget.style.opacity='1'; }
 function quickAssignStaff(staffId){ if(isStaffAssignedInLocation(staffId, activeLocation)) return; const rooms=allRoomingRecords.filter(r=>(r.fields['LOKASI / CITY']||'MEKAH').toUpperCase()===activeLocation); const target=rooms.find(r=>{ const j=r.fields['JEMAAH']?.length||0; const s=(r.fields['STAFF / EXTRA']||'').split(',').filter(Boolean).length; return (j+s)<(r.fields['KAPASITI']||4); }); if(target) assignStaffToRoom(staffId,target.id); else alert('Tiada slot kosong di lokasi '+activeLocation+'.'); }
-
 async function addTanpaKatilToRoom(roomId, jId){
   const rec=allRoomingRecords.find(r=>r.id===roomId);
   if(!rec) return;
