@@ -47,17 +47,12 @@ async function loadStaffList(){
       train:!!r.fields['TRAIN'],
       sortNumber:r.fields['SORT NUMBER']||9999,
       trip:r.fields['TRIP']||[],
-      roomIds: r.fields['ROOMING LIST'] || r.fields['ROOM'] || r.fields['BILIK'] || [],
+      roomIds: r.fields['ROOMING LIST'] || r.fields['ROOM'] || [],
       roomLink: (r.fields['ROOMING LIST']||[])[0]||null
     }));
     staffList.sort((a,b)=>(a.sortNumber||9999)-(b.sortNumber||9999));
-    if(staffList.length===0){
-      const local=JSON.parse(localStorage.getItem(getStaffStorageKey())||'[]');
-      if(local.length>0) staffList=local;
-    }
     renderStaffList();
-    renderRoomingGrid();
-    try{ renderRoomingOverview(allRoomingRecords.filter(r=>(r.fields['LOKASI / CITY']||'MEKAH').toUpperCase()===activeLocation.toUpperCase())); }catch(e){}
+    try{ renderRoomingGrid(); }catch(e){}
   }catch(e){
     console.error('loadStaffList Airtable failed', e);
     staffList=JSON.parse(localStorage.getItem(getStaffStorageKey())||'[]');
@@ -72,23 +67,35 @@ async function addNewStaff(){
   if(!name.includes('(')) name=`${name} (EFFAH)`;
   const base=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base')||localStorage.getItem('effah_base_id');
   const pat=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
-  const tripId=window.selectedTripRecord?.id||localStorage.getItem('effah_active_trip_id')||'';
+  const tripId=window.selectedTripRecord?.id||localStorage.getItem('effah_active_trip_id')||localStorage.getItem('selectedTripId')||'';
   try{
     if(base&&pat){
+      const fields = {
+        'NAME': name,
+        'TRAIN': false,
+        'SORT NUMBER': staffList.length+1
+      };
+      if(tripId) fields['TRIP'] = [tripId];
+      // BOARD BASIS jangan hantar kalau kosong - nanti Airtable error select
       const res=await fetch(`https://api.airtable.com/v0/${base}/STAFF%20LIST%20%28ROOMING%29`,{
         method:'POST',
         headers:{'Authorization':`Bearer ${pat}`,'Content-Type':'application/json'},
-        body: JSON.stringify({fields:{'NAME': name, 'BOARD BASIS':'', 'TRAIN': false, 'TRIP': tripId?[tripId]:[], 'SORT NUMBER': staffList.length+1}})
+        body: JSON.stringify({fields})
       });
       const data=await res.json();
+      console.log('Add staff Airtable response:', data);
       if(data.id){
-        staffList.push({id:data.id, airtableId:data.id, name, boardBasis:'', train:false, sortNumber:staffList.length+1, trip:tripId?[tripId]:[]});
+        staffList.push({id:data.id, airtableId:data.id, name, boardBasis:'', train:false, sortNumber:staffList.length+1, trip:tripId?[tripId]:[], roomIds: [], roomLink: null});
         saveStaffList(); renderStaffList(); input.value=''; return;
+      } else {
+        alert('Airtable error: ' + (data.error?.message || JSON.stringify(data)));
+        console.error('Airtable add staff failed', data);
       }
     }
-  }catch(e){ console.error('Add staff Airtable failed', e); }
+  }catch(e){ console.error('Add staff Airtable failed', e); alert('Gagal add staff ke Airtable: ' + e.message); }
+  // Fallback localStorage only if Airtable fails
   const id=`staff_${Date.now()}_${++staffIdCounter}`;
-  staffList.push({id, name, boardBasis:'', train:false, sortNumber:staffList.length+1});
+  staffList.push({id, name, boardBasis:'', train:false, sortNumber:staffList.length+1, roomIds: [], roomLink: null});
   saveStaffList(); renderStaffList(); input.value='';
 }
 
@@ -126,7 +133,6 @@ async function updateStaffTrain(staffId, checked){
 
 async function assignStaffToRoom(staffId,roomId){
   const staff=staffList.find(s=>s.id===staffId||s.airtableId===staffId); if(!staff) return;
-  const rec=allRoomingRecords.find(r=>r.id===roomId); if(!rec) return;
   staff.roomIds = [roomId];
   staff.roomLink = roomId;
   saveStaffList(); renderStaffList(); renderRoomingGrid(); renderLocationTabs();
@@ -577,6 +583,11 @@ function getStaffForRoom(roomId){
   return staffList.filter(s=> s.roomIds && s.roomIds.includes(roomId));
 }
 function isJemaahAssigned(jId){ return allRoomingRecords.some(r=>(r.fields['JEMAAH']||[]).includes(jId)); }
+function isStaffAssignedInLocation(staffId, location){
+  const s=staffList.find(x=>x.id===staffId); if(!s) return false;
+  const loc = (location||activeLocation).toUpperCase();
+  return allRoomingRecords.some(r=> (r.fields['LOKASI / CITY']||'MEKAH').toUpperCase()===loc && (r.fields['STAFF / EXTRA']||'').split(',').map(x=>x.trim()).includes(s.name));
+}
 
 function isJemaahAssignedTanpaKatil(jId){
   try{ return allRoomingRecords.some(r=>{ const arr=r.fields['JEMAAH TANPA KATIL']||r.fields['INFANT']||[]; return arr.includes(jId); }); }catch(e){ return false; }
@@ -737,7 +748,7 @@ function renderRoomingGrid(){
   renderRoomingOverview(rooms);
   if(rooms.length===0){ grid.innerHTML=`<div class="col-span-2 p-6 text-center text-[11px] border border-dashed rounded-2xl bg-white">Tiada bilik untuk <b>${activeLocation}</b><br><button onclick="openNewRoomModal()" class="mt-2.5 px-3 py-1.5 bg-[#7A0C2E] text-white rounded-full text-[11px]">+ Bilik Baru untuk ${activeLocation}</button></div>`; return; }
   grid.innerHTML=rooms.map(rec=>{
-    const f=rec.fields; const roomId=f['Room ID / Nama Bilik']||generateRoomIdFromCap(f['KAPASITI']); const pakej=f['PAKEJ / HOTEL']||'EKONOMI'; const cap=f['KAPASITI']||4; const hotel=f['HOTEL NAME']||''; const staffForRoom=getStaffForRoom(rec.id); const staffArr=staffForRoom.map(s=>s.name); const jIds=f['JEMAAH']||[]; const count=jIds.length+staffArr.length;
+    const f=rec.fields; const roomId=f['Room ID / Nama Bilik']||generateRoomIdFromCap(f['KAPASITI']); const pakej=f['PAKEJ / HOTEL']||'EKONOMI'; const cap=f['KAPASITI']||4; const hotel=f['HOTEL NAME']||''; const staffArr=(f['STAFF / EXTRA']||'').split(',').filter(Boolean); const jIds=f['JEMAAH']||[]; const count=jIds.length+staffArr.length;
     const jSlots=jIds.map(jId=>{ 
       const jRec=allRoomingJemaah.find(j=>j.id===jId); 
       const jName=getJemaahName(jRec?.fields);
