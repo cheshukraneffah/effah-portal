@@ -385,7 +385,7 @@ function renderNamelist(){
     if(fb==='FULLBOARD (MEKAH)' || fb==='BB (MEKAH)') fbCls='bg-orange-100 border-orange-200 text-orange-800';
     else if(fb==='FULLBOARD (MADINAH)' || fb==='BB (MADINAH)') fbCls='bg-blue-100 border-blue-200 text-blue-800';
     else if(fb==='FULLBOARD') fbCls='bg-emerald-100 border-emerald-200 text-emerald-800';
-    else if(fb==='NO FULLBOARD') fbCls='bg-slate-100 border-slate-200 text-slate-500';
+    else if(fb==='NO FULLBOARD' || fb==='' ) fbCls='bg-white border-dashed border-slate-300 text-slate-400';
     else if(fb==='-' || fb==='' ) fbCls='bg-white border-dashed border-slate-300 text-slate-400';
 
     const insToggle = ['TAKAFUL','ETIQA','AL-KHAIRI'].map(opt=>{
@@ -405,11 +405,10 @@ function renderNamelist(){
       <div class="col-span-3 font-medium truncate text-[10px] ${assignedInLoc?'text-slate-500 italic':''}" title="${name}">${name}</div>
       <div class="col-span-2 flex items-center gap-0.5">
         <select onchange="updateJemaahField('${r.id}','BOARD BASIS',this.value)" class="text-[8px] border rounded-full px-1 py-0.5 bg-white font-bold ${fbCls} outline-none w-full truncate" title="BOARD BASIS">
-          <option value="" ${!fb || fb==='-'?'selected':''}>- BOARD</option>
+          <option value="" ${!fb || fb==='-' || fb==='NO FULLBOARD'?'selected':''}>- BOARD</option>
           <option value="FULLBOARD" ${fb==='FULLBOARD'?'selected':''}>FULLBOARD</option>
           <option value="FULLBOARD (MEKAH)" ${fb==='FULLBOARD (MEKAH)'?'selected':''}>FULLBOARD (MEKAH)</option>
           <option value="FULLBOARD (MADINAH)" ${fb==='FULLBOARD (MADINAH)'?'selected':''}>FULLBOARD (MADINAH)</option>
-          <option value="NO FULLBOARD" ${fb==='NO FULLBOARD'?'selected':''}>NO FULLBOARD</option>
           <option value="BB (MEKAH)" ${fb==='BB (MEKAH)'?'selected':''}>BB (MEKAH)</option>
           <option value="BB (MADINAH)" ${fb==='BB (MADINAH)'?'selected':''}>BB (MADINAH)</option>
         </select>
@@ -773,7 +772,7 @@ function generateRoomingPrint(){
     const combinedStaff = [...new Set([...allStaffNames, ...staffInAnyRoom])];
 
     function fbPrintCell(val){
-      if(!val || val==='-' || val==='- FB' || val.toUpperCase()==='NO BOARD') return `<span style="color:#999">-</span>`;
+      if(!val || val==='-' || val==='- FB' || val.toUpperCase()==='NO FULLBOARD' || val.toUpperCase()==='NO BOARD') return `<span style="color:#999">-</span>`;
       const up=val.toUpperCase(); let style='';
       if(up.includes('BB') && up.includes('MEKAH')) style='background:#FFF7ED;color:#9A3412;border:1px dashed #EA580C;font-weight:bold;padding:2px 7px;border-radius:10px;font-size:8px;'; // BB MEKAH - dashed orange
       else if(up.includes('BB') && up.includes('MADINAH')) style='background:#EFF6FF;color:#1E40AF;border:1px dashed #3B82F6;font-weight:bold;padding:2px 7px;border-radius:10px;font-size:8px;'; // BB MADINAH - dashed blue
