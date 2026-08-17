@@ -315,14 +315,23 @@ function renderNamelist(){
   }
   const total=allRoomingJemaah.length;
   const belumGlobal=allRoomingJemaah.filter(r=>!isJemaahAssignedAny(r.id)).length;
-  const belumInLoc=allRoomingJemaah.filter(r=>!isJemaahAssignedInLocation(r.id, activeLocation)).length;
+  // V24.16: belumInLoc kira termasuk tanpa katil juga
+  const belumInLoc=allRoomingJemaah.filter(r=>{
+    const assignedNormal = isJemaahAssignedInLocation(r.id, activeLocation);
+    const assignedTanpa = allRoomingRecords.some(rec=> (rec.fields['LOKASI / CITY']||'MEKAH').toUpperCase()===activeLocation.toUpperCase() && ((rec.fields['JEMAAH TANPA KATIL']||[]).includes(r.id)));
+    return !assignedNormal && !assignedTanpa;
+  }).length;
   const totalEl=document.getElementById('totalJemaahBadge'); if(totalEl) totalEl.textContent=total+' Total';
   const belumEl=document.getElementById('belumAssignBadge'); if(belumEl) belumEl.textContent=belumInLoc+' Unassigned di '+activeLocation;
   const topBelum=document.getElementById('belumAssignTop'); if(topBelum) topBelum.textContent=belumGlobal+' Unassigned';
   const topAssign=document.getElementById('assignedTop'); if(topAssign) topAssign.textContent=(total-belumGlobal)+' Assigned';
   if(total===0){ cont.innerHTML='<div class="p-6 text-center text-[11px] text-slate-400">Tiada jemaah untuk trip ini</div>'; return; }
   cont.innerHTML=filtered.map((r,i)=>{
-    const name=getJemaahName(r.fields); const assignedInLoc=isJemaahAssignedInLocation(r.id, activeLocation); const assignedGlobal=isJemaahAssigned(r.id);
+        const name=getJemaahName(r.fields);
+    const assignedNormalInLoc=isJemaahAssignedInLocation(r.id, activeLocation);
+    const assignedTanpaInLoc=allRoomingRecords.some(rec=> (rec.fields['LOKASI / CITY']||'MEKAH').toUpperCase()===activeLocation.toUpperCase() && ((rec.fields['JEMAAH TANPA KATIL']||[]).includes(r.id)));
+    const assignedInLoc = assignedNormalInLoc || assignedTanpaInLoc;
+    const assignedGlobal=isJemaahAssignedAny(r.id);
     // FIX #1: buang pointer-events-none supaya masih boleh edit inline walau dah assigned
     const rowCls=assignedInLoc?'opacity-60 bg-slate-50':'hover:bg-slate-50';
     const drag=assignedInLoc?'':`draggable="true" ondragstart="dragJemaah(event,'${r.id}')" ondragend="dragEnd(event)"`;
@@ -817,7 +826,7 @@ function generateRoomingPrint(){
     });
 
     const html=`<html><head><title>Rooming ${tripName}</title><style>body{font-family:Arial,Helvetica,sans-serif;font-size:10px;margin:12px;color:#000}table{border-collapse:collapse;width:100%}th,td{border:1px solid #000;padding:4px 6px;font-size:9px}th{background:#7A0C2E;color:#fff;font-weight:bold;text-transform:uppercase}.header{display:flex;justify-content:space-between;font-weight:bold;font-size:12px;border-bottom:2px solid #000;padding-bottom:6px;margin-bottom:8px}.page-break{page-break-before:always}.namelist-page{max-width:900px;margin:0 auto}.location-page{max-width:100%}@media print{@page{size:A4 landscape;margin:10mm}body{-webkit-print-color-adjust:exact;print-color-adjust:exact}.page-break{page-break-before:always}}</style></head><body>
-      <div class="namelist-page"><div class="header"><span>NAMELIST ${tripName}</span><span>Total: ${allRoomingJemaah.length} Jemaah + ${combinedStaff.length} Staff</span></div><div style="font-size:9px;margin-bottom:8px"><b>Trip:</b> ${tripName} | <b>Tarikh Cetak:</b> ${new Date().toLocaleDateString('ms-MY')} | <b>LEGENDA:</b> <span style="background:#BBF7D0;padding:1px 6px;border-radius:10px;border:1px solid #065F46;font-size:8px">FULLBOARD</span> <span style="background:#BFDBFE;padding:1px 6px;border-radius:10px;border:1px solid #1E40AF;font-size:8px">FB MADINAH</span> <span style="background:#FDE68A;padding:1px 6px;border-radius:10px;border:1px solid #92400E;font-size:8px">FB MEKAH / TRAIN</span> <span style="background:#BBF7D0;padding:1px 6px;border-radius:10px;border:1px solid #065F46;font-size:8px">TAKAFUL</span> <span style="background:#FEF08A;padding:1px 6px;border-radius:10px;border:1px solid #854D0E;font-size:8px">ETIQA</span> <span style="background:#BFDBFE;padding:1px 6px;border-radius:10px;border:1px solid #1E40AF;font-size:8px">KHAIRI</span></div><table><tr><th style="width:30px">NO</th><th>NAMA JEMAAH</th><th style="width:130px">FULLBOARD</th><th style="width:60px">TRAIN</th><th style="width:70px">PAKEJ</th><th style="width:190px">INSURAN</th></tr>${namelistRows}</table></div>
+      <div class="namelist-page"><div class="header"><span>NAMELIST ${tripName}</span><span>Total: ${allRoomingJemaah.length} Jemaah + ${combinedStaff.length} Staff</span></div><div style="font-size:9px;margin-bottom:8px"><b>Trip:</b> ${tripName} | <b>Tarikh Cetak:</b> ${new Date().toLocaleDateString('ms-MY')}</div><table><tr><th style="width:30px">NO</th><th>NAMA JEMAAH</th><th style="width:130px">FULLBOARD</th><th style="width:60px">TRAIN</th><th style="width:70px">PAKEJ</th><th style="width:190px">INSURAN</th></tr>${namelistRows}</table></div>
       ${locationPages||'<div style="page-break-before:always"><div style="border:1px dashed #000;padding:20px;text-align:center">Tiada bilik untuk trip ini</div></div>'}
       <script>window.onload=function(){setTimeout(()=>window.print(),600)}; window.onafterprint=function(){window.close();}; setTimeout(()=>{try{window.close();}catch(e){}},2500);<\/script>
     </body></html>`;
