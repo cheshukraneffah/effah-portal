@@ -420,8 +420,9 @@ async function dropRoomReorder(e, targetRoomId){
   if(draggedIdx===-1 || targetIdx===-1) return;
   const moved=ordered.splice(draggedIdx,1)[0];
   ordered.splice(targetIdx,0,moved);
-  // Update local sort order
+  // Update local sort order and save to localStorage
   ordered.forEach((r,i)=>{ r.fields['SORT ORDER']=i+1; });
+  saveRoomOrder(ordered.map(r=>r.id));
   // Re-render immediately without refresh
   renderRoomingGrid();
   // Auto update Airtable in background
@@ -739,7 +740,7 @@ function renderRoomingGrid(){
   const occEl=document.getElementById('roomingOccupancy'); if(occEl) occEl.textContent=`${totalJ} Jemaah + ${totalStaff} Staff • ${activeLocation}`;
   renderRoomingOverview(rooms);
   if(rooms.length===0){ grid.innerHTML=`<div class="col-span-2 p-6 text-center text-[11px] border border-dashed rounded-2xl bg-white">Tiada bilik untuk <b>${activeLocation}</b><br><button onclick="openNewRoomModal()" class="mt-2.5 px-3 py-1.5 bg-[#7A0C2E] text-white rounded-full text-[11px]">+ Bilik Baru untuk ${activeLocation}</button></div>`; return; }
-  grid.innerHTML=rooms.map(rec=>{
+  grid.innerHTML=rooms.map((rec, roomIdx)=>{
     const f=rec.fields; const roomId=f['Room ID / Nama Bilik']||generateRoomIdFromCap(f['KAPASITI']); const pakej=f['PAKEJ / HOTEL']||'EKONOMI'; const cap=f['KAPASITI']||4; const hotel=f['HOTEL NAME']||''; const staffForRoom=getStaffForRoom(rec.id); const staffArr=staffForRoom.map(s=>s.name); const jIds=f['JEMAAH']||[]; const count=jIds.length+staffArr.length;
     const jSlots=jIds.map(jId=>{ 
       const jRec=allRoomingJemaah.find(j=>j.id===jId); 
@@ -773,7 +774,7 @@ function renderRoomingGrid(){
       <div class="flex items-center justify-between gap-1.5">
         <div class="flex items-center gap-1.5 flex-1 min-w-0">
           <button class="w-6 h-6 rounded-full bg-slate-100 border flex items-center justify-center cursor-grab shrink-0" draggable="true" ondragstart="handleRoomDragStart(event,'${rec.id}')" ondragend="handleRoomDragEnd(event)"><i class="fa-solid fa-grip-lines text-[9px]"></i></button>
-          <span class="font-bold text-[11px] shrink-0">${roomId}</span>
+          <span class="flex items-center gap-1.5 shrink-0"><span class="w-5 h-5 rounded-full bg-[#7A0C2E] text-white flex items-center justify-center text-[9px] font-bold">${roomIdx+1}</span><span class="font-bold text-[11px]">${roomId}</span></span>
           <input id="hotelInput-${rec.id}" value="${hotel}" placeholder="Nama Hotel" onchange="updateHotelInline('${rec.id}', this.value)" onfocus="this.select()" class="flex-1 min-w-0 px-2 py-1 bg-slate-50 border border-slate-200 rounded-full text-[11px] font-bold truncate focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#7A0C2E]/30" title="Klik untuk tukar nama hotel">
         </div>
         <button onclick="deleteRoom('${rec.id}','${roomId}')" class="w-6 h-6 rounded-full bg-slate-50 hover:bg-red-50 border text-[10px] shrink-0"><i class="fa-solid fa-trash"></i></button>
@@ -790,7 +791,6 @@ function renderRoomingGrid(){
 }
 function setActiveLocation(loc){ activeLocation=loc.toUpperCase(); localStorage.setItem('effah_active_location',activeLocation); const el=document.getElementById('copyTargetLoc'); if(el) el.textContent=activeLocation; renderLocationTabs(); renderRoomingGrid(); renderNamelist(); renderStaffList(); }
 function allowDrop(e){ e.preventDefault(); }
-function allowDropRoom(e){ e.preventDefault(); e.currentTarget.classList.add('ring-2','ring-[#7A0C2E]/20'); }
 function dragJemaah(e,jId){ if(isJemaahAssignedInLocation(jId, activeLocation)) return; e.dataTransfer.setData('text/plain',jId); const r=e.currentTarget; if(r) setTimeout(()=>r.style.opacity='0.3',0); }
 function dragEnd(e){ e.currentTarget.style.opacity='1'; }
 function dropJemaah(e,roomId){
@@ -1053,8 +1053,10 @@ function generateRoomingPrint(orientation){ orientation = orientation || 'landsc
 
     let locationPages = '';
     allLocations.forEach(loc=>{
-      const rooms = allRoomingRecords.filter(r=>(r.fields['LOKASI / CITY']||'MEKAH').toUpperCase()===loc.toUpperCase());
+      let rooms = allRoomingRecords.filter(r=>(r.fields['LOKASI / CITY']||'MEKAH').toUpperCase()===loc.toUpperCase());
       if(rooms.length===0) return;
+      // Sort by SORT ORDER for print
+      rooms = [...rooms].sort((a,b)=>(a.fields['SORT ORDER']||9999)-(b.fields['SORT ORDER']||9999));
       
       // FIXED LOGIC: Determine board makan per location
       let fbListForLoc = [];
@@ -1139,7 +1141,9 @@ function generateRoomingPrint(orientation){ orientation = orientation || 'landsc
 
       // Room blocks - smaller for portrait
       const isPortrait = orientation==='portrait';
-      const roomBlocks = rooms.map((rec, idx)=>{
+      // Ensure rooms sorted by SORT ORDER for print
+      const sortedRoomsForPrint = [...rooms].sort((a,b)=>(a.fields['SORT ORDER']||9999)-(b.fields['SORT ORDER']||9999));
+      const roomBlocks = sortedRoomsForPrint.map((rec, idx)=>{
         const f=rec.fields;
         const roomName = f['Room ID / Nama Bilik'] || f['ROOM ID'] || `B${f['KAPASITI']||4}-${idx+1}`;
         const pakej = f['PAKEJ / HOTEL']||'';
@@ -1167,7 +1171,7 @@ function generateRoomingPrint(orientation){ orientation = orientation || 'landsc
         
         return `<div style="border:1px solid #000;margin-bottom:${isPortrait ? '4px' : '6px'};background:#fff;break-inside:avoid">
           <div style="background:#fff;border-bottom:1px solid #000;padding:${isPortrait ? '2px 4px' : '3px 6px'};display:flex;justify-content:space-between;align-items:center">
-            <span style="font-weight:bold;font-size:${isPortrait ? '8px' : '9px'}">${roomName} ${pakej ? '('+pakej+')' : ''} ${hotel ? '- '+hotel : ''}</span>
+            <span style="font-weight:bold;font-size:${isPortrait ? '8px' : '9px'}">${idx+1}. ${roomName} ${pakej ? '('+pakej+')' : ''} ${hotel ? '- '+hotel : ''}</span>
             <span style="font-size:${isPortrait ? '7px' : '8px'};font-weight:bold">${jIds.length + staffForRoom.length}/${cap}</span>
           </div>
           <div style="padding:${isPortrait ? '3px 4px' : '4px 6px'}">
@@ -1195,8 +1199,8 @@ function generateRoomingPrint(orientation){ orientation = orientation || 'landsc
         fbTableHTML = `
           <div style="margin-top:10px;border:1px solid #000">
             <div style="background:#064E3B;color:#fff;padding:4px 8px;font-weight:bold;font-size:9px;display:flex;justify-content:space-between">
-              <span>${loc} - SENARAI PAKEJ MAKAN (${fbListForLoc.length} orang) - Sorted ikut Hotel</span>
-              <span style="background:#fff;color:#065F46;padding:1px 6px;border-radius:10px;font-size:9px">${fbListForLoc.length} Board Basis</span>
+              <span>${loc} - SENARAI PAKEJ MAKAN (${fbListForLoc.length} orang)</span>
+              <span style="background:#fff;color:#065F46;padding:1px 6px;border-radius:10px;font-size:9px">${fbListForLoc.length} Jemaah</span>
             </div>
             ${Object.keys(grouped).sort().map(hotelName=>`
               <div style="border-bottom:1px solid #000">
