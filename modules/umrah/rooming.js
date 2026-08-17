@@ -129,19 +129,21 @@ async function updateStaffTrain(staffId, checked){
 async function assignStaffToRoom(staffId,roomId){
   const staff=staffList.find(s=>s.id===staffId||s.airtableId===staffId); if(!staff) return;
   const rec=allRoomingRecords.find(r=>r.id===roomId); if(!rec) return;
-  staff.roomIds = [roomId];
-  staff.roomLink = roomId;
+  // FIX: allow multiple rooms linking - append not overwrite
+  if(!staff.roomIds) staff.roomIds=[];
+  if(!staff.roomIds.includes(roomId)) staff.roomIds.push(roomId);
+  staff.roomLink = staff.roomIds[0];
   saveStaffList(); renderStaffList(); renderRoomingGrid(); renderLocationTabs();
   const base=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base')||localStorage.getItem('effah_base_id');
   const pat=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
   if(!base||!pat||!staff.airtableId) return;
-  console.log('Assigning staff', staffId, 'to room', roomId);
+  console.log('Assigning staff', staffId, 'to rooms', staff.roomIds);
   try{
     let fieldName = 'ROOMING LIST';
     let res = await fetch(`https://api.airtable.com/v0/${base}/STAFF%20LIST%20%28ROOMING%29/${staff.airtableId}`,{
       method:'PATCH',
       headers:{'Authorization':`Bearer ${pat}`,'Content-Type':'application/json'},
-      body: JSON.stringify({fields:{[fieldName]: [roomId]}})
+      body: JSON.stringify({fields:{[fieldName]: staff.roomIds}})
     });
     let data = await res.json();
     if(data.error){
@@ -149,15 +151,15 @@ async function assignStaffToRoom(staffId,roomId){
       await fetch(`https://api.airtable.com/v0/${base}/STAFF%20LIST%20%28ROOMING%29/${staff.airtableId}`,{
         method:'PATCH',
         headers:{'Authorization':`Bearer ${pat}`,'Content-Type':'application/json'},
-        body: JSON.stringify({fields:{[fieldName]: [roomId]}})
+        body: JSON.stringify({fields:{[fieldName]: staff.roomIds}})
       });
     }
   }catch(e){ console.error('assignStaffToRoom link failed', e); }
 }
 async function removeStaffFromRoom(roomId, staffId){
   const staff=staffList.find(s=>s.id===staffId||s.airtableId===staffId); if(!staff) return;
-  staff.roomIds = [];
-  staff.roomLink = null;
+  staff.roomIds = (staff.roomIds||[]).filter(id=>id!==roomId);
+  staff.roomLink = staff.roomIds.length? staff.roomIds[0] : null;
   saveStaffList(); renderStaffList(); renderRoomingGrid(); renderLocationTabs();
   const base=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base')||localStorage.getItem('effah_base_id');
   const pat=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
@@ -166,7 +168,7 @@ async function removeStaffFromRoom(roomId, staffId){
     await fetch(`https://api.airtable.com/v0/${base}/STAFF%20LIST%20%28ROOMING%29/${staff.airtableId}`,{
       method:'PATCH',
       headers:{'Authorization':`Bearer ${pat}`,'Content-Type':'application/json'},
-      body: JSON.stringify({fields:{'ROOMING LIST': [], 'ROOM': []}})
+      body: JSON.stringify({fields:{'ROOMING LIST': staff.roomIds, 'ROOM': staff.roomIds}})
     });
   }catch(e){ console.error('removeStaffFromRoom failed', e); }
 }
@@ -1337,7 +1339,7 @@ function generateRoomingPrint(orientation){ orientation = orientation || 'landsc
                 <div style="background:#f0fdf4;padding:3px 8px;font-weight:bold;font-size:9px;border-bottom:1px solid #ddd">${hotelName} (${grouped[hotelName].length} Jemaah)</div>
                 <table style="width:100%;border-collapse:collapse;font-size:9px">
                   <tr style="background:#f8f8f8;font-weight:bold"><th style="border:1px solid #ddd;padding:3px 6px;width:30px">NO</th><th style="border:1px solid #ddd;padding:3px 6px;text-align:left">NAMA JEMAAH</th><th style="border:1px solid #ddd;padding:3px 6px;text-align:center">BOARD BASIS</th><th style="border:1px solid #ddd;padding:3px 6px;text-align:center">BILIK</th></tr>
-                  ${grouped[hotelName].map((item,i)=>{
+                  ${grouped[hotelName].sort((a,b)=>{ const na=parseInt(a.room)||9999; const nb=parseInt(b.room)||9999; return na-nb; }).map((item,i)=>{
                     const isStaffRow = item.rec._isStaff;
                     const displayName = isStaffRow ? (item.rec.fields['NAMA JEMAAH']||'') + ' (EFFAH)' : getJemaahName(item.rec.fields);
                     const noLabel = isStaffRow ? `S${staffList.findIndex(s=>s.id===item.rec.id)+1}` : (i+1 - grouped[hotelName].filter((x,idx)=> idx < i && x.rec._isStaff).length);
