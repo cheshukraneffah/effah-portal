@@ -214,9 +214,7 @@ function renderRoomingOverview(rooms){
     const cap=r.fields['KAPASITI']||4;
     byHotel[hotel][cap]=(byHotel[hotel][cap]||0)+1;
   });
-  // FB count
-  let fbCount=0;
-  const loc=activeLocation.toUpperCase();
+  let fbCount=0; const loc=activeLocation.toUpperCase();
   allRoomingJemaah.forEach(j=>{
     const fb=(j.fields['FULLBOARD']||'').toUpperCase();
     if(!fb || fb==='-' || fb==='NO FULLBOARD') return;
@@ -674,7 +672,6 @@ function removeStaff(roomId,staffName){ const rec=allRoomingRecords.find(r=>r.id
 
 // V24 PRINT - highlight colors
 function generateRoomingPrint(){
-  try{
   const tripNameRaw=window.selectedTripRecord?.fields?.Trip||document.getElementById('roomingTripSelect')?.selectedOptions[0]?.text||'Trip';
   const tripName=cleanTripNameForRooming(tripNameRaw);
   const baseLocs=['MEKAH','MADINAH','TAIF','JEDDAH'];
@@ -772,7 +769,7 @@ function generateRoomingPrint(){
       <div class="page-break"></div>
       <div class="location-page">
         <div class="header"><span>ROOMING LIST ${tripName} - ${loc} (${rooms.length} BILIK)</span><span>${overviewMini}</span></div>
-        <div style="font-size:9px;margin-bottom:8px;background:#f5f5f5;border:1px solid #000;padding:5px 8px"><b>${loc} OVERVIEW:</b> ${overviewMini} | Total: ${rooms.length} bilik, ${totalJemaahLoc} jemaah + ${totalStaffLoc} staff${fbTotalLoc?` • ${fbTotalLoc} FULLBOARD`:''}</div>
+        <div style="font-size:9px;margin-bottom:8px;background:#f5f5f5;border:1px solid #000;padding:5px 8px"><b>${loc} OVERVIEW:</b> ${overviewMini} | Total: ${rooms.length} bilik, ${totalJemaahLoc} jemaah + ${totalStaffLoc} staff</div>
         <div style="columns:2; column-gap:12px">${roomBlocks}</div>
       </div>
     `;
@@ -811,7 +808,6 @@ function generateRoomingPrint(){
       window.addEventListener('focus', function handler(){ setTimeout(()=>{ window.removeEventListener('focus', handler); try{window.close();}catch(e){} }, 800); }, {once:true});
     </script>
   </body></html>`;
-  const w=window.open('','_blank'); if(!w){ alert('Popup blocked! Sila allow popup untuk print.'); return; } w.document.write(html); w.document.close();
-  }catch(e){ console.error('Print error', e); alert('Gagal generate print: '+e.message); }
+  const w=window.open('','_blank'); if(w){ w.document.write(html); w.document.close(); }
 }
 async function autoAssignRooming(){ if(!confirm('Adakah anda pasti ingin menetapkan semua jemaah yang belum ditetapkan untuk lokasi '+activeLocation+' secara automatik?')) return; let rooms=[...allRoomingRecords].filter(r=>(r.fields['LOKASI / CITY']||'MEKAH').toUpperCase()===activeLocation.toUpperCase()); if(rooms.length===0) rooms=[...allRoomingRecords]; rooms=getRoomOrderedList(rooms); const unassigned=allRoomingJemaah.filter(j=>!isJemaahAssignedInLocation(j.id, activeLocation)); let idx=0; for(let room of rooms){ const cap=room.fields['KAPASITI']||roomingDefaultCap; const staffCount=(room.fields['STAFF / EXTRA']||'').split(',').filter(Boolean).length; let cur=[...(room.fields['JEMAAH']||[])]; while((cur.length+staffCount)<cap && idx<unassigned.length){ cur.push(unassigned[idx].id); idx++; } if(cur.length!==(room.fields['JEMAAH']||[]).length){ await updateRoomField(room.id,'JEMAAH',cur,false); } } setTimeout(fetchRoomingData,800); }
