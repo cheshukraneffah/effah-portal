@@ -739,21 +739,19 @@ function makeNamelistSticky(){
   try{
     const nl = document.getElementById('namelistContainer');
     if(!nl) return;
-    const leftCard = nl.closest('.w-full.lg\:w-\[52\%\]') || nl.parentElement;
+    const leftCard = nl.closest('.w-full.lg\\:w-\\[52\\%\\]') || nl.parentElement;
     if(leftCard){
       leftCard.style.position='sticky';
       leftCard.style.top='12px';
       leftCard.style.alignSelf='flex-start';
       leftCard.style.zIndex='20';
+      leftCard.style.maxHeight='calc(100vh - 24px)';
       leftCard.style.display='flex';
       leftCard.style.flexDirection='column';
       leftCard.style.backgroundColor='#ffffff';
-      leftCard.style.maxHeight='calc(100vh - 16px)';
-      leftCard.style.overflow='hidden';
     }
     nl.style.flex='1 1 auto';
-    nl.style.maxHeight='48vh';
-    nl.style.minHeight='200px';
+    nl.style.maxHeight='52vh';
     nl.style.overflowY='auto';
     nl.style.overflowX='hidden';
     nl.style.backgroundColor='#ffffff';
@@ -762,27 +760,16 @@ function makeNamelistSticky(){
       staffSec.style.flex='0 0 auto';
       staffSec.style.backgroundColor='#ffffff';
       staffSec.style.borderTop='2px solid #e2e8f0';
-      staffSec.style.display='flex';
-      staffSec.style.flexDirection='column';
-      staffSec.style.maxHeight='38vh';
-      staffSec.style.overflow='hidden';
     }
     const staffCont = document.getElementById('staffListContainer');
     if(staffCont){
-      staffCont.style.flex='1';
+      staffCont.style.maxHeight='32vh';
       staffCont.style.overflowY='auto';
       staffCont.style.overflowX='hidden';
       staffCont.style.backgroundColor='#ffffff';
     }
-    // Ensure rooming grid can scroll via window
-    const rg=document.getElementById('roomingGrid');
-    if(rg){
-      rg.style.overflow='visible';
-      rg.style.maxHeight='none';
-    }
   }catch(e){}
 }
-
 
 function filterRoomingNamelist(){ renderNamelist(); }
 
@@ -851,78 +838,9 @@ function renderRoomingGrid(){
   }).join('');
 }
 function setActiveLocation(loc){ activeLocation=loc.toUpperCase(); localStorage.setItem('effah_active_location',activeLocation); const el=document.getElementById('copyTargetLoc'); if(el) el.textContent=activeLocation; renderLocationTabs(); renderRoomingGrid(); renderNamelist(); renderStaffList(); }
-let _autoScrollInterval=null;
-function _stopAutoScroll(){ if(_autoScrollInterval){ clearInterval(_autoScrollInterval); _autoScrollInterval=null; } }
-function _startAutoScroll(){
-  if(_autoScrollInterval) return;
-  _autoScrollInterval=setInterval(()=>{
-    const y=window._lastDragY||0;
-    if(y<140){ window.scrollBy(0, -22); document.documentElement.scrollTop-=22; }
-    else if(y>window.innerHeight-140){ window.scrollBy(0, 22); document.documentElement.scrollTop+=22; }
-    // also scroll left panels if near edge
-    const nl=document.getElementById('namelistContainer');
-    const sl=document.getElementById('staffListContainer');
-    const grid=document.getElementById('roomingGrid');
-    if(nl){
-      const rect=nl.getBoundingClientRect();
-      if(y>rect.top && y<rect.bottom){
-        if(y-rect.top<80) nl.scrollBy(0,-12);
-        else if(rect.bottom-y<80) nl.scrollBy(0,12);
-      }
-    }
-    if(grid){
-      const rect=grid.getBoundingClientRect();
-      if(y>rect.top){
-        if(y>window.innerHeight-140) grid.scrollBy ? grid.scrollBy(0,10) : null;
-      }
-    }
-  }, 30);
-}
-function allowDrop(e){ e.preventDefault(); window._lastDragY=e.clientY; _startAutoScroll(); }
-document.addEventListener('dragover', (e)=>{ window._lastDragY=e.clientY; _startAutoScroll(); });
-document.addEventListener('dragend', ()=>{ _stopAutoScroll(); });
-document.addEventListener('drop', ()=>{ _stopAutoScroll(); });
+function allowDrop(e){ e.preventDefault(); }
 function dragJemaah(e,jId){ if(isJemaahAssignedInLocation(jId, activeLocation)) return; e.dataTransfer.setData('text/plain',jId); const r=e.currentTarget; if(r) setTimeout(()=>r.style.opacity='0.3',0); }
 function dragEnd(e){ e.currentTarget.style.opacity='1'; }
-
-function dragRoom(e,roomId){
-  e.dataTransfer.setData('text/room-id', roomId);
-  e.dataTransfer.effectAllowed='move';
-  const el=e.currentTarget.closest('[data-room-id]');
-  if(el) setTimeout(()=>el.style.opacity='0.4',0);
-}
-function dragRoomEnd(e){
-  const el=e.currentTarget.closest('[data-room-id]');
-  if(el) el.style.opacity='1';
-  _stopAutoScroll();
-}
-function allowDropRoom(e){ e.preventDefault(); window._lastDragY=e.clientY; _startAutoScroll(); e.currentTarget.classList.add('ring-2','ring-amber-300'); }
-function leaveDropRoom(e){ e.currentTarget.classList.remove('ring-2','ring-amber-300'); }
-async function dropRoom(e,targetRoomId){
-  e.preventDefault();
-  e.currentTarget.classList.remove('ring-2','ring-amber-300');
-  _stopAutoScroll();
-  const srcId=e.dataTransfer.getData('text/room-id');
-  if(!srcId || srcId===targetRoomId) return;
-  // Swap SORT ORDER
-  const srcRec=allRoomingRecords.find(r=>r.id===srcId);
-  const tgtRec=allRoomingRecords.find(r=>r.id===targetRoomId);
-  if(!srcRec||!tgtRec) return;
-  const srcOrder=srcRec.fields['SORT ORDER']||0;
-  const tgtOrder=tgtRec.fields['SORT ORDER']||0;
-  // Optimistic UI
-  srcRec.fields['SORT ORDER']=tgtOrder;
-  tgtRec.fields['SORT ORDER']=srcOrder;
-  renderRoomingGrid();
-  // Save to Airtable
-  const base=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base')||localStorage.getItem('effah_base_id');
-  const pat=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
-  try{
-    await fetch(`https://api.airtable.com/v0/${base}/ROOMING%20LIST/${srcId}`,{method:'PATCH',headers:{Authorization:`Bearer ${pat}`,'Content-Type':'application/json'},body:JSON.stringify({fields:{'SORT ORDER':tgtOrder}})});
-    await fetch(`https://api.airtable.com/v0/${base}/ROOMING%20LIST/${targetRoomId}`,{method:'PATCH',headers:{Authorization:`Bearer ${pat}`,'Content-Type':'application/json'},body:JSON.stringify({fields:{'SORT ORDER':srcOrder}})});
-  }catch(err){ console.error('swap room order failed',err); }
-}
-
 function dropJemaah(e,roomId){
   e.preventDefault(); e.currentTarget.classList.remove('ring-2','ring-[#7A0C2E]/20');
   document.querySelectorAll('[draggable="true"]').forEach(el=>el.style.opacity='1');
@@ -1420,8 +1338,8 @@ function generateRoomingPrint(orientation){ orientation = orientation || 'landsc
         
         const catatanBilik = (f['CATATAN BILIK'] || f['CATATAN'] || '').trim();
         const catatanPrint = catatanBilik ? ` (${catatanBilik})` : '';
-        return `<div style="border:1px solid #000;margin-bottom:${isPortrait ? '4px' : '6px'};background:#fff;break-inside:avoid" data-room-card="${rec.id}" ondragover="allowDropRoom(event)" ondragleave="leaveDropRoom(event)" ondrop="dropRoom(event,'${rec.id}')">
-          <div draggable="true" ondragstart="dragRoom(event,'${rec.id}')" ondragend="dragRoomEnd(event)" style="background:#fff;border-bottom:1px solid #000;padding:${isPortrait ? '2px 4px' : '3px 6px'};display:flex;justify-content:space-between;align-items:center;cursor:grab" title="Drag untuk susun bilik">
+        return `<div style="border:1px solid #000;margin-bottom:${isPortrait ? '4px' : '6px'};background:#fff;break-inside:avoid">
+          <div style="background:#fff;border-bottom:1px solid #000;padding:${isPortrait ? '2px 4px' : '3px 6px'};display:flex;justify-content:space-between;align-items:center">
             <span style="font-weight:bold;font-size:${isPortrait ? '8px' : '9px'}">${idx+1}. ${roomName} ${pakej ? '('+pakej+')' : ''} ${hotel ? '- '+hotel : ''}${catatanPrint}</span>
             <span style="font-size:${isPortrait ? '7px' : '8px'};font-weight:bold">${jIds.length + staffForRoom.length}/${cap}</span>
           </div>
@@ -1521,7 +1439,7 @@ function generateRoomingPrint(orientation){ orientation = orientation || 'landsc
     });
 
     const html=`<html><head><title>Rooming ${tripName} - ${orientation}</title><style>body{font-family:Arial,Helvetica,sans-serif;font-size:10px;margin:12px;color:#000}table{border-collapse:collapse;width:100%}th,td{border:1px solid #000;padding:4px 6px;font-size:9px}th{background:#7A0C2E;color:#fff;font-weight:bold;text-transform:uppercase}.header{display:flex;justify-content:space-between;font-weight:bold;font-size:12px;border-bottom:2px solid #000;padding-bottom:6px;margin-bottom:8px}.page-break{page-break-before:always}.namelist-page{max-width:900px;margin:0 auto}.location-page{max-width:100%}@media print{@page{size:A4 ${orientation};margin:${orientation==='portrait' ? '8mm' : '10mm'}}body{-webkit-print-color-adjust:exact;print-color-adjust:exact}.page-break{page-break-before:always}}</style></head><body>
-      <div class="namelist-page"><div class="header"><span>NAMELIST ${tripName}</span><span>Total: ${allRoomingJemaah.length} Jemaah + ${combinedStaff.length} Staff</span></div><div style="font-size:9px;margin-bottom:8px"><b>Trip:</b> ${tripName} | <b>Tarikh Cetak:</b> ${new Date().toLocaleDateString('ms-MY')} | <b>Orientasi:</b> ${orientation.toUpperCase()}</div><table style="table-layout:fixed"><colgroup><col style="width:32px"><col style="width:44%"><col style="width:110px"><col style="width:52px"><col style="width:62px"><col style="width:90px"></colgroup><tr><th>NO</th><th style="text-align:left">NAMA JEMAAH</th><th>BOARD</th><th>TRAIN</th><th>PAKEJ</th><th>INSURAN</th></tr>${namelistRows}</table></div>
+      <div class="namelist-page"><div class="header"><span>NAMELIST ${tripName}</span><span>Total: ${allRoomingJemaah.length} Jemaah + ${combinedStaff.length} Staff</span></div><div style="font-size:9px;margin-bottom:8px"><b>Trip:</b> ${tripName} | <b>Tarikh Cetak:</b> ${new Date().toLocaleDateString('ms-MY')} | <b>Orientasi:</b> ${orientation.toUpperCase()}</div><table><tr><th style="width:30px">NO</th><th>NAMA JEMAAH</th><th style="width:130px">BOARD</th><th style="width:60px">TRAIN</th><th style="width:70px">PAKEJ</th><th style="width:190px">INSURAN</th></tr>${namelistRows}</table></div>
       ${locationPages||'<div style="page-break-before:always"><div style="border:1px dashed #000;padding:20px;text-align:center">Tiada bilik untuk trip ini</div></div>'}
       <script>window.onload=function(){setTimeout(()=>window.print(),600)}; window.onafterprint=function(){window.close();}; setTimeout(()=>{try{window.close();}catch(e){}},3500);<\/script>
     </body></html>`;
