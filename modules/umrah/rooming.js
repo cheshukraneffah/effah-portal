@@ -17,7 +17,7 @@ function cleanTripNameForRooming(name){
 }
 function getJemaahName(f){ if(!f) return '-'; return f['NAMA'] || f['NAME'] || f['NAMA JEMAAH'] || f['NAMA PENUH'] || f['Name'] || '-'; }
 function generateRoomIdFromCap(cap){ return `B${parseInt(cap)||4}`; }
-function getFullboardVal(f){ return f['FULLBOARD'] || ''; }
+function getFullboardVal(f){ return f['BOARD'] || ''; }
 function getPakejVal(f){ return f['PAKEJ'] || ''; }
 function getInsuranVal(f){
   const v=f['INSURAN'];
@@ -93,7 +93,7 @@ function renderRoomingHTML(){
             <span id="headerNamaJemaah" class="bg-[#7A0C2E] text-white px-1.5 py-0.5 rounded text-[9px]">NAMA JEMAAH</span>
             <span id="sortIcon" class="text-[10px]">${roomingSortActive ? (roomingSortDir==='asc'?'↑':'↓') : '↕'}</span>
           </div>
-          <div class="col-span-2 text-center">FULLBOARD</div><div class="col-span-1 text-center">TRAIN</div><div class="col-span-3 text-center">INSURAN (TAKAFUL/ETIQA/KHAIRI)</div><div class="col-span-1 text-center">PAKEJ</div><div class="col-span-1 text-center">+</div>
+          <div class="col-span-2 text-center">BOARD</div><div class="col-span-1 text-center">TRAIN</div><div class="col-span-3 text-center">INSURAN (TAKAFUL/ETIQA/KHAIRI)</div><div class="col-span-1 text-center">PAKEJ</div><div class="col-span-1 text-center">+</div>
         </div>
         <div id="namelistContainer" class="flex-1 overflow-y-auto max-h-[42vh] divide-y divide-slate-50 bg-white min-h-[180px]"></div>
         <div class="border-t border-slate-200 bg-slate-50/50">
@@ -222,10 +222,10 @@ function renderRoomingOverview(rooms){
       const jIds=[...(r.fields['JEMAAH']||[]), ...(r.fields['JEMAAH TANPA KATIL']||[])];
       jIds.forEach(jId=>{
         const jRec=allRoomingJemaah.find(j=>j.id===jId);
-        const fb=(jRec?.fields?.['FULLBOARD']||'').toUpperCase();
-        if(!fb || fb==='-' || fb==='NO FULLBOARD') return;
-        if(locUpper==='MEKAH'){ if(fb.includes('MEKAH')||fb==='FULLBOARD') cnt++; }
-        else if(locUpper==='MADINAH'){ if(fb.includes('MADINAH')||fb==='FULLBOARD') cnt++; }
+        const fb=(jRec?.fields?.['BOARD']||'').toUpperCase();
+        if(!fb || fb==='-' || fb==='NO BOARD') return;
+        if(locUpper==='MEKAH'){ if(fb.includes('MEKAH')||fb==='BOARD') cnt++; }
+        else if(locUpper==='MADINAH'){ if(fb.includes('MADINAH')||fb==='BOARD') cnt++; }
         else cnt++;
       });
     });
@@ -233,12 +233,11 @@ function renderRoomingOverview(rooms){
   }
   let fbCount=0; const loc=activeLocation.toUpperCase();
   allRoomingJemaah.forEach(j=>{
-    const fb=(j.fields['FULLBOARD']||'').toUpperCase();
-    if(!fb || fb==='-' || fb==='NO FULLBOARD') return;
+    const fb=(j.fields['BOARD']||'').toUpperCase(); if(!fb || fb==='-' || fb==='NO BOARD') return;
     const assigned = rooms.some(r=> (r.fields['JEMAAH']||[]).includes(j.id) || (r.fields['JEMAAH TANPA KATIL']||[]).includes(j.id));
     if(!assigned) return;
-    if(loc==='MEKAH'){ if(fb.includes('MEKAH')||fb==='FULLBOARD') fbCount++; }
-    else if(loc==='MADINAH'){ if(fb.includes('MADINAH')||fb==='FULLBOARD') fbCount++; }
+    if(loc==='MEKAH'){ if(fb.includes('MEKAH')||fb==='BOARD') fbCount++; }
+    else if(loc==='MADINAH'){ if(fb.includes('MADINAH')||fb==='BOARD') fbCount++; }
     else fbCount++;
   });
   const totalBilik=rooms.length;
@@ -254,7 +253,7 @@ function renderRoomingOverview(rooms){
       const cnt=caps[cap];
       return `<span class="inline-flex items-center gap-1 bg-white/15 px-2 py-0.5 rounded-full text-[10px] mr-1 mb-1"><span>Bilik ber-${cap}</span><span class="font-bold">(${cnt})</span></span>`;
     }).join('');
-    return `<div class="flex flex-col gap-1 py-2 border-b border-white/10 last:border-0"><div class="flex items-center justify-between"><span class="font-bold text-[11px] truncate">${hotel}</span>${fbHotel?`<span class="text-[9px] bg-white/20 px-1.5 py-0.5 rounded-full">${fbHotel} FB</span>`:''}</div><div class="flex flex-wrap">${capsList}</div></div>`;
+    return `<div class="flex flex-col gap-1 py-2 border-b border-white/10 last:border-0"><div class="flex items-center justify-between"><span class="font-bold text-[11px] truncate">${hotel}</span>${fbHotel?`<span class="text-[9px] bg-white/20 px-1.5 py-0.5 rounded-full">${fbHotel} BOARD</span>`:''}</div><div class="flex flex-wrap">${capsList}</div></div>`;
   }).join('');
 
   let html=`<div class="space-y-2">
@@ -262,7 +261,7 @@ function renderRoomingOverview(rooms){
       <div class="font-bold text-[13px] tracking-widest">${activeLocation} • ${totalBilik} Bilik</div>
       <div class="flex items-center gap-1.5">
         <span class="text-[10px] bg-white/20 px-2 py-0.5 rounded-full">${totalJ} J+${totalBaby} I+${totalStaff} S</span>
-        ${fbCount?`<span class="text-[10px] bg-emerald-400/90 text-emerald-900 px-2 py-0.5 rounded-full font-bold">${fbCount} FB</span>`:''}
+        ${fbCount?`<span class="text-[10px] bg-emerald-400/90 text-emerald-900 px-2 py-0.5 rounded-full font-bold">${fbCount} BOARD</span>`:''}
       </div>
     </div>
     <div class="bg-white/10 rounded-xl p-2.5 max-h-[22vh] overflow-y-auto">
@@ -383,10 +382,10 @@ function renderNamelist(){
     const trChecked = isTrainChecked(r.fields);
     const insArr = getInsuranArray(r.fields);
     let fbCls = 'bg-white border-slate-200';
-    if(fb.includes('FULLBOARD (MEKAH)')) fbCls='bg-orange-100 border-orange-200 text-orange-800';
-    else if(fb.includes('FULLBOARD (MADINAH)')) fbCls='bg-blue-100 border-blue-200 text-blue-800';
-    else if(fb==='FULLBOARD') fbCls='bg-emerald-100 border-emerald-200 text-emerald-800';
-    else if(fb==='NO FULLBOARD') fbCls='bg-slate-100 border-slate-200 text-slate-500';
+    if(fb.includes('BOARD (MEKAH)')) fbCls='bg-orange-100 border-orange-200 text-orange-800';
+    else if(fb.includes('BOARD (MADINAH)')) fbCls='bg-blue-100 border-blue-200 text-blue-800';
+    else if(fb==='BOARD') fbCls='bg-emerald-100 border-emerald-200 text-emerald-800';
+    else if(fb==='NO BOARD') fbCls='bg-slate-100 border-slate-200 text-slate-500';
     else if(fb==='-') fbCls='bg-white border-dashed border-slate-300 text-slate-400';
 
     const insToggle = ['TAKAFUL','ETIQA','AL-KHAIRI'].map(opt=>{
@@ -405,12 +404,12 @@ function renderNamelist(){
       <div class="col-span-1 text-slate-400 text-[10px]">${String(i+1).padStart(2,'0')}</div>
       <div class="col-span-3 font-medium truncate text-[10px] ${assignedInLoc?'text-slate-500 italic':''}" title="${name}">${name}</div>
       <div class="col-span-2 flex items-center gap-0.5">
-        <select onchange="updateJemaahField('${r.id}','FULLBOARD',this.value)" class="text-[8px] border rounded-full px-1 py-0.5 bg-white font-bold ${fbCls} outline-none w-full truncate" title="FULLBOARD">
+        <select onchange="updateJemaahField('${r.id}','BOARD',this.value)" class="text-[8px] border rounded-full px-1 py-0.5 bg-white font-bold ${fbCls} outline-none w-full truncate" title="BOARD">
           <option value="" ${!fb || fb==='-'?'selected':''}>- FB</option>
-          <option value="FULLBOARD" ${fb==='FULLBOARD'?'selected':''}>FULLBOARD</option>
-          <option value="FULLBOARD (MEKAH)" ${fb==='FULLBOARD (MEKAH)'?'selected':''}>FB MEKAH</option>
-          <option value="FULLBOARD (MADINAH)" ${fb==='FULLBOARD (MADINAH)'?'selected':''}>FB MADINAH</option>
-          <option value="NO FULLBOARD" ${fb==='NO FULLBOARD'?'selected':''}>NO FB</option>
+          <option value="BOARD" ${fb==='BOARD'?'selected':''}>BOARD</option>
+          <option value="BOARD (MEKAH)" ${fb==='BOARD (MEKAH)'?'selected':''}>FB MEKAH</option>
+          <option value="BOARD (MADINAH)" ${fb==='BOARD (MADINAH)'?'selected':''}>FB MADINAH</option>
+          <option value="NO BOARD" ${fb==='NO BOARD'?'selected':''}>NO FB</option>
         </select>
       </div>
       <div class="col-span-1 text-center">
@@ -463,25 +462,25 @@ function renderRoomingGrid(){
     const jSlots=jIds.map(jId=>{ 
       const jRec=allRoomingJemaah.find(j=>j.id===jId); 
       const jName=getJemaahName(jRec?.fields);
-      const fb=(jRec?.fields?.['FULLBOARD']||'').trim();
+      const fb=(jRec?.fields?.['BOARD']||'').trim();
       const roomLoc = (f['LOKASI / CITY']||activeLocation||'').toUpperCase();
       let fbBadge='';
-      if(fb && fb!=='-' && fb.toUpperCase()!=='NO FULLBOARD'){
+      if(fb && fb!=='-' && fb.toUpperCase()!=='NO BOARD'){
         const up=fb.toUpperCase();
         // Special logic: MEKAH bilik tunjuk MEKAH je, MADINAH tunjuk MADINAH je
         if(roomLoc==='MEKAH'){
           if(up.includes('MEKAH')) fbBadge=`<span class="ml-1 px-1.5 py-0.5 bg-amber-200 text-amber-900 border border-amber-300 rounded-full text-[8px] font-bold">FB MEKAH</span>`;
-          else if(up==='FULLBOARD') fbBadge=`<span class="ml-1 px-1.5 py-0.5 bg-emerald-200 text-emerald-900 border border-emerald-300 rounded-full text-[8px] font-bold">FB</span>`;
+          else if(up==='BOARD') fbBadge=`<span class="ml-1 px-1.5 py-0.5 bg-emerald-200 text-emerald-900 border border-emerald-300 rounded-full text-[8px] font-bold">FB</span>`;
           // FB MADINAH hide kalau bilik MEKAH
         } else if(roomLoc==='MADINAH'){
           if(up.includes('MADINAH')) fbBadge=`<span class="ml-1 px-1.5 py-0.5 bg-blue-200 text-blue-900 border border-blue-300 rounded-full text-[8px] font-bold">FB MADINAH</span>`;
-          else if(up==='FULLBOARD') fbBadge=`<span class="ml-1 px-1.5 py-0.5 bg-emerald-200 text-emerald-900 border border-emerald-300 rounded-full text-[8px] font-bold">FB</span>`;
+          else if(up==='BOARD') fbBadge=`<span class="ml-1 px-1.5 py-0.5 bg-emerald-200 text-emerald-900 border border-emerald-300 rounded-full text-[8px] font-bold">FB</span>`;
           // FB MEKAH hide kalau bilik MADINAH
         } else {
           // TAIF / JEDDAH / lain - tunjuk dua2
           if(up.includes('MEKAH')) fbBadge=`<span class="ml-1 px-1.5 py-0.5 bg-amber-200 text-amber-900 border border-amber-300 rounded-full text-[8px] font-bold">FB MEKAH</span>`;
           else if(up.includes('MADINAH')) fbBadge=`<span class="ml-1 px-1.5 py-0.5 bg-blue-200 text-blue-900 border border-blue-300 rounded-full text-[8px] font-bold">FB MADINAH</span>`;
-          else if(up==='FULLBOARD') fbBadge=`<span class="ml-1 px-1.5 py-0.5 bg-emerald-200 text-emerald-900 border border-emerald-300 rounded-full text-[8px] font-bold">FB</span>`;
+          else if(up==='BOARD') fbBadge=`<span class="ml-1 px-1.5 py-0.5 bg-emerald-200 text-emerald-900 border border-emerald-300 rounded-full text-[8px] font-bold">FB</span>`;
         }
       }
       return `<div class="flex items-center justify-between px-2.5 py-2 bg-slate-100 text-slate-800 border border-slate-200 rounded-xl text-[11px]"><span class="truncate font-medium flex items-center">${jName}${fbBadge}</span><button onclick="removeJemaahFromRoom('${rec.id}','${jId}')" class="ml-2 w-4 h-4 rounded-full bg-white hover:bg-slate-200 text-[10px]">✕</button></div>`; 
@@ -776,11 +775,13 @@ function generateRoomingPrint(){
     const combinedStaff = [...new Set([...allStaffNames, ...staffInAnyRoom])];
 
     function fbPrintCell(val){
-      if(!val || val==='-' || val==='- FB') return `<span style="color:#999">-</span>`;
+      if(!val || val==='-' || val==='- FB' || val.toUpperCase()==='NO BOARD') return `<span style="color:#999">-</span>`;
       const up=val.toUpperCase(); let style='';
-      if(up.includes('MEKAH')) style='background:#FDE68A;color:#92400E;border:1px solid #92400E;font-weight:bold;padding:2px 7px;border-radius:10px;font-size:8px;';
+      if(up.includes('BB') && up.includes('MEKAH')) style='background:#FFF7ED;color:#9A3412;border:1px dashed #EA580C;font-weight:bold;padding:2px 7px;border-radius:10px;font-size:8px;'; // BB MEKAH - dashed orange
+      else if(up.includes('BB') && up.includes('MADINAH')) style='background:#EFF6FF;color:#1E40AF;border:1px dashed #3B82F6;font-weight:bold;padding:2px 7px;border-radius:10px;font-size:8px;'; // BB MADINAH - dashed blue
+      else if(up.includes('MEKAH')) style='background:#FDE68A;color:#92400E;border:1px solid #92400E;font-weight:bold;padding:2px 7px;border-radius:10px;font-size:8px;';
       else if(up.includes('MADINAH')) style='background:#BFDBFE;color:#1E40AF;border:1px solid #1E40AF;font-weight:bold;padding:2px 7px;border-radius:10px;font-size:8px;';
-      else if(up==='FULLBOARD') style='background:#BBF7D0;color:#065F46;border:1px solid #065F46;font-weight:bold;padding:2px 7px;border-radius:10px;font-size:8px;';
+      else if(up==='BOARD' || up.includes('BOARD')) style='background:#BBF7D0;color:#065F46;border:1px solid #065F46;font-weight:bold;padding:2px 7px;border-radius:10px;font-size:8px;';
       else style='background:#E5E7EB;color:#000;font-weight:bold;padding:2px 7px;border-radius:10px;font-size:8px;';
       return `<span style="${style}">${val}</span>`;
     }
@@ -815,10 +816,10 @@ function generateRoomingPrint(){
         const jIds=[...(r.fields['JEMAAH']||[]), ...(r.fields['JEMAAH TANPA KATIL']||[]), ...(r.fields['INFANT']||[])];
         jIds.forEach(jId=>{
           const jRec=allRoomingJemaah.find(j=>j.id===jId);
-          const fb=(jRec?.fields?.['FULLBOARD']||'').toUpperCase();
-          if(!fb || fb==='-' || fb==='NO FULLBOARD') return;
-          if(locUpper==='MEKAH'){ if(fb.includes('MEKAH')||fb==='FULLBOARD') cnt++; }
-          else if(locUpper==='MADINAH'){ if(fb.includes('MADINAH')||fb==='FULLBOARD') cnt++; }
+          const fb=(jRec?.fields?.['BOARD']||'').toUpperCase();
+          if(!fb || fb==='-' || fb==='NO BOARD') return; // BB now included
+          if(locUpper==='MEKAH'){ if(fb.includes('MEKAH')||fb==='BOARD') cnt++; }
+          else if(locUpper==='MADINAH'){ if(fb.includes('MADINAH')||fb==='BOARD') cnt++; }
           else cnt++;
         });
       });
@@ -841,7 +842,7 @@ function generateRoomingPrint(){
       let overviewMini = overviewTableRows.map(r=>`${r.hotel}: ${Object.keys(byHotel[r.hotel]).length? Object.keys(byHotel[r.hotel]).map(c=>`B${c}-${byHotel[r.hotel].filter(x=> (x.fields['KAPASITI']||4)==c).length}`).join(', '):''}${r.fbHotel?` (${r.fbHotel} FB)`:''}`).join(' | ');
       let overviewProfessionalHTML = `
         <table style="width:100%;border-collapse:collapse;font-size:9px;margin:0">
-          <tr style="background:#f8f8f8;font-weight:bold"><th style="border:1px solid #000;padding:3px 6px;text-align:left">HOTEL</th><th style="border:1px solid #000;padding:3px 6px;text-align:center">BILIK</th><th style="border:1px solid #000;padding:3px 6px;text-align:center">FULLBOARD</th><th style="border:1px solid #000;padding:3px 6px;text-align:center">JUMLAH</th></tr>
+          <tr style="background:#f8f8f8;font-weight:bold"><th style="border:1px solid #000;padding:3px 6px;text-align:left">HOTEL</th><th style="border:1px solid #000;padding:3px 6px;text-align:center">BILIK</th><th style="border:1px solid #000;padding:3px 6px;text-align:center">BOARD</th><th style="border:1px solid #000;padding:3px 6px;text-align:center">JUMLAH</th></tr>
           ${overviewTableRows.map(r=>`<tr><td style="border:1px solid #000;padding:3px 6px;font-weight:bold">${r.hotel}</td><td style="border:1px solid #000;padding:3px 6px;text-align:center">${r.capsDetail}</td><td style="border:1px solid #000;padding:3px 6px;text-align:center">${r.fbHotel? r.fbHotel+' FB' : '-'}</td><td style="border:1px solid #000;padding:3px 6px;text-align:center">${r.total} bilik</td></tr>`).join('')}
         </table>
       `;
@@ -857,11 +858,11 @@ function generateRoomingPrint(){
         }).filter(Boolean).join('');
         let rows=jIds.map((jId,idx)=>{
           const rec=allRoomingJemaah.find(j=>j.id===jId); const name=getJemaahName(rec?.fields); if(!name||name==='-') return '';
-          const fb=(rec?.fields?.['FULLBOARD']||'').trim(); let fbNote='';
-          if(fb && fb!=='NO FULLBOARD' && fb!=='-'){
+          const fb=(rec?.fields?.['BOARD']||'').trim(); let fbNote='';
+          if(fb && fb!=='NO BOARD' && fb!=='-'){
             const up=fb.toUpperCase();
-            if(roomLocPrint==='MEKAH'){ if(up.includes('MEKAH')) fbNote=` <span style="background:#FDE68A;border:1px solid #92400E;padding:0 4px;border-radius:8px;font-size:7px;font-weight:bold;">FB MEKAH</span>`; else if(up==='FULLBOARD') fbNote=` <span style="background:#6EE7B7;border:1px solid #064E3B;padding:0 4px;border-radius:8px;font-size:7px;font-weight:bold;">FB</span>`; }
-            else if(roomLocPrint==='MADINAH'){ if(up.includes('MADINAH')) fbNote=` <span style="background:#BFDBFE;border:1px solid #1E40AF;padding:0 4px;border-radius:8px;font-size:7px;font-weight:bold;">FB MADINAH</span>`; else if(up==='FULLBOARD') fbNote=` <span style="background:#6EE7B7;border:1px solid #064E3B;padding:0 4px;border-radius:8px;font-size:7px;font-weight:bold;">FB</span>`; }
+            if(roomLocPrint==='MEKAH'){ if(up.includes('MEKAH')) fbNote=` <span style="background:#FDE68A;border:1px solid #92400E;padding:0 4px;border-radius:8px;font-size:7px;font-weight:bold;">FB MEKAH</span>`; else if(up==='BOARD') fbNote=` <span style="background:#6EE7B7;border:1px solid #064E3B;padding:0 4px;border-radius:8px;font-size:7px;font-weight:bold;">FB</span>`; }
+            else if(roomLocPrint==='MADINAH'){ if(up.includes('MADINAH')) fbNote=` <span style="background:#BFDBFE;border:1px solid #1E40AF;padding:0 4px;border-radius:8px;font-size:7px;font-weight:bold;">FB MADINAH</span>`; else if(up==='BOARD') fbNote=` <span style="background:#6EE7B7;border:1px solid #064E3B;padding:0 4px;border-radius:8px;font-size:7px;font-weight:bold;">FB</span>`; }
             else { if(up.includes('MEKAH')) fbNote=` <span style="background:#FDE68A;border:1px solid #92400E;padding:0 4px;border-radius:8px;font-size:7px;font-weight:bold;">FB MEKAH</span>`; else if(up.includes('MADINAH')) fbNote=` <span style="background:#BFDBFE;border:1px solid #1E40AF;padding:0 4px;border-radius:8px;font-size:7px;font-weight:bold;">FB MADINAH</span>`; else if(fb) fbNote=` <span style="background:#6EE7B7;border:1px solid #064E3B;padding:0 4px;border-radius:8px;font-size:7px;font-weight:bold;">FB</span>`; }
           }
           return `<div>${idx+1}. ${name}${fbNote}</div>`;
@@ -879,14 +880,14 @@ function generateRoomingPrint(){
         jIds.forEach(jId=>{
           const jRec=allRoomingJemaah.find(j=>j.id===jId);
           if(!jRec) return;
-          const fb=(jRec.fields['FULLBOARD']||'').toUpperCase().trim();
-          if(!fb || fb==='-' || fb==='NO FULLBOARD') return;
+          const fb=(jRec.fields['BOARD']||'').toUpperCase().trim();
+          if(!fb || fb==='-' || fb==='NO BOARD') return; // BB now included in BOARD list
           let match=false;
-          if(loc.toUpperCase()==='MEKAH'){ if(fb.includes('MEKAH')||fb==='FULLBOARD') match=true; }
-          else if(loc.toUpperCase()==='MADINAH'){ if(fb.includes('MADINAH')||fb==='FULLBOARD') match=true; }
+          if(loc.toUpperCase()==='MEKAH'){ if(fb.includes('MEKAH')||fb==='BOARD') match=true; }
+          else if(loc.toUpperCase()==='MADINAH'){ if(fb.includes('MADINAH')||fb==='BOARD') match=true; }
           else match=true;
           if(match){
-            fbListForLoc.push({name:getJemaahName(jRec.fields), fbRaw:jRec.fields['FULLBOARD']||'FULLBOARD', hotel: r.fields['HOTEL NAME']||'TANPA HOTEL', room: r.fields['Room ID / Nama Bilik']||''});
+            fbListForLoc.push({name:getJemaahName(jRec.fields), fbRaw:jRec.fields['BOARD']||'BOARD', hotel: r.fields['HOTEL NAME']||'TANPA HOTEL', room: r.fields['Room ID / Nama Bilik']||''});
           }
         });
       });
@@ -899,8 +900,8 @@ function generateRoomingPrint(){
         fbTableHTML = `
           <div style="margin-top:14px;border:1px solid #000;break-inside:avoid">
             <div style="background:#065F46;color:#fff;padding:5px 8px;font-weight:bold;font-size:10px;display:flex;justify-content:space-between">
-              <span>${loc} - SENARAI FULLBOARD (${fbListForLoc.length} orang) - Sorted ikut Hotel</span>
-              <span style="background:#fff;color:#065F46;padding:1px 6px;border-radius:10px;font-size:9px">${fbListForLoc.length} FB</span>
+              <span>${loc} - SENARAI PAKEJ MAKAN (${fbListForLoc.length} orang) - Sorted ikut Hotel</span>
+              <span style="background:#fff;color:#065F46;padding:1px 6px;border-radius:10px;font-size:9px">${fbListForLoc.length} BOARD</span>
             </div>
             ${Object.keys(grouped).sort().map(hotelName=>`
               <div style="border-bottom:1px solid #000">
@@ -921,7 +922,7 @@ function generateRoomingPrint(){
           </div>
         `;
       } else {
-        fbTableHTML = `<div style="margin-top:12px;border:1px dashed #000;padding:8px;text-align:center;font-size:9px;color:#666">Tiada jemaah Fullboard di ${loc}</div>`;
+        fbTableHTML = `<div style="margin-top:12px;border:1px dashed #000;padding:8px;text-align:center;font-size:9px;color:#666">Tiada jemaah Pakej Makan di ${loc}</div>`;
       }
 
       locationPages+=`<div style="page-break-before:always">
@@ -935,7 +936,7 @@ function generateRoomingPrint(){
           <div style="background:#f5f5f5;padding:5px 8px;font-size:9px;border-top:1px solid #000;display:flex;justify-content:space-between">
             <span><b>Total:</b> ${rooms.length} bilik</span>
             <span>${totalJemaahLoc} jemaah${totalBabyLoc?` + ${totalBabyLoc} infant`:''} + ${totalStaffLoc} staff</span>
-            <span style="font-weight:bold">${fbTotalLoc? fbTotalLoc+' FULLBOARD' : '0 FULLBOARD'}</span>
+            <span style="font-weight:bold">${fbTotalLoc? fbTotalLoc+' BOARD' : '0 PAKEJ MAKAN'}</span>
           </div>
         </div>
         <div style="columns:2; column-gap:12px">${roomBlocks}</div>
@@ -944,7 +945,7 @@ function generateRoomingPrint(){
     });
 
     const html=`<html><head><title>Rooming ${tripName}</title><style>body{font-family:Arial,Helvetica,sans-serif;font-size:10px;margin:12px;color:#000}table{border-collapse:collapse;width:100%}th,td{border:1px solid #000;padding:4px 6px;font-size:9px}th{background:#7A0C2E;color:#fff;font-weight:bold;text-transform:uppercase}.header{display:flex;justify-content:space-between;font-weight:bold;font-size:12px;border-bottom:2px solid #000;padding-bottom:6px;margin-bottom:8px}.page-break{page-break-before:always}.namelist-page{max-width:900px;margin:0 auto}.location-page{max-width:100%}@media print{@page{size:A4 landscape;margin:10mm}body{-webkit-print-color-adjust:exact;print-color-adjust:exact}.page-break{page-break-before:always}}</style></head><body>
-      <div class="namelist-page"><div class="header"><span>NAMELIST ${tripName}</span><span>Total: ${allRoomingJemaah.length} Jemaah + ${combinedStaff.length} Staff</span></div><div style="font-size:9px;margin-bottom:8px"><b>Trip:</b> ${tripName} | <b>Tarikh Cetak:</b> ${new Date().toLocaleDateString('ms-MY')}</div><table><tr><th style="width:30px">NO</th><th>NAMA JEMAAH</th><th style="width:130px">FULLBOARD</th><th style="width:60px">TRAIN</th><th style="width:70px">PAKEJ</th><th style="width:190px">INSURAN</th></tr>${namelistRows}</table></div>
+      <div class="namelist-page"><div class="header"><span>NAMELIST ${tripName}</span><span>Total: ${allRoomingJemaah.length} Jemaah + ${combinedStaff.length} Staff</span></div><div style="font-size:9px;margin-bottom:8px"><b>Trip:</b> ${tripName} | <b>Tarikh Cetak:</b> ${new Date().toLocaleDateString('ms-MY')}</div><table><tr><th style="width:30px">NO</th><th>NAMA JEMAAH</th><th style="width:130px">BOARD</th><th style="width:60px">TRAIN</th><th style="width:70px">PAKEJ</th><th style="width:190px">INSURAN</th></tr>${namelistRows}</table></div>
       ${locationPages||'<div style="page-break-before:always"><div style="border:1px dashed #000;padding:20px;text-align:center">Tiada bilik untuk trip ini</div></div>'}
       <script>window.onload=function(){setTimeout(()=>window.print(),600)}; window.onafterprint=function(){window.close();}; setTimeout(()=>{try{window.close();}catch(e){}},2500);<\/script>
     </body></html>`;
