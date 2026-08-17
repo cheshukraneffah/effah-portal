@@ -1145,6 +1145,12 @@ function generateRoomingPrint(orientation){ orientation = orientation || 'landsc
       }).join(' ') : '-';
       return `<tr><td style="border:1px solid #ddd;padding:3px 6px;text-align:center">${i+1}</td><td style="border:1px solid #ddd;padding:3px 6px;font-weight:600">${name}</td><td style="border:1px solid #ddd;padding:3px 6px;text-align:center">${fbBadge}</td><td style="border:1px solid #ddd;padding:3px 6px;text-align:center">${train}</td><td style="border:1px solid #ddd;padding:3px 6px;text-align:center">${pakej}</td><td style="border:1px solid #ddd;padding:3px 6px;text-align:center">${insHtml}</td></tr>`;
     }).join('');
+    // --- STAFF IN NAMELIST (S1, S2...) ---
+    const allStaffForPrint = [];
+    if(typeof staffList!=='undefined') staffList.forEach(s=>{ if(s.name && !allStaffForPrint.includes(s.name)) allStaffForPrint.push(s.name); });
+    if(typeof allRoomingRecords!=='undefined') allRoomingRecords.forEach(r=>{ (r.fields['STAFF / EXTRA']||'').split(',').filter(Boolean).forEach(sn=>{ const c=sn.trim(); if(c && !allStaffForPrint.includes(c)) allStaffForPrint.push(c); }); });
+    if(typeof combinedStaff!=='undefined') combinedStaff.forEach(n=>{ const c=(typeof n==='string'?n:n.name||'').trim(); if(c && !allStaffForPrint.includes(c)) allStaffForPrint.push(c); });
+    allStaffForPrint.forEach((sName, sIdx)=>{ const cleanName=sName.replace(/\(EFFAH\)/i,'').trim(); if(!cleanName) return; namelistRows+=`<tr><td style="border:1px solid #ddd;padding:3px 6px;text-align:center">S${sIdx+1}</td><td style="border:1px solid #ddd;padding:3px 6px;font-weight:600">${cleanName} (EFFAH)</td><td style="border:1px solid #ddd;padding:3px 6px;text-align:center"><span style="color:#999">-</span></td><td style="border:1px solid #ddd;padding:3px 6px;text-align:center"><span style="color:#999">-</span></td><td style="border:1px solid #ddd;padding:3px 6px;text-align:center"><span style="color:#999">-</span></td><td style="border:1px solid #ddd;padding:3px 6px;text-align:center"><span style="color:#999">-</span></td></tr>`; });
 
     let locationPages = '';
     allLocations.forEach(loc=>{
@@ -1301,7 +1307,7 @@ function generateRoomingPrint(orientation){ orientation = orientation || 'landsc
         fbTableHTML = `
           <div style="margin-top:10px;border:1px solid #000">
             <div style="background:#064E3B;color:#fff;padding:4px 8px;font-weight:bold;font-size:9px;display:flex;justify-content:space-between">
-              <span>${loc} - SENARAI PAKEJ MAKAN (${fbListForLoc.length} orang)</span>
+              <span>${loc} - SENARAI PAKEJ MAKAN</span>
               <span style="background:#fff;color:#065F46;padding:1px 6px;border-radius:10px;font-size:9px">${fbListForLoc.length} Jemaah</span>
             </div>
             ${Object.keys(grouped).sort().map(hotelName=>`
