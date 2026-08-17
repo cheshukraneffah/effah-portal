@@ -147,14 +147,44 @@ async function assignStaffToRoom(staffId,roomId){
     });
     let data = await res.json();
     if(data.error){
-      fieldName = 'ROOM';
-      await fetch(`https://api.airtable.com/v0/${base}/STAFF%20LIST%20%28ROOMING%29/${staff.airtableId}`,{
-        method:'PATCH',
-        headers:{'Authorization':`Bearer ${pat}`,'Content-Type':'application/json'},
-        body: JSON.stringify({fields:{[fieldName]: staff.roomIds}})
-      });
+      console.error('ROOMING LIST link error 422 details:', data.error);
+      // If 422, try to link rooms one by one to see which fails, keep at least first
+      // Airtable sometimes rejects if field is still single-link - try overwrite with full array again after clearing
+      if(data.error.type==='INVALID_VALUE_FOR_COLUMN' || data.error.message?.includes('422')){
+        // Attempt to clear then set
+        await fetch(`https://api.airtable.com/v0/${base}/STAFF%20LIST%20%28ROOMING%29/${staff.airtableId}`,{
+          method:'PATCH',
+          headers:{'Authorization':`Bearer ${pat}`,'Content-Type':'application/json'},
+          body: JSON.stringify({fields:{[fieldName]: []}})
+        });
+        await new Promise(r=>setTimeout(r,300));
+        res = await fetch(`https://api.airtable.com/v0/${base}/STAFF%20LIST%20%28ROOMING%29/${staff.airtableId}`,{
+          method:'PATCH',
+          headers:{'Authorization':`Bearer ${pat}`,'Content-Type':'application/json'},
+          body: JSON.stringify({fields:{[fieldName]: staff.roomIds}})
+        });
+        data = await res.json();
+        if(data.error){
+          console.error('Still fails after clear:', data.error);
+          // fallback to ROOM field
+          fieldName = 'ROOM';
+          await fetch(`https://api.airtable.com/v0/${base}/STAFF%20LIST%20%28ROOMING%29/${staff.airtableId}`,{
+            method:'PATCH',
+            headers:{'Authorization':`Bearer ${pat}`,'Content-Type':'application/json'},
+            body: JSON.stringify({fields:{[fieldName]: staff.roomIds}})
+          });
+        }
+      } else {
+        fieldName = 'ROOM';
+        await fetch(`https://api.airtable.com/v0/${base}/STAFF%20LIST%20%28ROOMING%29/${staff.airtableId}`,{
+          method:'PATCH',
+          headers:{'Authorization':`Bearer ${pat}`,'Content-Type':'application/json'},
+          body: JSON.stringify({fields:{[fieldName]: staff.roomIds}})
+        });
+      }
     }
   }catch(e){ console.error('assignStaffToRoom link failed', e); }
+
 }
 async function removeStaffFromRoom(roomId, staffId){
   const staff=staffList.find(s=>s.id===staffId||s.airtableId===staffId); if(!staff) return;
@@ -1153,7 +1183,7 @@ function generateRoomingPrint(orientation){ orientation = orientation || 'landsc
     if(typeof staffList!=='undefined') staffList.forEach(s=>{ if(s.name && !allStaffForPrint.includes(s.name)){ allStaffForPrint.push(s.name); staffMap[s.name]=s; } });
     if(typeof allRoomingRecords!=='undefined') allRoomingRecords.forEach(r=>{ (r.fields['STAFF / EXTRA']||'').split(',').filter(Boolean).forEach(sn=>{ const c=sn.trim(); if(c && !allStaffForPrint.includes(c)){ allStaffForPrint.push(c); if(!staffMap[c]) staffMap[c]={name:c, board:'', train:false}; } }); });
     if(typeof combinedStaff!=='undefined') combinedStaff.forEach(n=>{ const c=(typeof n==='string'?n:n.name||'').trim(); if(c && !allStaffForPrint.includes(c)){ allStaffForPrint.push(c); staffMap[c]= (typeof n==='object'?n:{name:c}); } });
-    allStaffForPrint.forEach((sName, sIdx)=>{ const sObj = staffMap[sName]||{name:sName}; const cleanName=sName.replace(/\(EFFAH\)/i,'').trim(); if(!cleanName) return; const sBoard = (sObj.fields?.['BOARD']||sObj.board||sObj.BOARD||'').toString().toUpperCase(); const sBoardRaw = sObj.fields?.['BOARD']||sObj.board||''; let sBoardBadge='-'; if(sBoardRaw){ const up=sBoardRaw.toUpperCase(); if(up.includes('FULLBOARD')||up.includes('BB')||up.includes('BOARD')){ sBoardBadge=`<span style="background:#BBF7D0;border:1px solid #065F46;padding:1px 6px;border-radius:10px;font-weight:bold;font-size:8px">${sBoardRaw}</span>`; } else sBoardBadge=sBoardRaw; } const sTrain = sObj.fields ? isTrainChecked(sObj.fields) : (sObj.train||sObj.TRAIN||false); const sTrainBadge = sTrain ? '<span style="background:#FEF3C7;padding:1px 6px;border-radius:10px;font-size:8px">TRAIN</span>' : '-'; namelistRows+=`<tr style="background:#FDF2F4"><td style="border:1px solid #ddd;padding:3px 6px;text-align:center;background:#F9D5D9;font-weight:bold;color:#7A0C2E">S${sIdx+1}</td><td style="border:1px solid #ddd;padding:3px 6px;font-weight:700;background:#FDF2F4;color:#7A0C2E">${cleanName} (EFFAH)</td><td style="border:1px solid #ddd;padding:3px 6px;text-align:center;background:#FDF2F4">${sBoardBadge}</td><td style="border:1px solid #ddd;padding:3px 6px;text-align:center;background:#FDF2F4">${sTrainBadge}</td><td style="border:1px solid #ddd;padding:3px 6px;text-align:center;background:#FDF2F4"><span style="color:#999">-</span></td><td style="border:1px solid #ddd;padding:3px 6px;text-align:center;background:#FDF2F4"><span style="color:#999">-</span></td></tr>`; });
+    allStaffForPrint.forEach((sName, sIdx)=>{ const sObj = staffMap[sName]||{name:sName}; const cleanName=sName.replace(/\(EFFAH\)/i,'').trim(); if(!cleanName) return; const sBoardRaw = sObj.boardBasis||sObj.fields?.['BOARD']||sObj.board||''; const sBoard = sBoardRaw.toString().toUpperCase(); let sBoardBadge='-'; if(sBoardRaw){ const up=sBoardRaw.toString().toUpperCase(); if(up.includes('FULLBOARD')||up.includes('BB')||up.includes('BOARD')){ sBoardBadge=`<span style="background:#BBF7D0;border:1px solid #065F46;padding:1px 6px;border-radius:10px;font-weight:bold;font-size:8px">${sBoardRaw}</span>`; } else sBoardBadge=sBoardRaw; } const sTrain = sObj.train||sObj.fields?.TRAIN||false; const sTrainBadge = sTrain ? '<span style="background:#FEF3C7;padding:1px 6px;border-radius:10px;font-size:8px">TRAIN</span>' : '-'; namelistRows+=`<tr style="background:#FDF2F4"><td style="border:1px solid #ddd;padding:3px 6px;text-align:center;background:#F9D5D9;font-weight:bold;color:#7A0C2E">S${sIdx+1}</td><td style="border:1px solid #ddd;padding:3px 6px;font-weight:700;background:#FDF2F4;color:#7A0C2E">${cleanName} (EFFAH)</td><td style="border:1px solid #ddd;padding:3px 6px;text-align:center;background:#FDF2F4">${sBoardBadge}</td><td style="border:1px solid #ddd;padding:3px 6px;text-align:center;background:#FDF2F4">${sTrainBadge}</td><td style="border:1px solid #ddd;padding:3px 6px;text-align:center;background:#FDF2F4"><span style="color:#999">-</span></td><td style="border:1px solid #ddd;padding:3px 6px;text-align:center;background:#FDF2F4"><span style="color:#999">-</span></td></tr>`; });
 
     let locationPages = '';
     allLocations.forEach(loc=>{
@@ -1164,7 +1194,7 @@ function generateRoomingPrint(orientation){ orientation = orientation || 'landsc
       
       // FIXED LOGIC: Determine board makan per location - INCLUDING STAFF
       function isStaffBoardMatch(sObj, locUpper){
-        const fbRaw = (sObj.fields?.['BOARD']||sObj.board||'').toString().trim();
+        const fbRaw = (sObj.boardBasis||sObj.fields?.['BOARD']||sObj.board||'').toString().trim();
         if(!fbRaw) return false;
         const up=fbRaw.toUpperCase();
         if(up==='-'||up==='NO BOARD') return false;
@@ -1203,7 +1233,7 @@ function generateRoomingPrint(orientation){ orientation = orientation || 'landsc
       // Add STAFF with FULLBOARD in this location
       const staffFB = staffList.filter(s=> isStaffBoardMatch(s, loc.toUpperCase()) && s.roomIds && s.roomIds.some(rid=> rooms.some(r=>r.id===rid)));
       // Convert staff to same shape as jemaah for grouping
-      staffFB.forEach(s=>{ fbListForLoc.push({ id:s.id, fields:{'NAMA JEMAAH':s.name, 'BOARD': s.fields?.['BOARD']||s.board||'FULLBOARD', 'IS_STAFF':true, 'STAFF_OBJ':s}, _isStaff:true }); });
+      staffFB.forEach(s=>{ fbListForLoc.push({ id:s.id, fields:{'NAMA JEMAAH':s.name, 'BOARD': s.boardBasis||s.fields?.['BOARD']||s.board||'FULLBOARD', 'IS_STAFF':true, 'STAFF_OBJ':s}, _isStaff:true, boardBasis:s.boardBasis }); });
 
       // Staff linked to rooms in this location
       const staffInLoc = staffList.filter(s=> s.roomIds && s.roomIds.some(rid=> rooms.some(r=>r.id===rid)));
