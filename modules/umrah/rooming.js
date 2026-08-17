@@ -6,6 +6,155 @@ let activeLocation = localStorage.getItem('effah_active_location') || 'MEKAH';
 let roomingDefaultCap = 4;
 let customLocations = JSON.parse(localStorage.getItem('effah_custom_locations')||'[]');
 let staffList = [];
+
+let staffIdCounter = parseInt(localStorage.getItem('effah_staff_counter')||'1000');
+function getStaffStorageKey(){ return `effah_staff_list_${activeLocation}_${window.selectedTripRecord?.id||localStorage.getItem('effah_active_trip_id')||'default'}`; }
+function saveStaffList(){ try{ localStorage.setItem(getStaffStorageKey(), JSON.stringify(staffList)); localStorage.setItem('effah_staff_board_'+activeLocation, JSON.stringify(staffList)); }catch(e){} }
+
+async function loadStaffList(){
+  try{
+    const base=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base')||localStorage.getItem('effah_base_id');
+    const pat=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
+    const tripId=window.selectedTripRecord?.id||localStorage.getItem('effah_active_trip_id')||localStorage.getItem('selectedTripId')||'';
+    if(!base||!pat){ staffList=JSON.parse(localStorage.getItem(getStaffStorageKey())||'[]'); renderStaffList(); return; }
+    let allStaff=[],offset='';
+    do{
+      const res=await fetch(`https://api.airtable.com/v0/${base}/STAFF%20LIST%20%28ROOMING%29?pageSize=100${offset?`&offset=${offset}`:''}`,{headers:{Authorization:`Bearer ${pat}`}});
+      const data=await res.json();
+      if(data.records) allStaff=allStaff.concat(data.records);
+      offset=data.offset||'';
+    }while(offset);
+    let filtered=allStaff;
+    if(tripId){
+      filtered=allStaff.filter(r=>{
+        const tf=r.fields['TRIP']||[];
+        if(Array.isArray(tf)) return tf.includes(tripId);
+        return String(tf).includes(tripId);
+      });
+    }
+    staffList=filtered.map(r=>({
+      id:r.id,
+      airtableId:r.id,
+      name:r.fields['NAME']||'',
+      boardBasis:r.fields['BOARD BASIS']||'',
+      train:!!r.fields['TRAIN'],
+      sortNumber:r.fields['SORT NUMBER']||9999,
+      trip:r.fields['TRIP']||[]
+    }));
+    staffList.sort((a,b)=>(a.sortNumber||9999)-(b.sortNumber||9999));
+    if(staffList.length===0){
+      const local=JSON.parse(localStorage.getItem(getStaffStorageKey())||'[]');
+      if(local.length>0) staffList=local;
+    }
+    renderStaffList();
+  }catch(e){
+    console.error('loadStaffList Airtable failed', e);
+    staffList=JSON.parse(localStorage.getItem(getStaffStorageKey())||'[]');
+    renderStaffList();
+  }
+}
+
+async function addNewStaff(){
+  const input=document.getElementById('newStaffInput'); if(!input) return;
+  let name=input.value.trim().toUpperCase();
+  if(!name){ alert('Sila masukkan nama staff.'); return; }
+  if(!name.includes('(')) name=`${name} (EFFAH)`;
+  const base=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base')||localStorage.getItem('effah_base_id');
+  const pat=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
+  const tripId=window.selectedTripRecord?.id||localStorage.getItem('effah_active_trip_id')||'';
+  try{
+    if(base&&pat){
+      const res=await fetch(`https://api.airtable.com/v0/${base}/STAFF%20LIST%20%28ROOMING%29`,{
+        method:'POST',
+        headers:{'Authorization':`Bearer ${pat}`,'Content-Type':'application/json'},
+        body: JSON.stringify({fields:{'NAME': name, 'BOARD BASIS':'', 'TRAIN': false, 'TRIP': tripId?[tripId]:[], 'SORT NUMBER': staffList.length+1}})
+      });
+      const data=await res.json();
+      if(data.id){
+        staffList.push({id:data.id, airtableId:data.id, name, boardBasis:'', train:false, sortNumber:staffList.length+1, trip:tripId?[tripId]:[]});
+        saveStaffList(); renderStaffList(); input.value=''; return;
+      }
+    }
+  }catch(e){ console.error('Add staff Airtable failed', e); }
+  const id=`staff_${Date.now()}_${++staffIdCounter}`;
+  staffList.push({id, name, boardBasis:'', train:false, sortNumber:staffList.length+1});
+  saveStaffList(); renderStaffList(); input.value='';
+}
+
+async function updateStaffField(staffId, field, value){
+  const s=staffList.find(x=>x.id===staffId||x.airtableId===staffId); if(!s) return;
+  if(field==='boardBasis') s.boardBasis=value; else s[field]=value;
+  saveStaffList(); renderStaffList();
+  const base=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base')||localStorage.getItem('effah_base_id');
+  const pat=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
+  if(!base||!pat||!s.airtableId) return;
+  try{
+    const airtableField = field==='boardBasis' ? 'BOARD BASIS' : field.toUpperCase();
+    await fetch(`https://api.airtable.com/v0/${base}/STAFF%20LIST%20%28ROOMING%29/${s.airtableId}`,{
+      method:'PATCH',
+      headers:{'Authorization':`Bearer ${pat}`,'Content-Type':'application/json'},
+      body: JSON.stringify({fields:{[airtableField]: value}})
+    });
+  }catch(e){ console.error('updateStaffField failed', e); }
+}
+
+async function updateStaffTrain(staffId, checked){
+  const s=staffList.find(x=>x.id===staffId||x.airtableId===staffId); if(!s) return;
+  s.train=checked; saveStaffList(); renderStaffList();
+  const base=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base')||localStorage.getItem('effah_base_id');
+  const pat=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
+  if(!base||!pat||!s.airtableId) return;
+  try{
+    await fetch(`https://api.airtable.com/v0/${base}/STAFF%20LIST%20%28ROOMING%29/${s.airtableId}`,{
+      method:'PATCH',
+      headers:{'Authorization':`Bearer ${pat}`,'Content-Type':'application/json'},
+      body: JSON.stringify({fields:{'TRAIN': checked}})
+    });
+  }catch(e){ console.error('updateStaffTrain failed', e); }
+}
+
+async function deleteStaff(staffId){
+  const s=staffList.find(x=>x.id===staffId||x.airtableId===staffId);
+  const base=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base')||localStorage.getItem('effah_base_id');
+  const pat=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
+  if(base&&pat&&s?.airtableId){
+    try{ await fetch(`https://api.airtable.com/v0/${base}/STAFF%20LIST%20%28ROOMING%29/${s.airtableId}`,{method:'DELETE', headers:{'Authorization':`Bearer ${pat}`}}); }catch(e){ console.error(e); }
+  }
+  staffList=staffList.filter(x=>x.id!==staffId&&x.airtableId!==staffId);
+  saveStaffList(); renderStaffList();
+}
+
+function renderStaffList(){
+  const cont=document.getElementById('staffListContainer'); const badge=document.getElementById('staffTotalBadge'); if(!cont) return; if(badge) badge.textContent=staffList.length+' Staff';
+  if(staffList.length===0){ cont.innerHTML='<div class="p-2.5 text-center text-[11px] text-slate-400">Tiada staff / extra</div>'; return; }
+  cont.innerHTML=staffList.map((s,idx)=>{
+    const assignedInLoc=isStaffAssignedInLocation(s.id, activeLocation); 
+    const cls=assignedInLoc?'opacity-50 bg-slate-50':'bg-white hover:bg-slate-50 cursor-grab'; const drag=assignedInLoc?'':`draggable="true" ondragstart="dragStaff(event,'${s.id}')" ondragend="dragStaffEnd(event)"`;
+    const boardVal=s.boardBasis||'';
+    let boardCls='bg-white border-slate-200';
+    if(boardVal==='FULLBOARD (MEKAH)' || boardVal==='BB (MEKAH)') boardCls='bg-orange-100 border-orange-200 text-orange-800';
+    else if(boardVal==='FULLBOARD (MADINAH)' || boardVal==='BB (MADINAH)') boardCls='bg-blue-100 border-blue-200 text-blue-800';
+    else if(boardVal==='FULLBOARD') boardCls='bg-emerald-100 border-emerald-200 text-emerald-800';
+    return `<div ${drag} class="flex flex-col gap-1 px-2.5 py-2 rounded-xl border text-[11px] ${cls}">
+      <div class="flex items-center justify-between">
+        <div class="flex gap-2 items-center"><span class="text-slate-400 text-[10px]">${String(idx+1).padStart(2,'0')}</span><span class="font-medium truncate max-w-[120px]">${s.name}</span>${assignedInLoc?'<span class="ml-1 px-1 py-0.5 bg-slate-200 rounded text-[8px]">ASSIGNED di '+activeLocation+'</span>':''}</div>
+        <div class="flex gap-1"><button onclick="quickAssignStaff('${s.id}')" class="w-5 h-5 rounded-full border ${assignedInLoc?'opacity-30':'hover:bg-[#7A0C2E] hover:text-white'} text-[10px]">+</button><button onclick="deleteStaff('${s.id}')" class="w-5 h-5 rounded-full border hover:bg-red-50 text-[10px]"><i class="fa-solid fa-trash text-[9px]"></i></button></div>
+      </div>
+      <div class="flex items-center gap-1">
+        <select onchange="updateStaffField('${s.id}','boardBasis',this.value)" class="text-[8px] border rounded-full px-1.5 py-0.5 font-bold ${boardCls} outline-none flex-1">
+          <option value="" ${!boardVal?'selected':''}>- BOARD</option>
+          <option value="FULLBOARD" ${boardVal==='FULLBOARD'?'selected':''}>FULLBOARD</option>
+          <option value="FULLBOARD (MEKAH)" ${boardVal==='FULLBOARD (MEKAH)'?'selected':''}>FULLBOARD (MEKAH)</option>
+          <option value="FULLBOARD (MADINAH)" ${boardVal==='FULLBOARD (MADINAH)'?'selected':''}>FULLBOARD (MADINAH)</option>
+          <option value="BB (MEKAH)" ${boardVal==='BB (MEKAH)'?'selected':''}>BB (MEKAH)</option>
+          <option value="BB (MADINAH)" ${boardVal==='BB (MADINAH)'?'selected':''}>BB (MADINAH)</option>
+        </select>
+        <label class="flex items-center gap-1 text-[8px] border rounded-full px-1.5 py-0.5 bg-white cursor-pointer"><input type="checkbox" ${s.train?'checked':''} onchange="updateStaffTrain('${s.id}',this.checked)" class="w-3 h-3"> TRAIN</label>
+      </div>
+    </div>`;
+  }).join('');
+}
+
 let staffIdCounter = parseInt(localStorage.getItem('effah_staff_counter')||'1000');
 let roomingSortDir = localStorage.getItem('effah_rooming_sort_dir') || 'asc';
 let roomingSortActive = localStorage.getItem('effah_rooming_sort_active') === 'true' ? true : false;
@@ -226,7 +375,6 @@ async function dropRoomReorder(e, targetRoomId){
     }catch(err){ console.error('Sort update failed', rec.id, err); }
   }
 }
-function getRoomOrderedList(rooms){ return [...rooms].sort((a,b)=> (a.fields['SORT ORDER']||9999)-(b.fields['SORT ORDER']||9999)); }
 async function updateRoomCatatan(roomId, value){
   const rec=allRoomingRecords.find(r=>r.id===roomId);
   if(!rec) return;
@@ -327,7 +475,7 @@ function renderLocationTabs(){
   html+=`<button onclick="openAddLocationModal()" class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-slate-100 border border-slate-200 text-slate-600 hover:bg-slate-200">+ Lokasi</button>`;
   container.innerHTML=html;
 }
-async function fetchRoomingData(){
+async async function fetchRoomingData(){
   try{
     showRoomingLoading(); populateRoomingTripDropdown();
     const tripId=window.selectedTripRecord?.id||localStorage.getItem('effah_active_trip_id')||localStorage.getItem('effah_last_selected_trip')||localStorage.getItem('selectedTripId');
@@ -760,14 +908,7 @@ async function executeCopyRooms(){
   if(created>0) alert(`Berjaya menyalin ${created} bilik dari ${src} ke ${activeLocation} (${modeText}).` + (failed>0?` ${failed} bilik gagal disalin.`:''));
   else alert('Gagal menyalin bilik. Sila cuba semula.');
 }
-function getStaffStorageKey(){ return `effah_staff_list_${localStorage.getItem('effah_active_trip_id')||'default'}`; }
-function loadStaffList(){ staffList=JSON.parse(localStorage.getItem(getStaffStorageKey())||'[]'); renderStaffList(); }
-function saveStaffList(){ localStorage.setItem(getStaffStorageKey(),JSON.stringify(staffList)); }
-function addNewStaff(){ const input=document.getElementById('newStaffInput'); if(!input) return; let name=input.value.trim().toUpperCase(); if(!name) { alert('Sila masukkan nama staff.'); return; } if(!name.includes('(')) name=`${name} (EFFAH)`; const id=`staff_${Date.now()}_${++staffIdCounter}`; staffList.push({id, name, boardBasis:'', train:false}); saveStaffList(); renderStaffList(); input.value=''; }
-function updateStaffField(staffId, field, value){ const s=staffList.find(x=>x.id===staffId); if(!s) return; s[field]=value; saveStaffList(); renderStaffList(); }
-function updateStaffTrain(staffId, checked){ const s=staffList.find(x=>x.id===staffId); if(!s) return; s.train=checked; saveStaffList(); renderStaffList(); }
 
-function deleteStaff(staffId){ if(!confirm('Adakah anda pasti ingin memadamkan staff ini?')) return; staffList=staffList.filter(s=>s.id!==staffId); saveStaffList(); renderStaffList(); renderNamelist(); }
 function dragStaff(e,staffId){ if(isStaffAssignedInLocation(staffId, activeLocation)) return; e.dataTransfer.effectAllowed='move'; e.dataTransfer.setData('text/staff-id',staffId); e.dataTransfer.setData('text/plain',staffId); const row=e.currentTarget; if(row) setTimeout(()=>row.style.opacity='0.3',0); }
 function dragStaffEnd(e){ e.currentTarget.style.opacity='1'; }
 function quickAssignStaff(staffId){ if(isStaffAssignedInLocation(staffId, activeLocation)) return; const rooms=allRoomingRecords.filter(r=>(r.fields['LOKASI / CITY']||'MEKAH').toUpperCase()===activeLocation); const target=rooms.find(r=>{ const j=r.fields['JEMAAH']?.length||0; const s=(r.fields['STAFF / EXTRA']||'').split(',').filter(Boolean).length; return (j+s)<(r.fields['KAPASITI']||4); }); if(target) assignStaffToRoom(staffId,target.id); else alert('Tiada slot kosong di lokasi '+activeLocation+'.'); }
@@ -974,7 +1115,7 @@ function generateRoomingPrint(){
                     if(up.includes('MEKAH')) badge=`<span style="background:#FDE68A;border:1px solid #92400E;padding:1px 6px;border-radius:10px;font-weight:bold;font-size:8px">${fb.fbRaw}</span>`;
                     else if(up.includes('MADINAH')) badge=`<span style="background:#BFDBFE;border:1px solid #1E40AF;padding:1px 6px;border-radius:10px;font-weight:bold;font-size:8px">${fb.fbRaw}</span>`;
                     else badge=`<span style="background:#BBF7D0;border:1px solid #065F46;padding:1px 6px;border-radius:10px;font-weight:bold;font-size:8px">${fb.fbRaw}</span>`;
-                    return `<tr><td style="border:1px solid #ddd;padding:3px 6px;text-align:center">${i+1}</td><td style="border:1px solid #ddd;padding:3px 6px;font-weight:600">${fb.name}</td><td style="border:1px solid #ddd;padding:3px 6px;text-align:center">${badge}</td><td style="border:1px solid #ddd;padding:3px 6px;text-align:center;font-size:8px">${fb.room}</td></tr>`;
+                    return `<tr><td style="border:1px solid #ddd;padding:3px 6px;text-align:center">${i+1}</td><td style="border:1px solid #ddd;padding:3px 6px;font-weight:600">${fb.name}${fb.type==='STAFF'?' <span style="background:#FADBD8;color:#7A0C2E;padding:1px 4px;border-radius:6px;font-size:7px">STAFF</span>':''}</td><td style="border:1px solid #ddd;padding:3px 6px;text-align:center">${badge}</td><td style="border:1px solid #ddd;padding:3px 6px;text-align:center;font-size:8px">${fb.room}</td></tr>`;
                   }).join('')}
                 </table>
               </div>
