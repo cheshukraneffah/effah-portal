@@ -280,6 +280,14 @@ function isStaffAssignedInLocation(staffId, location){
 }
 function isStaffAssigned(staffId){ const s=staffList.find(x=>x.id===staffId); if(!s) return false; return allRoomingRecords.some(r=> (r.fields['STAFF / EXTRA']||'').split(',').map(x=>x.trim()).includes(s.name)); }
 
+function isJemaahAssignedTanpaKatil(jId){
+  return allRoomingRecords.some(r=> ((r.fields['JEMAAH TANPA KATIL']||r.fields['INFANT']||[])||[]).includes(jId));
+}
+function isJemaahAssignedAny(jId){
+  return isJemaahAssigned(jId) || isJemaahAssignedTanpaKatil(jId);
+}
+
+
 function renderNamelist(){
   const cont=document.getElementById('namelistContainer'); if(!cont) return;
   const q=(document.getElementById('searchRoomingJemaah')?.value||'').toLowerCase();
@@ -296,7 +304,7 @@ function renderNamelist(){
     });
   }
   const total=allRoomingJemaah.length;
-  const belumGlobal=allRoomingJemaah.filter(r=>!isJemaahAssigned(r.id)).length;
+  const belumGlobal=allRoomingJemaah.filter(r=>!isJemaahAssignedAny(r.id)).length;
   const belumInLoc=allRoomingJemaah.filter(r=>!isJemaahAssignedInLocation(r.id, activeLocation)).length;
   const totalEl=document.getElementById('totalJemaahBadge'); if(totalEl) totalEl.textContent=total+' Total';
   const belumEl=document.getElementById('belumAssignBadge'); if(belumEl) belumEl.textContent=belumInLoc+' Unassigned di '+activeLocation;
@@ -419,6 +427,8 @@ function renderRoomingGrid(){
       return `<div class="flex items-center justify-between px-2.5 py-2 bg-slate-100 text-slate-800 border border-slate-200 rounded-xl text-[11px]"><span class="truncate font-medium flex items-center">${jName}${fbBadge}</span><button onclick="removeJemaahFromRoom('${rec.id}','${jId}')" class="ml-2 w-4 h-4 rounded-full bg-white hover:bg-slate-200 text-[10px]">✕</button></div>`; 
     }).join('');
     const sSlots=staffArr.map(s=>`<div class="flex items-center justify-between px-2.5 py-2 bg-[#FADBD8] text-[#7A0C2E] border border-[#F5B7B1] rounded-xl text-[11px]"><span class="truncate">👤 ${s}</span><button onclick="removeStaff('${rec.id}','${s.replace(/'/g,"\\'")}')" class="ml-2 w-4 h-4 rounded-full bg-white/70 text-[10px]">✕</button></div>`).join('');
+    const tanpaKatilIds = f['JEMAAH TANPA KATIL'] || f['INFANT'] || [];
+    const tanpaKatilSlots = tanpaKatilIds.map(tId=>{ const tRec=allRoomingJemaah.find(j=>j.id===tId); const tName=tRec?getJemaahName(tRec.fields):'Unknown'; return `<div class="flex items-center justify-between px-2.5 py-2 bg-amber-50 text-amber-900 border border-amber-200 rounded-xl text-[11px] border-dashed"><span class="truncate">👶 ${tName} <span class="ml-1 px-1.5 py-0.5 bg-white border border-amber-300 rounded-full text-[8px] font-bold">TANPA KATIL</span></span><button onclick="removeTanpaKatilFromRoom('${rec.id}','${tId}')" class="ml-2 w-4 h-4 rounded-full bg-white text-[10px]">✕</button></div>`; }).join('');
     const emptyCount=Math.max(0,cap-count); const emptySlots=Array.from({length:emptyCount}).map((_,i)=>`<div ondragover="allowDrop(event)" ondrop="dropJemaah(event,'${rec.id}')" class="px-2.5 py-2 border border-dashed border-slate-300 rounded-xl text-[10px] text-slate-400 text-center">Slot Kosong ${count+i+1}</div>`).join('');
     return `<div data-room-id="${rec.id}" ondragover="allowDropRoom(event)" ondragleave="handleRoomDragLeave(event)" ondrop="dropJemaah(event,'${rec.id}')" class="bg-white rounded-2xl border border-slate-200 p-2.5 shadow-sm flex flex-col gap-2 h-fit">
       <div class="flex items-center justify-between gap-1.5">
@@ -433,8 +443,8 @@ function renderRoomingGrid(){
         <div class="flex items-center gap-1 px-2.5 py-1 bg-slate-50 rounded-full border"><select onchange="updateRoomField('${rec.id}','PAKEJ / HOTEL',this.value)" class="bg-transparent text-[10px] font-bold outline-none"><option ${pakej==='JIMAT'?'selected':''}>JIMAT</option><option ${pakej==='EKONOMI'?'selected':''}>EKONOMI</option><option ${pakej==='STANDARD'?'selected':''}>STANDARD</option><option ${pakej==='PREMIUM'?'selected':''}>PREMIUM</option></select></div>
         <div class="ml-auto flex items-center gap-1 bg-slate-50 rounded-full px-1 py-0.5 border"><button onclick="updateCap('${rec.id}',-1)" class="w-5 h-5 rounded-full bg-white border text-[10px]">−</button><span class="font-bold w-4 text-center text-[11px]">${cap}</span><button onclick="updateCap('${rec.id}',1)" class="w-5 h-5 rounded-full bg-white border text-[10px]">+</button><span class="text-[9px] ml-1">${count}/${cap}</span></div>
       </div>
-      <div class="space-y-1">${jSlots}${sSlots}${emptySlots}${tanpaKatilSlots?`<div class="pt-1 border-t border-dashed border-amber-200 mt-1"><div class="text-[8px] font-bold text-amber-700 mb-1">TANPA KATIL / BABY (tidak kira kapasiti)</div>${tanpaKatilSlots}</div>`:''}</div>
-      <button onclick="openTanpaKatilModal('${rec.id}')" class="mt-1 w-full py-1.5 bg-amber-50 hover:bg-amber-100 border border-amber-200 border-dashed text-amber-800 rounded-xl text-[10px] font-bold">+ Tambah Kanak-kanak / Baby (Tanpa Katil)</button>
+      <div class="space-y-1">${jSlots}${sSlots}${emptySlots}${tanpaKatilSlots?`<div class="pt-1.5 mt-1 border-t border-dashed border-amber-200"><div class="text-[8px] font-bold text-amber-700 mb-1 tracking-widest">TANPA KATIL / BABY</div>${tanpaKatilSlots}</div>`:''}</div>
+      <button onclick="openTanpaKatilModal('${rec.id}')" class="mt-1 w-full py-1.5 bg-amber-50 hover:bg-amber-100 border border-amber-200 border-dashed text-amber-800 rounded-xl text-[10px] font-bold">+ Kanak-kanak / Baby (Tanpa Katil)</button>
       <div class="h-1 bg-slate-100 rounded-full overflow-hidden"><div class="h-full bg-[#7A0C2E]" style="width:${Math.min(100,(count/cap)*100)}%"></div></div>
     </div>`;
   }).join('');
@@ -735,7 +745,7 @@ function generateRoomingPrint(){
         return `<div>${idx+1}. ${name}${fbNote}</div>`; 
       }).filter(Boolean).join('');
       staff.forEach((s)=>{ const clean=s.replace(/\(EFFAH\)/i,'').trim(); rows+=`<div style="color:#7A0C2E;font-weight:bold">NA ${clean} (EFFAH)</div>`; });
-      return `<div style="border:1px solid #000;margin-bottom:8px;padding:6px 8px;background:#fff;break-inside:avoid"><div style="display:flex;justify-content:space-between;font-weight:bold;font-size:10px;border-bottom:1px solid #000;padding-bottom:3px;margin-bottom:4px"><span>${rid} (${pakej}) - ${hotel}</span><span>${jIds.length+staff.length}/${f['KAPASITI']||4} ${tanpaKatilPrintIds.length>0?`+ ${tanpaKatilPrintIds.length} baby`:''}</span></div><div style="font-size:9px;line-height:1.6">${rows||'- Kosong -'}${tanpaKatilPrintRows?`<div style='margin-top:4px;border-top:1px dashed #92400E;padding-top:2px'>${tanpaKatilPrintRows}</div>`:''}</div></div>`;
+      return `<div style="border:1px solid #000;margin-bottom:8px;padding:6px 8px;background:#fff;break-inside:avoid"><div style="display:flex;justify-content:space-between;font-weight:bold;font-size:10px;border-bottom:1px solid #000;padding-bottom:3px;margin-bottom:4px"><span>${rid} (${pakej}) - ${hotel}</span><span>${jIds.length+staff.length}/${f['KAPASITI']||4}</span></div><div style="font-size:9px;line-height:1.6">${rows||'- Kosong -'}${tanpaKatilPrintRows?`<div style='margin-top:4px;border-top:1px dashed #92400E;padding-top:3px'>${tanpaKatilPrintRows}</div>`:''}</div></div>`;
     }).join('');
     const icon = ''; // no emoji
     const totalJemaahLoc = rooms.reduce((s,r)=>s+(r.fields['JEMAAH']?.length||0),0);
