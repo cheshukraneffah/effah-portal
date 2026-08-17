@@ -479,7 +479,7 @@ function renderLocationTabs(){
   html+=`<button onclick="openAddLocationModal()" class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-slate-100 border border-slate-200 text-slate-600 hover:bg-slate-200">+ Lokasi</button>`;
   container.innerHTML=html;
 }
-async async function fetchRoomingData(){
+async function fetchRoomingData(){
   try{
     showRoomingLoading(); populateRoomingTripDropdown();
     const tripId=window.selectedTripRecord?.id||localStorage.getItem('effah_active_trip_id')||localStorage.getItem('effah_last_selected_trip')||localStorage.getItem('selectedTripId');
