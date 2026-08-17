@@ -17,7 +17,7 @@ function cleanTripNameForRooming(name){
 }
 function getJemaahName(f){ if(!f) return '-'; return f['NAMA'] || f['NAME'] || f['NAMA JEMAAH'] || f['NAMA PENUH'] || f['Name'] || '-'; }
 function generateRoomIdFromCap(cap){ return `B${parseInt(cap)||4}`; }
-function getFullboardVal(f){ return f['BOARD'] || ''; }
+function getFullboardVal(f){ return f['BOARD BASIS'] || f['BOARD'] || ''; }
 function getPakejVal(f){ return f['PAKEJ'] || ''; }
 function getInsuranVal(f){
   const v=f['INSURAN'];
@@ -93,7 +93,7 @@ function renderRoomingHTML(){
             <span id="headerNamaJemaah" class="bg-[#7A0C2E] text-white px-1.5 py-0.5 rounded text-[9px]">NAMA JEMAAH</span>
             <span id="sortIcon" class="text-[10px]">${roomingSortActive ? (roomingSortDir==='asc'?'↑':'↓') : '↕'}</span>
           </div>
-          <div class="col-span-2 text-center">BOARD</div><div class="col-span-1 text-center">TRAIN</div><div class="col-span-3 text-center">INSURAN (TAKAFUL/ETIQA/KHAIRI)</div><div class="col-span-1 text-center">PAKEJ</div><div class="col-span-1 text-center">+</div>
+          <div class="col-span-2 text-center">BOARD BASIS</div><div class="col-span-1 text-center">TRAIN</div><div class="col-span-3 text-center">INSURAN (TAKAFUL/ETIQA/KHAIRI)</div><div class="col-span-1 text-center">PAKEJ</div><div class="col-span-1 text-center">+</div>
         </div>
         <div id="namelistContainer" class="flex-1 overflow-y-auto max-h-[42vh] divide-y divide-slate-50 bg-white min-h-[180px]"></div>
         <div class="border-t border-slate-200 bg-slate-50/50">
@@ -253,7 +253,7 @@ function renderRoomingOverview(rooms){
       const cnt=caps[cap];
       return `<span class="inline-flex items-center gap-1 bg-white/15 px-2 py-0.5 rounded-full text-[10px] mr-1 mb-1"><span>Bilik ber-${cap}</span><span class="font-bold">(${cnt})</span></span>`;
     }).join('');
-    return `<div class="flex flex-col gap-1 py-2 border-b border-white/10 last:border-0"><div class="flex items-center justify-between"><span class="font-bold text-[11px] truncate">${hotel}</span>${fbHotel?`<span class="text-[9px] bg-white/20 px-1.5 py-0.5 rounded-full">${fbHotel} BOARD</span>`:''}</div><div class="flex flex-wrap">${capsList}</div></div>`;
+    return `<div class="flex flex-col gap-1 py-2 border-b border-white/10 last:border-0"><div class="flex items-center justify-between"><span class="font-bold text-[11px] truncate">${hotel}</span>${fbHotel?`<span class="text-[9px] bg-white/20 px-1.5 py-0.5 rounded-full">${fbHotel} Board Basis</span>`:''}</div><div class="flex flex-wrap">${capsList}</div></div>`;
   }).join('');
 
   let html=`<div class="space-y-2">
@@ -261,7 +261,7 @@ function renderRoomingOverview(rooms){
       <div class="font-bold text-[13px] tracking-widest">${activeLocation} • ${totalBilik} Bilik</div>
       <div class="flex items-center gap-1.5">
         <span class="text-[10px] bg-white/20 px-2 py-0.5 rounded-full">${totalJ} J+${totalBaby} I+${totalStaff} S</span>
-        ${fbCount?`<span class="text-[10px] bg-emerald-400/90 text-emerald-900 px-2 py-0.5 rounded-full font-bold">${fbCount} BOARD</span>`:''}
+        ${fbCount?`<span class="text-[10px] bg-emerald-400/90 text-emerald-900 px-2 py-0.5 rounded-full font-bold">${fbCount} Board Basis</span>`:''}
       </div>
     </div>
     <div class="bg-white/10 rounded-xl p-2.5 max-h-[22vh] overflow-y-auto">
@@ -382,11 +382,11 @@ function renderNamelist(){
     const trChecked = isTrainChecked(r.fields);
     const insArr = getInsuranArray(r.fields);
     let fbCls = 'bg-white border-slate-200';
-    if(fb.includes('BOARD (MEKAH)')) fbCls='bg-orange-100 border-orange-200 text-orange-800';
-    else if(fb.includes('BOARD (MADINAH)')) fbCls='bg-blue-100 border-blue-200 text-blue-800';
-    else if(fb==='BOARD') fbCls='bg-emerald-100 border-emerald-200 text-emerald-800';
-    else if(fb==='NO BOARD') fbCls='bg-slate-100 border-slate-200 text-slate-500';
-    else if(fb==='-') fbCls='bg-white border-dashed border-slate-300 text-slate-400';
+    if(fb==='FULLBOARD (MEKAH)' || fb==='BB (MEKAH)') fbCls='bg-orange-100 border-orange-200 text-orange-800';
+    else if(fb==='FULLBOARD (MADINAH)' || fb==='BB (MADINAH)') fbCls='bg-blue-100 border-blue-200 text-blue-800';
+    else if(fb==='FULLBOARD') fbCls='bg-emerald-100 border-emerald-200 text-emerald-800';
+    else if(fb==='NO FULLBOARD') fbCls='bg-slate-100 border-slate-200 text-slate-500';
+    else if(fb==='-' || fb==='' ) fbCls='bg-white border-dashed border-slate-300 text-slate-400';
 
     const insToggle = ['TAKAFUL','ETIQA','AL-KHAIRI'].map(opt=>{
       const active = insArr.includes(opt);
@@ -404,12 +404,14 @@ function renderNamelist(){
       <div class="col-span-1 text-slate-400 text-[10px]">${String(i+1).padStart(2,'0')}</div>
       <div class="col-span-3 font-medium truncate text-[10px] ${assignedInLoc?'text-slate-500 italic':''}" title="${name}">${name}</div>
       <div class="col-span-2 flex items-center gap-0.5">
-        <select onchange="updateJemaahField('${r.id}','BOARD',this.value)" class="text-[8px] border rounded-full px-1 py-0.5 bg-white font-bold ${fbCls} outline-none w-full truncate" title="BOARD">
-          <option value="" ${!fb || fb==='-'?'selected':''}>- FB</option>
-          <option value="BOARD" ${fb==='BOARD'?'selected':''}>BOARD</option>
-          <option value="BOARD (MEKAH)" ${fb==='BOARD (MEKAH)'?'selected':''}>FB MEKAH</option>
-          <option value="BOARD (MADINAH)" ${fb==='BOARD (MADINAH)'?'selected':''}>FB MADINAH</option>
-          <option value="NO BOARD" ${fb==='NO BOARD'?'selected':''}>NO FB</option>
+        <select onchange="updateJemaahField('${r.id}','BOARD BASIS',this.value)" class="text-[8px] border rounded-full px-1 py-0.5 bg-white font-bold ${fbCls} outline-none w-full truncate" title="BOARD BASIS">
+          <option value="" ${!fb || fb==='-'?'selected':''}>- BOARD</option>
+          <option value="FULLBOARD" ${fb==='FULLBOARD'?'selected':''}>FULLBOARD</option>
+          <option value="FULLBOARD (MEKAH)" ${fb==='FULLBOARD (MEKAH)'?'selected':''}>FULLBOARD (MEKAH)</option>
+          <option value="FULLBOARD (MADINAH)" ${fb==='FULLBOARD (MADINAH)'?'selected':''}>FULLBOARD (MADINAH)</option>
+          <option value="NO FULLBOARD" ${fb==='NO FULLBOARD'?'selected':''}>NO FULLBOARD</option>
+          <option value="BB (MEKAH)" ${fb==='BB (MEKAH)'?'selected':''}>BB (MEKAH)</option>
+          <option value="BB (MADINAH)" ${fb==='BB (MADINAH)'?'selected':''}>BB (MADINAH)</option>
         </select>
       </div>
       <div class="col-span-1 text-center">
@@ -465,22 +467,18 @@ function renderRoomingGrid(){
       const fb=(jRec?.fields?.['BOARD']||'').trim();
       const roomLoc = (f['LOKASI / CITY']||activeLocation||'').toUpperCase();
       let fbBadge='';
-      if(fb && fb!=='-' && fb.toUpperCase()!=='NO BOARD'){
+      if(fb && fb!=='-' && fb.toUpperCase()!=='NO FULLBOARD' && fb!==''){
         const up=fb.toUpperCase();
-        // Special logic: MEKAH bilik tunjuk MEKAH je, MADINAH tunjuk MADINAH je
+        const raw=fb;
         if(roomLoc==='MEKAH'){
-          if(up.includes('MEKAH')) fbBadge=`<span class="ml-1 px-1.5 py-0.5 bg-amber-200 text-amber-900 border border-amber-300 rounded-full text-[8px] font-bold">FB MEKAH</span>`;
-          else if(up==='BOARD') fbBadge=`<span class="ml-1 px-1.5 py-0.5 bg-emerald-200 text-emerald-900 border border-emerald-300 rounded-full text-[8px] font-bold">FB</span>`;
-          // FB MADINAH hide kalau bilik MEKAH
+          if(up.includes('MEKAH')) fbBadge=`<span class="ml-1 px-1.5 py-0.5 bg-amber-200 text-amber-900 border border-amber-300 rounded-full text-[8px] font-bold">${raw}</span>`;
+          else if(up==='FULLBOARD') fbBadge=`<span class="ml-1 px-1.5 py-0.5 bg-emerald-200 text-emerald-900 border border-emerald-300 rounded-full text-[8px] font-bold">FULLBOARD</span>`;
         } else if(roomLoc==='MADINAH'){
-          if(up.includes('MADINAH')) fbBadge=`<span class="ml-1 px-1.5 py-0.5 bg-blue-200 text-blue-900 border border-blue-300 rounded-full text-[8px] font-bold">FB MADINAH</span>`;
-          else if(up==='BOARD') fbBadge=`<span class="ml-1 px-1.5 py-0.5 bg-emerald-200 text-emerald-900 border border-emerald-300 rounded-full text-[8px] font-bold">FB</span>`;
-          // FB MEKAH hide kalau bilik MADINAH
+          if(up.includes('MADINAH')) fbBadge=`<span class="ml-1 px-1.5 py-0.5 bg-blue-200 text-blue-900 border border-blue-300 rounded-full text-[8px] font-bold">${raw}</span>`;
+          else if(up==='FULLBOARD') fbBadge=`<span class="ml-1 px-1.5 py-0.5 bg-emerald-200 text-emerald-900 border border-emerald-300 rounded-full text-[8px] font-bold">FULLBOARD</span>`;
         } else {
-          // TAIF / JEDDAH / lain - tunjuk dua2
-          if(up.includes('MEKAH')) fbBadge=`<span class="ml-1 px-1.5 py-0.5 bg-amber-200 text-amber-900 border border-amber-300 rounded-full text-[8px] font-bold">FB MEKAH</span>`;
-          else if(up.includes('MADINAH')) fbBadge=`<span class="ml-1 px-1.5 py-0.5 bg-blue-200 text-blue-900 border border-blue-300 rounded-full text-[8px] font-bold">FB MADINAH</span>`;
-          else if(up==='BOARD') fbBadge=`<span class="ml-1 px-1.5 py-0.5 bg-emerald-200 text-emerald-900 border border-emerald-300 rounded-full text-[8px] font-bold">FB</span>`;
+          if(up.includes('MEKAH') || up.includes('MADINAH') || up==='FULLBOARD') fbBadge=`<span class="ml-1 px-1.5 py-0.5 bg-emerald-200 text-emerald-900 border border-emerald-300 rounded-full text-[8px] font-bold">${raw}</span>`;
+          else if(up.startsWith('BB')) fbBadge=`<span class="ml-1 px-1.5 py-0.5 bg-orange-100 text-orange-800 border border-orange-200 rounded-full text-[8px] font-bold">${raw}</span>`;
         }
       }
       return `<div class="flex items-center justify-between px-2.5 py-2 bg-slate-100 text-slate-800 border border-slate-200 rounded-xl text-[11px]"><span class="truncate font-medium flex items-center">${jName}${fbBadge}</span><button onclick="removeJemaahFromRoom('${rec.id}','${jId}')" class="ml-2 w-4 h-4 rounded-full bg-white hover:bg-slate-200 text-[10px]">✕</button></div>`; 
@@ -901,13 +899,13 @@ function generateRoomingPrint(){
           <div style="margin-top:14px;border:1px solid #000;break-inside:avoid">
             <div style="background:#065F46;color:#fff;padding:5px 8px;font-weight:bold;font-size:10px;display:flex;justify-content:space-between">
               <span>${loc} - SENARAI PAKEJ MAKAN (${fbListForLoc.length} orang) - Sorted ikut Hotel</span>
-              <span style="background:#fff;color:#065F46;padding:1px 6px;border-radius:10px;font-size:9px">${fbListForLoc.length} BOARD</span>
+              <span style="background:#fff;color:#065F46;padding:1px 6px;border-radius:10px;font-size:9px">${fbListForLoc.length} Board Basis</span>
             </div>
             ${Object.keys(grouped).sort().map(hotelName=>`
               <div style="border-bottom:1px solid #000">
                 <div style="background:#f0fdf4;padding:3px 8px;font-weight:bold;font-size:9px;border-bottom:1px solid #ddd">${hotelName} (${grouped[hotelName].length} FB)</div>
                 <table style="width:100%;border-collapse:collapse;font-size:9px">
-                  <tr style="background:#f8f8f8;font-weight:bold"><th style="border:1px solid #ddd;padding:3px 6px;width:30px">NO</th><th style="border:1px solid #ddd;padding:3px 6px;text-align:left">NAMA JEMAAH</th><th style="border:1px solid #ddd;padding:3px 6px;text-align:center">JENIS FB</th><th style="border:1px solid #ddd;padding:3px 6px;text-align:center">BILIK</th></tr>
+                  <tr style="background:#f8f8f8;font-weight:bold"><th style="border:1px solid #ddd;padding:3px 6px;width:30px">NO</th><th style="border:1px solid #ddd;padding:3px 6px;text-align:left">NAMA JEMAAH</th><th style="border:1px solid #ddd;padding:3px 6px;text-align:center">BOARD BASIS</th><th style="border:1px solid #ddd;padding:3px 6px;text-align:center">BILIK</th></tr>
                   ${grouped[hotelName].map((fb,i)=>{
                     let badge='';
                     const up=fb.fbRaw.toUpperCase();
