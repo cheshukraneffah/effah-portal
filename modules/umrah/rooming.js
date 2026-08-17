@@ -761,10 +761,6 @@ function makeNamelistSticky(){
       staffCont.style.maxHeight='none';
       staffCont.style.overflowY='visible';
     }
-    const staffCont = document.getElementById('staffListContainer');
-    if(staffCont){
-      staffCont.style.maxHeight='22vh';
-    }
   }catch(e){}
 }
 
