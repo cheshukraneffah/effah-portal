@@ -1,13 +1,20 @@
 // ROOMING V24 - Fix grayed still editable + print highlight (TAKAFUL hijau, ETIQA kuning, KHAIRI biru, TRAIN kuning)
 // Base: V23 exact layout, only 2 patches
-let allRoomingRecords = [];
-let allRoomingJemaah = [];
-let activeLocation = localStorage.getItem('effah_active_location') || 'MEKAH';
-let roomingDefaultCap = 4;
-let customLocations = JSON.parse(localStorage.getItem('effah_custom_locations')||'[]');
-let staffList = [];
+var allRoomingRecords = window.allRoomingRecords || [];
+var allRoomingJemaah = window.allRoomingJemaah || [];
+var activeLocation = window.activeLocation || localStorage.getItem('effah_active_location') || 'MEKAH';
+var roomingDefaultCap = 4;
+var customLocations = window.customLocations || JSON.parse(localStorage.getItem('effah_custom_locations')||'[]');
+var staffList = window.staffList || [];
 
-let staffIdCounter = parseInt(localStorage.getItem('effah_staff_counter')||'1000');
+var staffIdCounter = window.staffIdCounter || parseInt(localStorage.getItem('effah_staff_counter')||'1000');
+var roomingSortDir = window.roomingSortDir || localStorage.getItem('effah_rooming_sort_dir') || 'asc';
+var roomingSortActive = typeof window.roomingSortActive !== 'undefined' ? window.roomingSortActive : (localStorage.getItem('effah_rooming_sort_active') === 'true' ? true : false);
+window.allRoomingRecords = allRoomingRecords;
+window.allRoomingJemaah = allRoomingJemaah;
+window.activeLocation = activeLocation;
+window.staffList = staffList;
+window.staffIdCounter = staffIdCounter;
 function getStaffStorageKey(){ return `effah_staff_list_${activeLocation}_${window.selectedTripRecord?.id||localStorage.getItem('effah_active_trip_id')||'default'}`; }
 function saveStaffList(){ try{ localStorage.setItem(getStaffStorageKey(), JSON.stringify(staffList)); localStorage.setItem('effah_staff_board_'+activeLocation, JSON.stringify(staffList)); }catch(e){} }
 
@@ -155,9 +162,6 @@ function renderStaffList(){
   }).join('');
 }
 
-let staffIdCounter = parseInt(localStorage.getItem('effah_staff_counter')||'1000');
-let roomingSortDir = localStorage.getItem('effah_rooming_sort_dir') || 'asc';
-let roomingSortActive = localStorage.getItem('effah_rooming_sort_active') === 'true' ? true : false;
 
 function cleanTripNameForRooming(name){
   if(!name) return '';
@@ -343,7 +347,7 @@ function getRoomOrderedList(rooms){
 }
 function saveRoomOrder(ids){ localStorage.setItem(getRoomOrderKey(), JSON.stringify(ids)); }
 
-let draggedRoomId=null;
+var draggedRoomId = window.draggedRoomId || null;
 function handleRoomDragStart(e, roomId){ draggedRoomId=roomId; e.dataTransfer.effectAllowed='move'; e.target.closest('[data-room-id]')?.classList.add('opacity-50'); }
 function handleRoomDragEnd(e){ e.target.closest('[data-room-id]')?.classList.remove('opacity-50'); draggedRoomId=null; }
 function allowDropRoom(e){ e.preventDefault(); e.currentTarget.classList.add('ring-2','ring-[#7A0C2E]/30'); }
