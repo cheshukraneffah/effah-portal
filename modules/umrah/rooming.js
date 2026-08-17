@@ -373,7 +373,7 @@ function renderRoomingHTML(){
           <div id="roomingOverview" class="mt-2.5 p-2.5 bg-[#7A0C2E] text-white rounded-xl text-[11px]"></div>
           <div id="locationTabs" class="flex flex-wrap gap-1 mt-2.5"></div>
         </div>
-        <div id="roomingGrid" class="grid grid-cols-1 lg:grid-cols-2 gap-2.5 content-start min-h-[280px]"></div>
+        <div id="roomingGrid" class="grid grid-cols-1 lg:grid-cols-2 gap-2.5 overflow-y-auto max-h-[78vh] pr-1 content-start min-h-[280px]"></div>
       </div>
     </div>
   </div>
@@ -744,13 +744,15 @@ function makeNamelistSticky(){
     if(leftWrapper){
       leftWrapper.style.position='sticky';
       leftWrapper.style.top='12px';
+      leftWrapper.style.maxHeight='calc(100vh - 16px)';
+      leftWrapper.style.overflowY='auto';
       leftWrapper.style.alignSelf='start';
       leftWrapper.style.zIndex='20';
       leftWrapper.setAttribute('data-left-col','true');
     }
     const nl = document.getElementById('namelistContainer');
     if(nl){
-      nl.style.maxHeight='calc(100vh - 200px)';
+      nl.style.maxHeight='calc(100vh - 240px)';
       nl.style.overflowY='auto';
     }
     const staffCont = document.getElementById('staffListContainer');
@@ -1317,7 +1319,7 @@ function generateRoomingPrint(orientation){ orientation = orientation || 'landsc
         }).join('') : '';
         
         let staffHtml = staffForRoom.length ? staffForRoom.map((s, sIdx)=>{
-          return `<div style="font-size:${isPortrait ? '7.5px' : '8.5px'};padding:${isPortrait ? '1px 0' : '2px 0'};border-bottom:1px dotted #ddd;color:#7A0C2E;background:#FDF2F4">S${sIdx+1}. ${s.name.replace(/\(EFFAH\)/i,'').trim()} (EFFAH)</div>`;
+          return `<div style="font-size:${isPortrait ? '6.5px' : '7.5px'};padding:1px 0;color:#7A0C2E;background:#FADBD8">S${sIdx+1}. ${s.name}</div>`;
         }).join('') : '';
         
         const catatanBilik = (f['CATATAN BILIK'] || f['CATATAN'] || '').trim();
@@ -1367,38 +1369,32 @@ function generateRoomingPrint(orientation){ orientation = orientation || 'landsc
               <span>${loc} - SENARAI PAKEJ MAKAN</span>
               <span style="background:#fff;color:#065F46;padding:1px 6px;border-radius:10px;font-size:9px">${fbBadgeText}</span>
             </div>
-            ${Object.keys(grouped).sort().map(hotelName=>{
-              const allItems = grouped[hotelName];
-              const jemaahOnly = allItems.filter(x=>!x.rec._isStaff).sort((a,b)=>{ const na=parseInt(a.room)||9999; const nb=parseInt(b.room)||9999; return na-nb; });
-              const staffOnly = allItems.filter(x=>x.rec._isStaff).sort((a,b)=>{ const na=parseInt(a.room)||9999; const nb=parseInt(b.room)||9999; return na-nb; });
-              const sortedItems = [...jemaahOnly, ...staffOnly];
-              const totalPax = allItems.length;
-              return '<div style="border-bottom:1px solid #000"><div style="background:#f0fdf4;padding:3px 8px;font-weight:bold;font-size:9px;border-bottom:1px solid #ddd">'+hotelName+' ('+totalPax+' pax)</div><table style="width:100%;border-collapse:collapse;font-size:9px"><tr style="background:#f8f8f8;font-weight:bold"><th style="border:1px solid #ddd;padding:3px 6px;width:30px">NO</th><th style="border:1px solid #ddd;padding:3px 6px;text-align:left">NAMA JEMAAH</th><th style="border:1px solid #ddd;padding:3px 6px;text-align:center">BOARD BASIS</th><th style="border:1px solid #ddd;padding:3px 6px;text-align:center">BILIK</th></tr>'+ sortedItems.map((item,i)=>{
+            ${Object.keys(grouped).sort().map(hotelName=>`
+              <div style="border-bottom:1px solid #000">
+                <div style="background:#f0fdf4;padding:3px 8px;font-weight:bold;font-size:9px;border-bottom:1px solid #ddd">${hotelName} (${grouped[hotelName].length} Jemaah)</div>
+                <table style="width:100%;border-collapse:collapse;font-size:9px">
+                  <tr style="background:#f8f8f8;font-weight:bold"><th style="border:1px solid #ddd;padding:3px 6px;width:30px">NO</th><th style="border:1px solid #ddd;padding:3px 6px;text-align:left">NAMA JEMAAH</th><th style="border:1px solid #ddd;padding:3px 6px;text-align:center">BOARD BASIS</th><th style="border:1px solid #ddd;padding:3px 6px;text-align:center">BILIK</th></tr>
+                  ${grouped[hotelName].sort((a,b)=>{ const na=parseInt(a.room)||9999; const nb=parseInt(b.room)||9999; return na-nb; }).map((item,i)=>{
                     const isStaffRow = item.rec._isStaff;
-                    let rawStaffName = (item.rec.fields['NAMA JEMAAH']||'');
-                    rawStaffName = rawStaffName.replace(/\s*\(EFFAH\)\s*/gi,'').trim();
-                    rawStaffName = rawStaffName.replace(/\(EFFAH\)/i,'').trim();
-                    const displayName = isStaffRow ? rawStaffName + ' (EFFAH)' : getJemaahName(item.rec.fields);
+                    const displayName = isStaffRow ? (item.rec.fields['NAMA JEMAAH']||'') + ' (EFFAH)' : getJemaahName(item.rec.fields);
+                    const noLabel = isStaffRow ? `S${staffList.findIndex(s=>s.id===item.rec.id)+1}` : (i+1 - grouped[hotelName].filter((x,idx)=> idx < i && x.rec._isStaff).length);
+                    // recalc proper numbering for staff
                     const fbRaw = isStaffRow ? (item.rec.fields['BOARD']||'FULLBOARD') : (getFullboardVal(item.rec.fields)||'');
-                    const up=(fbRaw||'').toUpperCase();
+                    const up=fbRaw.toUpperCase();
                     let badge='';
-                    if(up.includes('MEKAH')) badge='<span style="background:#FDE68A;border:1px solid #92400E;padding:1px 6px;border-radius:10px;font-weight:bold;font-size:8px">'+fbRaw+'</span>';
-                    else if(up.includes('MADINAH')) badge='<span style="background:#BFDBFE;border:1px solid #1E40AF;padding:1px 6px;border-radius:10px;font-weight:bold;font-size:8px">'+fbRaw+'</span>';
-                    else badge='<span style="background:#BBF7D0;border:1px solid #065F46;padding:1px 6px;border-radius:10px;font-weight:bold;font-size:8px">'+fbRaw+'</span>';
-                    let rowNo='';
-                    if(isStaffRow){
-                      const staffSorted = grouped[hotelName].filter(x=>x.rec._isStaff).sort((a,b)=>{ const na=parseInt(a.room)||9999; const nb=parseInt(b.room)||9999; return na-nb; });
-                      const pos = staffSorted.findIndex(x=>x.rec.id===item.rec.id);
-                      rowNo = 'S'+(pos+1);
-                    } else {
-                      rowNo = ''+(i+1);
-                    }
+                    if(up.includes('MEKAH') && up.includes('BB')) badge=`<span style="background:#FDE68A;border:1px solid #92400E;padding:1px 6px;border-radius:10px;font-weight:bold;font-size:8px">${fbRaw}</span>`;
+                    else if(up.includes('MEKAH') && up.includes('FULLBOARD')) badge=`<span style="background:#FDE68A;border:1px solid #92400E;padding:1px 6px;border-radius:10px;font-weight:bold;font-size:8px">${fbRaw}</span>`;
+                    else if(up.includes('MADINAH') && up.includes('BB')) badge=`<span style="background:#BFDBFE;border:1px solid #1E40AF;padding:1px 6px;border-radius:10px;font-weight:bold;font-size:8px">${fbRaw}</span>`;
+                    else if(up.includes('MADINAH')) badge=`<span style="background:#BFDBFE;border:1px solid #1E40AF;padding:1px 6px;border-radius:10px;font-weight:bold;font-size:8px">${fbRaw}</span>`;
+                    else if(up==='FULLBOARD') badge=`<span style="background:#BBF7D0;border:1px solid #065F46;padding:1px 6px;border-radius:10px;font-weight:bold;font-size:8px">${fbRaw}</span>`;
+                    else badge=`<span style="background:#BBF7D0;border:1px solid #065F46;padding:1px 6px;border-radius:10px;font-weight:bold;font-size:8px">${fbRaw}</span>`;
+                    const rowNo = isStaffRow ? `S${i+1}` : `${i+1}`;
                     const rowStyle = isStaffRow ? ' style="background:#FDF2F4"' : '';
-                    const cellStyle = isStaffRow ? 'background:#F9D5D9;font-weight:bold;color:#7A0C2E' : '';
-                    const nameStyle = isStaffRow ? 'color:#7A0C2E' : '';
-                    return '<tr'+rowStyle+'><td style="border:1px solid #ddd;padding:3px 6px;text-align:center;'+cellStyle+'">'+rowNo+'</td><td style="border:1px solid #ddd;padding:3px 6px;font-weight:600;'+nameStyle+'">'+displayName+'</td><td style="border:1px solid #ddd;padding:3px 6px;text-align:center">'+badge+'</td><td style="border:1px solid #ddd;padding:3px 6px;text-align:center;font-size:8px">'+item.room+'</td></tr>';
-                  }).join('') + '</table></div>';
-            }).join('')}
+                    return `<tr${rowStyle}><td style="border:1px solid #ddd;padding:3px 6px;text-align:center;${isStaffRow?'background:#F9D5D9;font-weight:bold;color:#7A0C2E':''}">${rowNo}</td><td style="border:1px solid #ddd;padding:3px 6px;font-weight:600;${isStaffRow?'color:#7A0C2E':''}">${displayName}</td><td style="border:1px solid #ddd;padding:3px 6px;text-align:center">${badge}</td><td style="border:1px solid #ddd;padding:3px 6px;text-align:center;font-size:8px">${item.room}</td></tr>`;
+                  }).join('')}
+                </table>
+              </div>
+            `).join('')}
           </div>
         `;
       } else {
