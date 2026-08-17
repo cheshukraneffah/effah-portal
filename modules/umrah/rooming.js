@@ -41,8 +41,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
 function showRoomingLoading(){
   const g=document.getElementById('roomingGrid'); const l=document.getElementById('namelistContainer');
-  if(g) g.innerHTML=`<div class="col-span-2 p-6 text-center text-[11px] text-slate-400">Memuatkan bilik...</div>`;
-  if(l) l.innerHTML=`<div class="p-6 text-center text-[11px] text-slate-400">Memuatkan jemaah...</div>`;
+  const spinner = `<div class="flex flex-col items-center justify-center gap-2 py-10"><div class="w-6 h-6 border-2 border-slate-200 border-t-[#7A0C2E] rounded-full animate-spin"></div><div class="text-[11px] text-slate-500">Memuatkan...</div></div>`;
+  const skeletonRooms = Array.from({length:4}).map(()=>`<div class="bg-white rounded-2xl border border-slate-200 p-3 animate-pulse"><div class="h-4 bg-slate-100 rounded-full w-1/3 mb-2"></div><div class="h-3 bg-slate-100 rounded-full w-2/3"></div><div class="mt-3 space-y-2"><div class="h-8 bg-slate-50 rounded-xl"></div><div class="h-8 bg-slate-50 rounded-xl"></div></div></div>`).join('');
+  const skeletonList = Array.from({length:6}).map(()=>`<div class="px-2.5 py-3 flex gap-2 animate-pulse"><div class="w-6 h-3 bg-slate-100 rounded"></div><div class="flex-1 h-3 bg-slate-100 rounded-full"></div><div class="w-16 h-5 bg-slate-50 rounded-full"></div></div>`).join('');
+  if(g) g.innerHTML=skeletonRooms;
+  if(l) l.innerHTML=`${spinner}<div class="divide-y divide-slate-50">${skeletonList}</div>`;
+  const overview=document.getElementById('roomingOverview');
+  if(overview) overview.innerHTML=`<div class="flex items-center gap-2 text-[11px]"><div class="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> Memuatkan ${activeLocation}...</div>`;
 }
 
 function renderRoomingHTML(){
@@ -201,27 +206,54 @@ document.addEventListener('dragover',e=>{ const g=document.getElementById('roomi
 
 function renderRoomingOverview(rooms){
   const el=document.getElementById('roomingOverview'); if(!el) return;
-  if(rooms.length===0){ el.innerHTML='<div class="text-[11px] opacity-70">Tiada bilik untuk '+activeLocation+'</div>'; return; }
+  if(rooms.length===0){ el.innerHTML='<div class="flex items-center gap-2 text-[11px] opacity-70"><span class="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span> Tiada bilik untuk '+activeLocation+'</div>'; return; }
+  // Group by hotel -> cap -> count
   const byHotel = {};
   rooms.forEach(r=>{
     const hotel = (r.fields['HOTEL NAME']||'TANPA HOTEL').trim().toUpperCase() || 'TANPA HOTEL';
-    if(!byHotel[hotel]) byHotel[hotel]=[];
-    byHotel[hotel].push(r);
+    if(!byHotel[hotel]) byHotel[hotel]={};
+    const cap=r.fields['KAPASITI']||4;
+    byHotel[hotel][cap]=(byHotel[hotel][cap]||0)+1;
   });
-  let html=`<div class="space-y-1.5"><div class="font-bold text-[11px] tracking-widest">${activeLocation}</div>`;
-  html+=`<div class="grid grid-cols-2 gap-3">`;
-  Object.keys(byHotel).forEach(hotel=>{
-    const hotelRooms = byHotel[hotel];
-    const capCount={};
-    hotelRooms.forEach(r=>{ const cap=r.fields['KAPASITI']||4; capCount[cap]=(capCount[cap]||0)+1; });
-    html+=`<div><div class="font-bold text-[10px] uppercase tracking-wide opacity-90 truncate">${hotel}</div>`;
-    html+=`<div class="mt-1 space-y-0.5 text-[11px] font-medium">`;
-    Object.keys(capCount).sort((a,b)=>a-b).forEach(cap=>{
-      html+=`<div>B${cap} - ${capCount[cap]}</div>`;
+  // Fullboard counts for this location
+  let fbCount=0;
+  const loc=activeLocation.toUpperCase();
+  allRoomingJemaah.forEach(j=>{
+    const fb=(j.fields['FULLBOARD']||'').toUpperCase();
+    if(!fb || fb==='-' || fb==='NO FULLBOARD') return;
+    const assigned = (rooms.some(r=> (r.fields['JEMAAH']||[]).includes(j.id) || (r.fields['JEMAAH TANPA KATIL']||[]).includes(j.id)));
+    if(!assigned) return;
+    if(loc==='MEKAH'){
+      if(fb.includes('MEKAH') || fb==='FULLBOARD') fbCount++;
+    } else if(loc==='MADINAH'){
+      if(fb.includes('MADINAH') || fb==='FULLBOARD') fbCount++;
+    } else {
+      fbCount++; // TAIF/JEDDAH/KL kira semua
+    }
+  });
+  const totalBilik=rooms.length;
+  const totalJ=rooms.reduce((s,r)=>s+(r.fields['JEMAAH']?.length||0),0);
+  const totalBaby=rooms.reduce((s,r)=>s+(r.fields['JEMAAH TANPA KATIL']?.length||0),0);
+  const totalStaff=rooms.reduce((s,r)=>s+(r.fields['STAFF / EXTRA']||'').split(',').filter(Boolean).length,0);
+
+  let lines=[];
+  Object.keys(byHotel).sort().forEach(hotel=>{
+    const caps=byHotel[hotel];
+    Object.keys(caps).sort((a,b)=>b-a).forEach(cap=>{
+      const cnt=caps[cap];
+      lines.push(`<div class="flex items-center justify-between py-1 border-b border-white/10 last:border-0"><span>Bilik ber-${cap} (${cnt})</span><span class="font-bold truncate ml-3">${hotel}</span></div>`);
     });
-    html+=`</div></div>`;
   });
-  html+=`</div></div>`;
+
+  let html=`<div class="space-y-2">
+    <div class="flex items-center justify-between">
+      <div class="font-bold text-[12px] tracking-widest">${activeLocation} • ${totalBilik} Bilik</div>
+      <div class="text-[10px] opacity-90">${totalJ} Jemaah${totalBaby?` + ${totalBaby} baby`:''} + ${totalStaff} Staff${fbCount?` • ${fbCount} FB`:''}</div>
+    </div>
+    <div class="bg-white/10 rounded-xl p-2.5 text-[11px] leading-relaxed">
+      ${lines.length?lines.join(''): '<div class="opacity-70">Tiada data hotel</div>'}
+    </div>
+  </div>`;
   el.innerHTML=html;
 }
 
@@ -657,6 +689,8 @@ function removeStaff(roomId,staffName){ const rec=allRoomingRecords.find(r=>r.id
 
 // V24 PRINT - highlight colors
 function generateRoomingPrint(){
+  try{
+    console.log('Print clicked for', activeLocation);
   const tripNameRaw=window.selectedTripRecord?.fields?.Trip||document.getElementById('roomingTripSelect')?.selectedOptions[0]?.text||'Trip';
   const tripName=cleanTripNameForRooming(tripNameRaw);
   const baseLocs=['MEKAH','MADINAH','TAIF','JEDDAH'];
@@ -754,7 +788,7 @@ function generateRoomingPrint(){
       <div class="page-break"></div>
       <div class="location-page">
         <div class="header"><span>ROOMING LIST ${tripName} - ${loc} (${rooms.length} BILIK)</span><span>${overviewMini}</span></div>
-        <div style="font-size:9px;margin-bottom:8px;background:#f5f5f5;border:1px solid #000;padding:5px 8px"><b>${loc} OVERVIEW:</b> ${overviewMini} | Total: ${rooms.length} bilik, ${totalJemaahLoc} jemaah + ${totalStaffLoc} staff</div>
+        <div style="font-size:9px;margin-bottom:8px;background:#f5f5f5;border:1px solid #000;padding:5px 8px"><b>${loc} OVERVIEW:</b> ${overviewMini} | Total: ${rooms.length} bilik, ${totalJemaahLoc} jemaah + ${totalStaffLoc} staff${fbTotalLoc?` • ${fbTotalLoc} FULLBOARD`:''}</div>
         <div style="columns:2; column-gap:12px">${roomBlocks}</div>
       </div>
     `;
@@ -793,6 +827,7 @@ function generateRoomingPrint(){
       window.addEventListener('focus', function handler(){ setTimeout(()=>{ window.removeEventListener('focus', handler); try{window.close();}catch(e){} }, 800); }, {once:true});
     </script>
   </body></html>`;
-  const w=window.open('','_blank'); if(w){ w.document.write(html); w.document.close(); }
+  const w=window.open('','_blank'); if(!w){ alert('Popup blocked! Sila allow popup untuk print.'); return; } w.document.write(html); w.document.close();
+  }catch(e){ console.error('Print error', e); alert('Gagal generate print: '+e.message); }
 }
 async function autoAssignRooming(){ if(!confirm('Adakah anda pasti ingin menetapkan semua jemaah yang belum ditetapkan untuk lokasi '+activeLocation+' secara automatik?')) return; let rooms=[...allRoomingRecords].filter(r=>(r.fields['LOKASI / CITY']||'MEKAH').toUpperCase()===activeLocation.toUpperCase()); if(rooms.length===0) rooms=[...allRoomingRecords]; rooms=getRoomOrderedList(rooms); const unassigned=allRoomingJemaah.filter(j=>!isJemaahAssignedInLocation(j.id, activeLocation)); let idx=0; for(let room of rooms){ const cap=room.fields['KAPASITI']||roomingDefaultCap; const staffCount=(room.fields['STAFF / EXTRA']||'').split(',').filter(Boolean).length; let cur=[...(room.fields['JEMAAH']||[])]; while((cur.length+staffCount)<cap && idx<unassigned.length){ cur.push(unassigned[idx].id); idx++; } if(cur.length!==(room.fields['JEMAAH']||[]).length){ await updateRoomField(room.id,'JEMAAH',cur,false); } } setTimeout(fetchRoomingData,800); }
