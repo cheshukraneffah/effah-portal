@@ -1254,8 +1254,7 @@ function generateRoomingPrint(orientation){ orientation = orientation || 'landsc
     w.document.close();
   }catch(e){
     console.error(e);
-    alert('Gagal generate print: '+e.message+'
-'+e.stack);
+    alert('Gagal generate print: '+e.message);
   }
 }
 
