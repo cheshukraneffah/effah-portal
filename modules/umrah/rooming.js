@@ -47,12 +47,17 @@ async function loadStaffList(){
       train:!!r.fields['TRAIN'],
       sortNumber:r.fields['SORT NUMBER']||9999,
       trip:r.fields['TRIP']||[],
-      roomIds: r.fields['ROOMING LIST'] || r.fields['ROOM'] || [],
+      roomIds: r.fields['ROOMING LIST'] || r.fields['ROOM'] || r.fields['BILIK'] || [],
       roomLink: (r.fields['ROOMING LIST']||[])[0]||null
     }));
     staffList.sort((a,b)=>(a.sortNumber||9999)-(b.sortNumber||9999));
+    if(staffList.length===0){
+      const local=JSON.parse(localStorage.getItem(getStaffStorageKey())||'[]');
+      if(local.length>0) staffList=local;
+    }
     renderStaffList();
-    try{ renderRoomingGrid(); }catch(e){}
+    renderRoomingGrid();
+    try{ renderRoomingOverview(allRoomingRecords.filter(r=>(r.fields['LOKASI / CITY']||'MEKAH').toUpperCase()===activeLocation.toUpperCase())); }catch(e){}
   }catch(e){
     console.error('loadStaffList Airtable failed', e);
     staffList=JSON.parse(localStorage.getItem(getStaffStorageKey())||'[]');
@@ -67,33 +72,23 @@ async function addNewStaff(){
   if(!name.includes('(')) name=`${name} (EFFAH)`;
   const base=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base')||localStorage.getItem('effah_base_id');
   const pat=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
-  const tripId=window.selectedTripRecord?.id||localStorage.getItem('effah_active_trip_id')||localStorage.getItem('selectedTripId')||'';
+  const tripId=window.selectedTripRecord?.id||localStorage.getItem('effah_active_trip_id')||'';
   try{
     if(base&&pat){
-      const fields = {
-        'NAME': name,
-        'TRAIN': false,
-        'SORT NUMBER': staffList.length+1
-      };
-      if(tripId) fields['TRIP'] = [tripId];
-      // BOARD BASIS jangan hantar kalau kosong - nanti Airtable error select
+      const fields = {'NAME': name, 'TRAIN': false, 'SORT NUMBER': staffList.length+1};
+      if(tripId) fields['TRIP']=[tripId];
       const res=await fetch(`https://api.airtable.com/v0/${base}/STAFF%20LIST%20%28ROOMING%29`,{
         method:'POST',
         headers:{'Authorization':`Bearer ${pat}`,'Content-Type':'application/json'},
         body: JSON.stringify({fields})
       });
       const data=await res.json();
-      console.log('Add staff Airtable response:', data);
       if(data.id){
         staffList.push({id:data.id, airtableId:data.id, name, boardBasis:'', train:false, sortNumber:staffList.length+1, trip:tripId?[tripId]:[], roomIds: [], roomLink: null});
         saveStaffList(); renderStaffList(); input.value=''; return;
-      } else {
-        alert('Airtable error: ' + (data.error?.message || JSON.stringify(data)));
-        console.error('Airtable add staff failed', data);
       }
     }
-  }catch(e){ console.error('Add staff Airtable failed', e); alert('Gagal add staff ke Airtable: ' + e.message); }
-  // Fallback localStorage only if Airtable fails
+  }catch(e){ console.error('Add staff Airtable failed', e); }
   const id=`staff_${Date.now()}_${++staffIdCounter}`;
   staffList.push({id, name, boardBasis:'', train:false, sortNumber:staffList.length+1, roomIds: [], roomLink: null});
   saveStaffList(); renderStaffList(); input.value='';
@@ -133,12 +128,14 @@ async function updateStaffTrain(staffId, checked){
 
 async function assignStaffToRoom(staffId,roomId){
   const staff=staffList.find(s=>s.id===staffId||s.airtableId===staffId); if(!staff) return;
+  const rec=allRoomingRecords.find(r=>r.id===roomId); if(!rec) return;
   staff.roomIds = [roomId];
   staff.roomLink = roomId;
   saveStaffList(); renderStaffList(); renderRoomingGrid(); renderLocationTabs();
   const base=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base')||localStorage.getItem('effah_base_id');
   const pat=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
   if(!base||!pat||!staff.airtableId) return;
+  console.log('Assigning staff', staffId, 'to room', roomId);
   try{
     let fieldName = 'ROOMING LIST';
     let res = await fetch(`https://api.airtable.com/v0/${base}/STAFF%20LIST%20%28ROOMING%29/${staff.airtableId}`,{
@@ -334,7 +331,7 @@ function renderRoomingHTML(){
               </div>
             </div>
             <div class="flex items-center gap-1 flex-wrap">
-              <button onclick="generateRoomingPrint()" class="px-2.5 py-1 bg-white border border-slate-200 rounded-full text-[10px] font-bold hover:bg-slate-50">Print / PDF</button>
+              <div class="flex gap-1"><button onclick="generateRoomingPrint('landscape')" class="px-2.5 py-1 bg-white border border-slate-200 rounded-full text-[10px] font-bold hover:bg-slate-50">Print Landscape</button><button onclick="generateRoomingPrint('portrait')" class="px-2.5 py-1 bg-white border border-slate-200 rounded-full text-[10px] font-bold hover:bg-slate-50">Print Portrait</button></div>
               <button onclick="openCopyRoomsModal()" class="px-2.5 py-1 bg-white border border-slate-200 rounded-full text-[10px] font-bold hover:bg-slate-50">Copy Bilik</button>
               <button onclick="autoAssignRooming()" class="px-2.5 py-1 bg-slate-100 border border-slate-200 text-slate-700 rounded-full text-[10px] font-bold hover:bg-slate-200">Auto Assign</button>
               <button onclick="openNewRoomModal()" class="px-2.5 py-1 bg-[#7A0C2E] text-white rounded-full text-[10px] font-bold hover:bg-[#5a0922]">+ Bilik Baru</button>
@@ -583,11 +580,6 @@ function getStaffForRoom(roomId){
   return staffList.filter(s=> s.roomIds && s.roomIds.includes(roomId));
 }
 function isJemaahAssigned(jId){ return allRoomingRecords.some(r=>(r.fields['JEMAAH']||[]).includes(jId)); }
-function isStaffAssignedInLocation(staffId, location){
-  const s=staffList.find(x=>x.id===staffId); if(!s) return false;
-  const loc = (location||activeLocation).toUpperCase();
-  return allRoomingRecords.some(r=> (r.fields['LOKASI / CITY']||'MEKAH').toUpperCase()===loc && (r.fields['STAFF / EXTRA']||'').split(',').map(x=>x.trim()).includes(s.name));
-}
 
 function isJemaahAssignedTanpaKatil(jId){
   try{ return allRoomingRecords.some(r=>{ const arr=r.fields['JEMAAH TANPA KATIL']||r.fields['INFANT']||[]; return arr.includes(jId); }); }catch(e){ return false; }
@@ -748,7 +740,7 @@ function renderRoomingGrid(){
   renderRoomingOverview(rooms);
   if(rooms.length===0){ grid.innerHTML=`<div class="col-span-2 p-6 text-center text-[11px] border border-dashed rounded-2xl bg-white">Tiada bilik untuk <b>${activeLocation}</b><br><button onclick="openNewRoomModal()" class="mt-2.5 px-3 py-1.5 bg-[#7A0C2E] text-white rounded-full text-[11px]">+ Bilik Baru untuk ${activeLocation}</button></div>`; return; }
   grid.innerHTML=rooms.map(rec=>{
-    const f=rec.fields; const roomId=f['Room ID / Nama Bilik']||generateRoomIdFromCap(f['KAPASITI']); const pakej=f['PAKEJ / HOTEL']||'EKONOMI'; const cap=f['KAPASITI']||4; const hotel=f['HOTEL NAME']||''; const staffArr=(f['STAFF / EXTRA']||'').split(',').filter(Boolean); const jIds=f['JEMAAH']||[]; const count=jIds.length+staffArr.length;
+    const f=rec.fields; const roomId=f['Room ID / Nama Bilik']||generateRoomIdFromCap(f['KAPASITI']); const pakej=f['PAKEJ / HOTEL']||'EKONOMI'; const cap=f['KAPASITI']||4; const hotel=f['HOTEL NAME']||''; const staffForRoom=getStaffForRoom(rec.id); const staffArr=staffForRoom.map(s=>s.name); const jIds=f['JEMAAH']||[]; const count=jIds.length+staffArr.length;
     const jSlots=jIds.map(jId=>{ 
       const jRec=allRoomingJemaah.find(j=>j.id===jId); 
       const jName=getJemaahName(jRec?.fields);
@@ -985,7 +977,7 @@ async function executeCopyRooms(){
 
 function dragStaff(e,staffId){ if(isStaffAssignedInLocation(staffId, activeLocation)) return; e.dataTransfer.effectAllowed='move'; e.dataTransfer.setData('text/staff-id',staffId); e.dataTransfer.setData('text/plain',staffId); const row=e.currentTarget; if(row) setTimeout(()=>row.style.opacity='0.3',0); }
 function dragStaffEnd(e){ e.currentTarget.style.opacity='1'; }
-function quickAssignStaff(staffId){ if(isStaffAssignedInLocation(staffId, activeLocation)) return; const rooms=allRoomingRecords.filter(r=>(r.fields['LOKASI / CITY']||'MEKAH').toUpperCase()===activeLocation); const target=rooms.find(r=>{ const j=r.fields['JEMAAH']?.length||0; const s=(r.fields['STAFF / EXTRA']||'').split(',').filter(Boolean).length; return (j+s)<(r.fields['KAPASITI']||4); }); if(target) assignStaffToRoom(staffId,target.id); else alert('Tiada slot kosong di lokasi '+activeLocation+'.'); }
+function quickAssignStaff(staffId){ if(isStaffAssignedInLocation(staffId, activeLocation)) return; const rooms=allRoomingRecords.filter(r=>(r.fields['LOKASI / CITY']||'MEKAH').toUpperCase()===activeLocation); const target=rooms.find(r=>{ const j=r.fields['JEMAAH']?.length||0; const s=getStaffForRoom(r.id).length; return (j+s)<(r.fields['KAPASITI']||4); }); if(target) assignStaffToRoom(staffId,target.id); else alert('Tiada slot kosong di lokasi '+activeLocation+'.'); }
 async function addTanpaKatilToRoom(roomId, jId){
   const rec=allRoomingRecords.find(r=>r.id===roomId);
   if(!rec) return;
@@ -1018,7 +1010,7 @@ async function removeTanpaKatilFromRoom(roomId, jId){
 
 
 
-function generateRoomingPrint(){
+function generateRoomingPrint(orientation){ orientation = orientation || 'landscape';
   try{
     const tripNameRaw=window.selectedTripRecord?.fields?.Trip||document.getElementById('roomingTripSelect')?.selectedOptions[0]?.text||'Trip';
     const tripName=cleanTripNameForRooming(tripNameRaw);
@@ -1196,12 +1188,12 @@ function generateRoomingPrint(){
             <span style="font-weight:bold">${fbTotalLoc? fbTotalLoc+' BOARD' : '0 PAKEJ MAKAN'}</span>
           </div>
         </div>
-        <div style="columns:2; column-gap:12px">${roomBlocks}</div>
+        <div style="columns:${orientation==='portrait' ? 1 : 2}; column-gap:12px">${roomBlocks}</div>
         ${fbTableHTML}
       </div>`;
     });
 
-    const html=`<html><head><title>Rooming ${tripName}</title><style>body{font-family:Arial,Helvetica,sans-serif;font-size:10px;margin:12px;color:#000}table{border-collapse:collapse;width:100%}th,td{border:1px solid #000;padding:4px 6px;font-size:9px}th{background:#7A0C2E;color:#fff;font-weight:bold;text-transform:uppercase}.header{display:flex;justify-content:space-between;font-weight:bold;font-size:12px;border-bottom:2px solid #000;padding-bottom:6px;margin-bottom:8px}.page-break{page-break-before:always}.namelist-page{max-width:900px;margin:0 auto}.location-page{max-width:100%}@media print{@page{size:A4 landscape;margin:10mm}body{-webkit-print-color-adjust:exact;print-color-adjust:exact}.page-break{page-break-before:always}}</style></head><body>
+    const html=`<html><head><title>Rooming ${tripName}</title><style>body{font-family:Arial,Helvetica,sans-serif;font-size:10px;margin:12px;color:#000}table{border-collapse:collapse;width:100%}th,td{border:1px solid #000;padding:4px 6px;font-size:9px}th{background:#7A0C2E;color:#fff;font-weight:bold;text-transform:uppercase}.header{display:flex;justify-content:space-between;font-weight:bold;font-size:12px;border-bottom:2px solid #000;padding-bottom:6px;margin-bottom:8px}.page-break{page-break-before:always}.namelist-page{max-width:900px;margin:0 auto}.location-page{max-width:100%}@media print{@page{size:A4 ${orientation};margin:10mm}body{-webkit-print-color-adjust:exact;print-color-adjust:exact}.page-break{page-break-before:always}}</style></head><body>
       <div class="namelist-page"><div class="header"><span>NAMELIST ${tripName}</span><span>Total: ${allRoomingJemaah.length} Jemaah + ${combinedStaff.length} Staff</span></div><div style="font-size:9px;margin-bottom:8px"><b>Trip:</b> ${tripName} | <b>Tarikh Cetak:</b> ${new Date().toLocaleDateString('ms-MY')}</div><table><tr><th style="width:30px">NO</th><th>NAMA JEMAAH</th><th style="width:130px">BOARD</th><th style="width:60px">TRAIN</th><th style="width:70px">PAKEJ</th><th style="width:190px">INSURAN</th></tr>${namelistRows}</table></div>
       ${locationPages||'<div style="page-break-before:always"><div style="border:1px dashed #000;padding:20px;text-align:center">Tiada bilik untuk trip ini</div></div>'}
       <script>window.onload=function(){setTimeout(()=>window.print(),600)}; window.onafterprint=function(){window.close();}; setTimeout(()=>{try{window.close();}catch(e){}},2500);<\/script>
