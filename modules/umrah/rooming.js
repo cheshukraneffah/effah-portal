@@ -41,8 +41,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
 function showRoomingLoading(){
   const g=document.getElementById('roomingGrid'); const l=document.getElementById('namelistContainer');
-  if(g) g.innerHTML=`<div class="col-span-2 p-6 text-center text-[11px] text-slate-400">Memuatkan bilik...</div>`;
-  if(l) l.innerHTML=`<div class="p-6 text-center text-[11px] text-slate-400">Memuatkan jemaah...</div>`;
+  const spinner = `<div class="flex flex-col items-center justify-center gap-3 py-10"><div class="w-8 h-8 border-[3px] border-slate-200 border-t-[#7A0C2E] rounded-full animate-spin"></div><div class="text-[11px] text-slate-600 font-medium">Memuatkan jemaah...</div></div>`;
+  const spinnerBilik = `<div class="col-span-2 flex flex-col items-center justify-center gap-3 py-16"><div class="w-8 h-8 border-[3px] border-slate-200 border-t-[#7A0C2E] rounded-full animate-spin"></div><div class="text-[11px] text-slate-600 font-medium">Memuatkan bilik...</div></div>`;
+  const skeletonRooms = Array.from({length:4}).map(()=>`<div class="bg-white rounded-2xl border border-slate-200 p-3 animate-pulse"><div class="h-4 bg-slate-100 rounded-full w-1/3 mb-3"></div><div class="h-3 bg-slate-100 rounded-full w-2/3 mb-4"></div><div class="space-y-2"><div class="h-9 bg-slate-50 rounded-xl"></div><div class="h-9 bg-slate-50 rounded-xl"></div><div class="h-9 bg-slate-100 rounded-xl border border-dashed"></div></div></div>`).join('');
+  const skeletonList = Array.from({length:6}).map(()=>`<div class="px-2.5 py-3 flex gap-2 animate-pulse"><div class="w-6 h-3 bg-slate-100 rounded"></div><div class="flex-1 h-3 bg-slate-100 rounded-full"></div><div class="w-16 h-5 bg-slate-50 rounded-full"></div></div>`).join('');
+  if(g) g.innerHTML=`${spinnerBilik}<div class="grid grid-cols-1 gap-2.5 mt-2">${skeletonRooms}</div>`;
+  if(l) l.innerHTML=`${spinner}<div class="divide-y divide-slate-50 border-t mt-2">${skeletonList}</div>`;
+  const overview=document.getElementById('roomingOverview');
+  if(overview) overview.innerHTML=`<div class="flex items-center gap-2 text-[11px]"><div class="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> Memuatkan ${activeLocation}...</div>`;
 }
 
 function renderRoomingHTML(){
@@ -209,6 +215,22 @@ function renderRoomingOverview(rooms){
     const cap=r.fields['KAPASITI']||4;
     byHotel[hotel][cap]=(byHotel[hotel][cap]||0)+1;
   });
+  // count FB per hotel
+  function countFBForHotel(hotelRooms, locUpper){
+    let cnt=0;
+    hotelRooms.forEach(r=>{
+      const jIds=[...(r.fields['JEMAAH']||[]), ...(r.fields['JEMAAH TANPA KATIL']||[])];
+      jIds.forEach(jId=>{
+        const jRec=allRoomingJemaah.find(j=>j.id===jId);
+        const fb=(jRec?.fields?.['FULLBOARD']||'').toUpperCase();
+        if(!fb || fb==='-' || fb==='NO FULLBOARD') return;
+        if(locUpper==='MEKAH'){ if(fb.includes('MEKAH')||fb==='FULLBOARD') cnt++; }
+        else if(locUpper==='MADINAH'){ if(fb.includes('MADINAH')||fb==='FULLBOARD') cnt++; }
+        else cnt++;
+      });
+    });
+    return cnt;
+  }
   let fbCount=0; const loc=activeLocation.toUpperCase();
   allRoomingJemaah.forEach(j=>{
     const fb=(j.fields['FULLBOARD']||'').toUpperCase();
@@ -223,15 +245,34 @@ function renderRoomingOverview(rooms){
   const totalJ=rooms.reduce((s,r)=>s+(r.fields['JEMAAH']?.length||0),0);
   const totalBaby=rooms.reduce((s,r)=>s+(r.fields['JEMAAH TANPA KATIL']?.length||0),0);
   const totalStaff=rooms.reduce((s,r)=>s+(r.fields['STAFF / EXTRA']||'').split(',').filter(Boolean).length,0);
-  let lines=[];
-  Object.keys(byHotel).sort().forEach(hotel=>{
+
+  let hotelBlocks = Object.keys(byHotel).sort().map(hotel=>{
     const caps=byHotel[hotel];
-    Object.keys(caps).sort((a,b)=>b-a).forEach(cap=>{
+    const hotelRooms = allRoomingRecords.filter(r=> (r.fields['HOTEL NAME']||'TANPA HOTEL').toUpperCase()===hotel && (r.fields['LOKASI / CITY']||'MEKAH').toUpperCase()===loc);
+    const fbHotel = countFBForHotel(hotelRooms, loc);
+    const capsList = Object.keys(caps).sort((a,b)=>b-a).map(cap=>{
       const cnt=caps[cap];
-      lines.push(`<div class="flex items-center justify-between py-1.5 border-b border-white/10 last:border-0"><span>Bilik ber-${cap} (${cnt})</span><span class="font-bold truncate ml-3">${hotel}</span></div>`);
-    });
-  });
-  let html=`<div class="space-y-2"><div class="flex items-center justify-between"><div class="font-bold text-[12px] tracking-widest">${activeLocation} • ${totalBilik} Bilik</div><div class="text-[10px] opacity-90">${totalJ} Jemaah${totalBaby?` + ${totalBaby} infant`:''} + ${totalStaff} Staff${fbCount?` • ${fbCount} FB`:''}</div></div><div class="bg-white/10 rounded-xl p-2.5 text-[11px] leading-relaxed">${lines.length?lines.join(''): '<div class="opacity-70">Tiada data hotel</div>'}</div></div>`;
+      return `<span class="inline-flex items-center gap-1 bg-white/15 px-2 py-0.5 rounded-full text-[10px] mr-1 mb-1"><span>Bilik ber-${cap}</span><span class="font-bold">(${cnt})</span></span>`;
+    }).join('');
+    return `<div class="flex flex-col gap-1 py-2 border-b border-white/10 last:border-0"><div class="flex items-center justify-between"><span class="font-bold text-[11px] truncate">${hotel}</span>${fbHotel?`<span class="text-[9px] bg-white/20 px-1.5 py-0.5 rounded-full">${fbHotel} FB</span>`:''}</div><div class="flex flex-wrap">${capsList}</div></div>`;
+  }).join('');
+
+  let html=`<div class="space-y-2">
+    <div class="flex items-center justify-between">
+      <div class="font-bold text-[13px] tracking-widest">${activeLocation} • ${totalBilik} Bilik</div>
+      <div class="flex items-center gap-1.5">
+        <span class="text-[10px] bg-white/20 px-2 py-0.5 rounded-full">${totalJ} J+${totalBaby} I+${totalStaff} S</span>
+        ${fbCount?`<span class="text-[10px] bg-emerald-400/90 text-emerald-900 px-2 py-0.5 rounded-full font-bold">${fbCount} FB</span>`:''}
+      </div>
+    </div>
+    <div class="bg-white/10 rounded-xl p-2.5 max-h-[22vh] overflow-y-auto">
+      ${hotelBlocks||'<div class="opacity-70 text-[11px]">Tiada data hotel</div>'}
+    </div>
+    <div class="flex justify-between text-[9px] opacity-80 px-1">
+      <span>Total ${totalBilik} bilik</span>
+      <span>${totalJ} jemaah${totalBaby?` + ${totalBaby} infant`:''} + ${totalStaff} staff</span>
+    </div>
+  </div>`;
   el.innerHTML=html;
 }
 
@@ -790,12 +831,21 @@ function generateRoomingPrint(){
       if(rooms.length===0) return;
       rooms=getRoomOrderedList(rooms);
       const byHotel={}; rooms.forEach(r=>{ const hotel=(r.fields['HOTEL NAME']||'TANPA HOTEL').trim().toUpperCase()||'TANPA HOTEL'; if(!byHotel[hotel]) byHotel[hotel]=[]; byHotel[hotel].push(r); });
-      let overviewMini = Object.keys(byHotel).map(hotel=>{
+      // Professional overview - table format
+      let overviewTableRows = Object.keys(byHotel).sort().map(hotel=>{
         const capCount={}; byHotel[hotel].forEach(r=>{ const cap=r.fields['KAPASITI']||4; capCount[cap]=(capCount[cap]||0)+1; });
         const fbHotel = countFBForRooms(byHotel[hotel], loc.toUpperCase());
-        const capStr = Object.keys(capCount).sort((a,b)=>b-a).map(c=>`B${c}-${capCount[c]}`).join(', ');
-        return `${hotel}: ${capStr}${fbHotel?` (${fbHotel} FB)`:''}`;
-      }).join(' | ');
+        const capsDetail = Object.keys(capCount).sort((a,b)=>b-a).map(c=>`Bilik ber-${c} (${capCount[c]})`).join(', ');
+        return {hotel, capsDetail, fbHotel, total: Object.values(capCount).reduce((a,b)=>a+b,0)};
+      });
+      let overviewMini = overviewTableRows.map(r=>`${r.hotel}: ${Object.keys(byHotel[r.hotel]).length? Object.keys(byHotel[r.hotel]).map(c=>`B${c}-${byHotel[r.hotel].filter(x=> (x.fields['KAPASITI']||4)==c).length}`).join(', '):''}${r.fbHotel?` (${r.fbHotel} FB)`:''}`).join(' | ');
+      let overviewProfessionalHTML = `
+        <table style="width:100%;border-collapse:collapse;font-size:9px;margin:0">
+          <tr style="background:#f8f8f8;font-weight:bold"><th style="border:1px solid #000;padding:3px 6px;text-align:left">HOTEL</th><th style="border:1px solid #000;padding:3px 6px;text-align:center">BILIK</th><th style="border:1px solid #000;padding:3px 6px;text-align:center">FULLBOARD</th><th style="border:1px solid #000;padding:3px 6px;text-align:center">JUMLAH</th></tr>
+          ${overviewTableRows.map(r=>`<tr><td style="border:1px solid #000;padding:3px 6px;font-weight:bold">${r.hotel}</td><td style="border:1px solid #000;padding:3px 6px;text-align:center">${r.capsDetail}</td><td style="border:1px solid #000;padding:3px 6px;text-align:center">${r.fbHotel? r.fbHotel+' FB' : '-'}</td><td style="border:1px solid #000;padding:3px 6px;text-align:center">${r.total} bilik</td></tr>`).join('')}
+        </table>
+      `;
+
       const fbTotalLoc = countFBForRooms(rooms, loc.toUpperCase());
       const roomBlocks=rooms.map(r=>{
         const f=r.fields; const rid=f['Room ID / Nama Bilik']||generateRoomIdFromCap(f['KAPASITI']); const pakej=f['PAKEJ / HOTEL']||'EKONOMI'; const hotel=f['HOTEL NAME']||'TANPA HOTEL'; const jIds=f['JEMAAH']||[]; const staff=(f['STAFF / EXTRA']||'').split(',').filter(Boolean);
@@ -822,7 +872,22 @@ function generateRoomingPrint(){
       const totalJemaahLoc=rooms.reduce((s,r)=>s+(r.fields['JEMAAH']?.length||0),0);
       const totalStaffLoc=rooms.reduce((s,r)=>s+(r.fields['STAFF / EXTRA']||'').split(',').filter(Boolean).length,0);
       const totalBabyLoc=rooms.reduce((s,r)=>s+(r.fields['JEMAAH TANPA KATIL']?.length||0),0);
-      locationPages+=`<div style="page-break-before:always"><div style="display:flex;justify-content:space-between;font-weight:bold;font-size:12px;border-bottom:2px solid #000;padding-bottom:6px;margin-bottom:8px"><span>ROOMING LIST ${tripName} - ${loc} (${rooms.length} BILIK)</span><span style="font-size:9px;font-weight:normal">${overviewMini}</span></div><div style="font-size:9px;margin-bottom:8px;background:#f5f5f5;border:1px solid #000;padding:5px 8px"><b>${loc} OVERVIEW:</b> ${overviewMini} | Total: ${rooms.length} bilik, ${totalJemaahLoc} jemaah${totalBabyLoc?` + ${totalBabyLoc} infant`:''} + ${totalStaffLoc} staff${fbTotalLoc?` • ${fbTotalLoc} FULLBOARD`:''}</div><div style="columns:2; column-gap:12px">${roomBlocks}</div></div>`;
+      locationPages+=`<div style="page-break-before:always">
+        <div style="display:flex;justify-content:space-between;align-items:center;font-weight:bold;font-size:13px;border-bottom:2px solid #000;padding-bottom:6px;margin-bottom:8px">
+          <span>ROOMING LIST ${tripName} - ${loc} (${rooms.length} BILIK)</span>
+          <span style="font-size:9px;font-weight:normal;background:#7A0C2E;color:#fff;padding:3px 8px;border-radius:10px">${totalJemaahLoc} jemaah${totalBabyLoc?` + ${totalBabyLoc} infant`:''} + ${totalStaffLoc} staff${fbTotalLoc?` • ${fbTotalLoc} FB`:''}</span>
+        </div>
+        <div style="margin-bottom:10px;border:1px solid #000;padding:0;background:#fff">
+          <div style="background:#7A0C2E;color:#fff;padding:4px 8px;font-weight:bold;font-size:10px">${loc} OVERVIEW - ${rooms.length} Bilik</div>
+          ${overviewProfessionalHTML}
+          <div style="background:#f5f5f5;padding:5px 8px;font-size:9px;border-top:1px solid #000;display:flex;justify-content:space-between">
+            <span><b>Total:</b> ${rooms.length} bilik</span>
+            <span>${totalJemaahLoc} jemaah${totalBabyLoc?` + ${totalBabyLoc} infant`:''} + ${totalStaffLoc} staff</span>
+            <span style="font-weight:bold">${fbTotalLoc? fbTotalLoc+' FULLBOARD' : '0 FULLBOARD'}</span>
+          </div>
+        </div>
+        <div style="columns:2; column-gap:12px">${roomBlocks}</div>
+      </div>`;
     });
 
     const html=`<html><head><title>Rooming ${tripName}</title><style>body{font-family:Arial,Helvetica,sans-serif;font-size:10px;margin:12px;color:#000}table{border-collapse:collapse;width:100%}th,td{border:1px solid #000;padding:4px 6px;font-size:9px}th{background:#7A0C2E;color:#fff;font-weight:bold;text-transform:uppercase}.header{display:flex;justify-content:space-between;font-weight:bold;font-size:12px;border-bottom:2px solid #000;padding-bottom:6px;margin-bottom:8px}.page-break{page-break-before:always}.namelist-page{max-width:900px;margin:0 auto}.location-page{max-width:100%}@media print{@page{size:A4 landscape;margin:10mm}body{-webkit-print-color-adjust:exact;print-color-adjust:exact}.page-break{page-break-before:always}}</style></head><body>
