@@ -41,14 +41,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
 function showRoomingLoading(){
   const g=document.getElementById('roomingGrid'); const l=document.getElementById('namelistContainer');
-  const spinner = `<div class="flex flex-col items-center justify-center gap-3 py-10"><div class="w-8 h-8 border- border-slate-200 border-t-[#7A0C2E] rounded-full animate-spin"></div><div class="text- text-slate-600 font-medium">Memuatkan jemaah...</div></div>`;
-  const spinnerBilik = `<div class="col-span-2 flex flex-col items-center justify-center gap-3 py-16"><div class="w-8 h-8 border- border-slate-200 border-t-[#7A0C2E] rounded-full animate-spin"></div><div class="text- text-slate-600 font-medium">Memuatkan bilik...</div></div>`;
+  const spinner = `<div class="flex flex-col items-center justify-center gap-3 py-10"><div class="w-8 h-8 border-[3px] border-slate-200 border-t-[#7A0C2E] rounded-full animate-spin"></div><div class="text-[11px] text-slate-600 font-medium">Memuatkan jemaah...</div></div>`;
+  const spinnerBilik = `<div class="col-span-2 flex flex-col items-center justify-center gap-3 py-16"><div class="w-8 h-8 border-[3px] border-slate-200 border-t-[#7A0C2E] rounded-full animate-spin"></div><div class="text-[11px] text-slate-600 font-medium">Memuatkan bilik...</div></div>`;
   const skeletonRooms = Array.from({length:4}).map(()=>`<div class="bg-white rounded-2xl border border-slate-200 p-3 animate-pulse"><div class="h-4 bg-slate-100 rounded-full w-1/3 mb-3"></div><div class="h-3 bg-slate-100 rounded-full w-2/3 mb-4"></div><div class="space-y-2"><div class="h-9 bg-slate-50 rounded-xl"></div><div class="h-9 bg-slate-50 rounded-xl"></div><div class="h-9 bg-slate-100 rounded-xl border border-dashed"></div></div></div>`).join('');
   const skeletonList = Array.from({length:6}).map(()=>`<div class="px-2.5 py-3 flex gap-2 animate-pulse"><div class="w-6 h-3 bg-slate-100 rounded"></div><div class="flex-1 h-3 bg-slate-100 rounded-full"></div><div class="w-16 h-5 bg-slate-50 rounded-full"></div></div>`).join('');
   if(g) g.innerHTML=`${spinnerBilik}<div class="grid grid-cols-1 gap-2.5 mt-2">${skeletonRooms}</div>`;
   if(l) l.innerHTML=`${spinner}<div class="divide-y divide-slate-50 border-t mt-2">${skeletonList}</div>`;
   const overview=document.getElementById('roomingOverview');
-  if(overview) overview.innerHTML=`<div class="flex items-center gap-2 text-"><div class="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> Memuatkan ${activeLocation}...</div>`;
+  if(overview) overview.innerHTML=`<div class="flex items-center gap-2 text-[11px]"><div class="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> Memuatkan ${activeLocation}...</div>`;
 }
 
 function renderRoomingHTML(){
@@ -57,15 +57,15 @@ function renderRoomingHTML(){
   <div class="flex flex-col gap-2.5 p-2">
     <div class="bg-white rounded-2xl border border-slate-200 p-2.5 flex flex-wrap items-center justify-between gap-2">
       <div class="flex items-center gap-2.5 flex-wrap">
-        <span class="font-bold tracking-widest text-slate-800 text-">ROOMING LIST</span>
-        <select id="roomingTripSelect" onchange="onRoomingTripChange(this.value)" class="px-2.5 py-1 border border-slate-300 rounded-full bg-white text- font-bold min-w- max-w- truncate">
+        <span class="font-bold tracking-widest text-slate-800 text-[11px]">ROOMING LIST</span>
+        <select id="roomingTripSelect" onchange="onRoomingTripChange(this.value)" class="px-2.5 py-1 border border-slate-300 rounded-full bg-white text-[11px] font-bold min-w-[240px] max-w-[320px] truncate">
           <option value="">Pilih Trip...</option>
         </select>
       </div>
-      <div class="flex items-center gap-1.5 text-">
-        <span id="belumAssignTop" class="px-2 py-0.5 bg-amber-100 rounded-full font-bold text-">0 Unassigned</span>
-        <span id="assignedTop" class="px-2 py-0.5 bg-emerald-50 rounded-full font-bold text-">0 Assigned</span>
-        <button onclick="fetchRoomingData()" class="w-6 h-6 rounded-full border bg-white hover:bg-slate-50 text-"><i class="fa-solid fa-rotate"></i></button>
+      <div class="flex items-center gap-1.5 text-[11px]">
+        <span id="belumAssignTop" class="px-2 py-0.5 bg-amber-100 rounded-full font-bold text-[10px]">0 Unassigned</span>
+        <span id="assignedTop" class="px-2 py-0.5 bg-emerald-50 rounded-full font-bold text-[10px]">0 Assigned</span>
+        <button onclick="fetchRoomingData()" class="w-6 h-6 rounded-full border bg-white hover:bg-slate-50 text-[10px]"><i class="fa-solid fa-rotate"></i></button>
       </div>
     </div>
 
@@ -73,39 +73,39 @@ function renderRoomingHTML(){
       <div class="w-full lg:w-[52%] bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col overflow-hidden">
         <div class="p-2.5 border-b border-slate-200">
           <div class="flex items-center justify-between mb-2.5">
-            <h3 class="font-bold text- tracking-widest text-slate-700">NAMELIST JEMAAH</h3>
+            <h3 class="font-bold text-[11px] tracking-widest text-slate-700">NAMELIST JEMAAH</h3>
             <div class="flex gap-1">
-              <span id="belumAssignBadge" class="px-2 py-0.5 bg-amber-100 text-amber-800 rounded-full text- font-bold">0 Unassigned</span>
-              <span id="totalJemaahBadge" class="px-2 py-0.5 bg-slate-100 border border-slate-200 text-slate-700 rounded-full text- font-bold">0 Total</span>
+              <span id="belumAssignBadge" class="px-2 py-0.5 bg-amber-100 text-amber-800 rounded-full text-[10px] font-bold">0 Unassigned</span>
+              <span id="totalJemaahBadge" class="px-2 py-0.5 bg-slate-100 border border-slate-200 text-slate-700 rounded-full text-[10px] font-bold">0 Total</span>
             </div>
           </div>
           <div class="flex gap-1.5">
             <div class="relative flex-1">
-              <i class="fa-solid fa-magnifying-glass absolute left-2.5 top-2.5 text-slate-400 text-"></i>
-              <input id="searchRoomingJemaah" onkeyup="filterRoomingNamelist()" placeholder="Cari nama jemaah..." class="w-full text- pl-7 pr-2.5 py-2 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:outline-none">
+              <i class="fa-solid fa-magnifying-glass absolute left-2.5 top-2.5 text-slate-400 text-[10px]"></i>
+              <input id="searchRoomingJemaah" onkeyup="filterRoomingNamelist()" placeholder="Cari nama jemaah..." class="w-full text-[11px] pl-7 pr-2.5 py-2 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:outline-none">
             </div>
-            <select id="filterPakejRooming" onchange="filterRoomingNamelist()" class="text- border border-slate-200 rounded-xl px-2.5 py-2 bg-white font-medium"><option value="">Semua Pakej</option><option>JIMAT</option><option>EKONOMI</option><option>STANDARD</option><option>PREMIUM</option></select>
+            <select id="filterPakejRooming" onchange="filterRoomingNamelist()" class="text-[11px] border border-slate-200 rounded-xl px-2.5 py-2 bg-white font-medium"><option value="">Semua Pakej</option><option>JIMAT</option><option>EKONOMI</option><option>STANDARD</option><option>PREMIUM</option></select>
           </div>
         </div>
-        <div class="px-2.5 py-1.5 bg-slate-50/70 border-b border-slate-200 grid grid-cols-12 text- font-bold text-slate-500 tracking-wider">
+        <div class="px-2.5 py-1.5 bg-slate-50/70 border-b border-slate-200 grid grid-cols-12 text-[9px] font-bold text-slate-500 tracking-wider">
           <div class="col-span-1">NO</div>
           <div class="col-span-3 flex items-center gap-1 cursor-pointer hover:text-[#7A0C2E] select-none" onclick="toggleSortNama()" title="Klik untuk sort A-Z / Z-A">
-            <span id="headerNamaJemaah" class="bg-[#7A0C2E] text-white px-1.5 py-0.5 rounded text-">NAMA JEMAAH</span>
-            <span id="sortIcon" class="text-">${roomingSortActive ? (roomingSortDir==='asc'?'↑':'↓') : '↕'}</span>
+            <span id="headerNamaJemaah" class="bg-[#7A0C2E] text-white px-1.5 py-0.5 rounded text-[9px]">NAMA JEMAAH</span>
+            <span id="sortIcon" class="text-[10px]">${roomingSortActive ? (roomingSortDir==='asc'?'↑':'↓') : '↕'}</span>
           </div>
           <div class="col-span-2 text-center">BOARD BASIS</div><div class="col-span-1 text-center">TRAIN</div><div class="col-span-3 text-center">INSURAN (TAKAFUL/ETIQA/KHAIRI)</div><div class="col-span-1 text-center">PAKEJ</div><div class="col-span-1 text-center">+</div>
         </div>
-        <div id="namelistContainer" class="flex-1 overflow-y-auto max-h- divide-y divide-slate-50 bg-white min-h-"></div>
+        <div id="namelistContainer" class="flex-1 overflow-y-auto max-h-[42vh] divide-y divide-slate-50 bg-white min-h-[180px]"></div>
         <div class="border-t border-slate-200 bg-slate-50/50">
           <div class="p-2.5 flex items-center justify-between">
-            <h4 class="font-bold text- tracking-widest text-slate-700">STAFF / EXTRA LIST</h4>
-            <span id="staffTotalBadge" class="px-2 py-0.5 bg-slate-100 border border-slate-200 text-slate-700 rounded-full text- font-bold">0 Staff</span>
+            <h4 class="font-bold text-[11px] tracking-widest text-slate-700">STAFF / EXTRA LIST</h4>
+            <span id="staffTotalBadge" class="px-2 py-0.5 bg-slate-100 border border-slate-200 text-slate-700 rounded-full text-[10px] font-bold">0 Staff</span>
           </div>
           <div class="px-2.5 pb-2.5 flex gap-1.5">
-            <input id="newStaffInput" placeholder="Taip nama staff" class="flex-1 text- px-2.5 py-2 border border-slate-200 rounded-xl bg-white focus:outline-none" onkeydown="if(event.key==='Enter'){ addNewStaff(); }">
-            <button onclick="addNewStaff()" class="px-3 py-2 bg-slate-100 border border-slate-200 text-slate-700 rounded-xl text- font-bold hover:bg-slate-200">+ Add</button>
+            <input id="newStaffInput" placeholder="Taip nama staff" class="flex-1 text-[11px] px-2.5 py-2 border border-slate-200 rounded-xl bg-white focus:outline-none" onkeydown="if(event.key==='Enter'){ addNewStaff(); }">
+            <button onclick="addNewStaff()" class="px-3 py-2 bg-slate-100 border border-slate-200 text-slate-700 rounded-xl text-[11px] font-bold hover:bg-slate-200">+ Add</button>
           </div>
-          <div id="staffListContainer" class="px-2 pb-2.5 max-h- overflow-y-auto space-y-1 bg-slate-50/50 min-h-"></div>
+          <div id="staffListContainer" class="px-2 pb-2.5 max-h-[22vh] overflow-y-auto space-y-1 bg-slate-50/50 min-h-[70px]"></div>
         </div>
       </div>
 
@@ -113,49 +113,49 @@ function renderRoomingHTML(){
         <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-2.5">
           <div class="flex items-center justify-between gap-2 flex-wrap">
             <div>
-              <h3 class="font-bold text- tracking-widest">ROOMING LIST</h3>
-              <div class="flex items-center gap-1.5 mt-1 text-">
+              <h3 class="font-bold text-[11px] tracking-widest">ROOMING LIST</h3>
+              <div class="flex items-center gap-1.5 mt-1 text-[10px]">
                 <span id="roomingBiliks" class="px-2 py-0.5 bg-slate-100 border border-slate-200 text-slate-700 rounded-full font-bold">0 Bilik</span>
                 <span id="roomingOccupancy" class="text-slate-500">0 Jemaah + 0 Staff • ${activeLocation}</span>
               </div>
             </div>
             <div class="flex items-center gap-1 flex-wrap">
-              <button onclick="generateRoomingPrint()" class="px-2.5 py-1 bg-white border border-slate-200 rounded-full text- font-bold hover:bg-slate-50">Print / PDF</button>
-              <button onclick="openCopyRoomsModal()" class="px-2.5 py-1 bg-white border border-slate-200 rounded-full text- font-bold hover:bg-slate-50">Copy Bilik</button>
-              <button onclick="autoAssignRooming()" class="px-2.5 py-1 bg-slate-100 border border-slate-200 text-slate-700 rounded-full text- font-bold hover:bg-slate-200">Auto Assign</button>
-              <button onclick="openNewRoomModal()" class="px-2.5 py-1 bg-[#7A0C2E] text-white rounded-full text- font-bold hover:bg-[#5a0922]">+ Bilik Baru</button>
+              <button onclick="generateRoomingPrint()" class="px-2.5 py-1 bg-white border border-slate-200 rounded-full text-[10px] font-bold hover:bg-slate-50">Print / PDF</button>
+              <button onclick="openCopyRoomsModal()" class="px-2.5 py-1 bg-white border border-slate-200 rounded-full text-[10px] font-bold hover:bg-slate-50">Copy Bilik</button>
+              <button onclick="autoAssignRooming()" class="px-2.5 py-1 bg-slate-100 border border-slate-200 text-slate-700 rounded-full text-[10px] font-bold hover:bg-slate-200">Auto Assign</button>
+              <button onclick="openNewRoomModal()" class="px-2.5 py-1 bg-[#7A0C2E] text-white rounded-full text-[10px] font-bold hover:bg-[#5a0922]">+ Bilik Baru</button>
             </div>
           </div>
-          <div id="roomingOverview" class="mt-2.5 p-2.5 bg-[#7A0C2E] text-white rounded-xl text-"></div>
+          <div id="roomingOverview" class="mt-2.5 p-2.5 bg-[#7A0C2E] text-white rounded-xl text-[11px]"></div>
           <div id="locationTabs" class="flex flex-wrap gap-1 mt-2.5"></div>
         </div>
-        <div id="roomingGrid" class="grid grid-cols-1 lg:grid-cols-2 gap-2.5 overflow-y-auto max-h- pr-1 content-start min-h-"></div>
+        <div id="roomingGrid" class="grid grid-cols-1 lg:grid-cols-2 gap-2.5 overflow-y-auto max-h-[78vh] pr-1 content-start min-h-[280px]"></div>
       </div>
     </div>
   </div>
 
   <div id="newRoomModal" class="fixed inset-0 bg-black/50 z-50 hidden flex items-center justify-center p-4">
     <div class="bg-white rounded-2xl p-4 max-w-sm w-full shadow-2xl">
-      <h3 class="font-bold mb-3 text-">Tambah Bilik Baru</h3>
-      <div class="space-y-2.5 text-">
+      <h3 class="font-bold mb-3 text-[11px]">Tambah Bilik Baru</h3>
+      <div class="space-y-2.5 text-[11px]">
         <div>
-          <label class="text- font-bold text-slate-500">ROOM ID (Auto)</label>
-          <input id="newRoomId" readonly class="w-full p-2 border border-slate-200 rounded-xl bg-slate-100 font-bold text-slate-700 text-" value="B4">
-          <p class="text- text-slate-400 mt-0.5">Dijana automatik: B + Kapasiti</p>
+          <label class="text-[9px] font-bold text-slate-500">ROOM ID (Auto)</label>
+          <input id="newRoomId" readonly class="w-full p-2 border border-slate-200 rounded-xl bg-slate-100 font-bold text-slate-700 text-[11px]" value="B4">
+          <p class="text-[9px] text-slate-400 mt-0.5">Dijana automatik: B + Kapasiti</p>
         </div>
-        <select id="newRoomLokasi" class="w-full p-2 border border-slate-200 rounded-xl bg-white text-"><option value="MEKAH">MEKAH</option><option value="MADINAH">MADINAH</option><option value="TAIF">TAIF</option><option value="JEDDAH">JEDDAH</option></select>
-        <select id="newRoomPakej" class="w-full p-2 border border-slate-200 rounded-xl bg-white text-"><option>JIMAT</option><option>EKONOMI</option><option>STANDARD</option><option>PREMIUM</option></select>
-        <input id="newRoomHotel" placeholder="Nama Hotel" class="w-full p-2 border border-slate-200 rounded-xl bg-white text-">
+        <select id="newRoomLokasi" class="w-full p-2 border border-slate-200 rounded-xl bg-white text-[11px]"><option value="MEKAH">MEKAH</option><option value="MADINAH">MADINAH</option><option value="TAIF">TAIF</option><option value="JEDDAH">JEDDAH</option></select>
+        <select id="newRoomPakej" class="w-full p-2 border border-slate-200 rounded-xl bg-white text-[11px]"><option>JIMAT</option><option>EKONOMI</option><option>STANDARD</option><option>PREMIUM</option></select>
+        <input id="newRoomHotel" placeholder="Nama Hotel" class="w-full p-2 border border-slate-200 rounded-xl bg-white text-[11px]">
         <div class="flex gap-2 items-center">
-          <input id="newRoomCap" type="number" value="4" min="1" max="8" oninput="updateNewRoomIdFromCap()" class="flex-1 p-2 border border-slate-200 rounded-xl font-bold bg-white text-">
-          <span class="py-2 text-slate-500 font-bold text-">Kapasiti</span>
-          <button type="button" onclick="changeNewRoomCap(-1)" class="w-7 h-7 rounded-full bg-slate-100 border text-">−</button>
-          <button type="button" onclick="changeNewRoomCap(1)" class="w-7 h-7 rounded-full bg-slate-100 border text-">+</button>
+          <input id="newRoomCap" type="number" value="4" min="1" max="8" oninput="updateNewRoomIdFromCap()" class="flex-1 p-2 border border-slate-200 rounded-xl font-bold bg-white text-[11px]">
+          <span class="py-2 text-slate-500 font-bold text-[10px]">Kapasiti</span>
+          <button type="button" onclick="changeNewRoomCap(-1)" class="w-7 h-7 rounded-full bg-slate-100 border text-[11px]">−</button>
+          <button type="button" onclick="changeNewRoomCap(1)" class="w-7 h-7 rounded-full bg-slate-100 border text-[11px]">+</button>
         </div>
-        <textarea id="newRoomNote" placeholder="Catatan bilik..." class="w-full p-2 border border-slate-200 rounded-xl h-14 bg-white text-"></textarea>
+        <textarea id="newRoomNote" placeholder="Catatan bilik..." class="w-full p-2 border border-slate-200 rounded-xl h-14 bg-white text-[11px]"></textarea>
         <div class="flex gap-2 pt-1">
-          <button onclick="closeNewRoomModal()" class="flex-1 py-2 bg-slate-100 border border-slate-200 rounded-xl font-bold text-">Batal</button>
-          <button onclick="submitNewRoom()" id="btnCiptaBilik" class="flex-1 py-2 bg-[#7A0C2E] text-white rounded-xl font-bold text-">Cipta Bilik</button>
+          <button onclick="closeNewRoomModal()" class="flex-1 py-2 bg-slate-100 border border-slate-200 rounded-xl font-bold text-[11px]">Batal</button>
+          <button onclick="submitNewRoom()" id="btnCiptaBilik" class="flex-1 py-2 bg-[#7A0C2E] text-white rounded-xl font-bold text-[11px]">Cipta Bilik</button>
         </div>
       </div>
     </div>
@@ -163,21 +163,21 @@ function renderRoomingHTML(){
 
   <div id="copyRoomsModal" class="fixed inset-0 bg-black/50 z-50 hidden flex items-center justify-center p-4">
     <div class="bg-white rounded-2xl p-4 max-w-md w-full shadow-2xl">
-      <h3 class="font-bold mb-2 text-">Salin Bilik Dari Lokasi Lain</h3>
-      <p class="text- text-slate-500 mb-2.5">Salin bilik ke <b id="copyTargetLoc">${activeLocation}</b></p>
+      <h3 class="font-bold mb-2 text-[11px]">Salin Bilik Dari Lokasi Lain</h3>
+      <p class="text-[10px] text-slate-500 mb-2.5">Salin bilik ke <b id="copyTargetLoc">${activeLocation}</b></p>
       <div class="mb-2.5 p-2.5 bg-slate-50 rounded-xl border">
-        <div class="text- font-bold text-slate-600 mb-1.5">Pilihan Salinan:</div>
+        <div class="text-[9px] font-bold text-slate-600 mb-1.5">Pilihan Salinan:</div>
         <label class="flex items-start gap-2 p-1.5 rounded-lg hover:bg-white border border-transparent hover:border-slate-200 cursor-pointer">
           <input type="radio" name="copyMode" value="structure" checked class="mt-0.5">
-          <div><div class="text- font-bold">Struktur bilik sahaja</div><div class="text- text-slate-500">Hanya kapasiti, pakej & hotel.</div></div>
+          <div><div class="text-[11px] font-bold">Struktur bilik sahaja</div><div class="text-[9px] text-slate-500">Hanya kapasiti, pakej & hotel.</div></div>
         </label>
         <label class="flex items-start gap-2 p-1.5 rounded-lg hover:bg-white border border-transparent hover:border-slate-200 cursor-pointer mt-1.5">
           <input type="radio" name="copyMode" value="withJemaah" class="mt-0.5">
-          <div><div class="text- font-bold">Struktur + Jemaah & Staff</div><div class="text- text-slate-500">Bilik beserta penghuni akan disalin.</div></div>
+          <div><div class="text-[11px] font-bold">Struktur + Jemaah & Staff</div><div class="text-[9px] text-slate-500">Bilik beserta penghuni akan disalin.</div></div>
         </label>
       </div>
-      <div id="copySourceList" class="space-y-1.5 mb-3 max-h- overflow-y-auto"></div>
-      <div class="flex gap-2"><button onclick="closeCopyRoomsModal()" class="flex-1 py-2 bg-slate-100 border rounded-xl font-bold text-">Batal</button><button onclick="executeCopyRooms()" class="flex-1 py-2 bg-[#7A0C2E] text-white rounded-xl font-bold text-">Salin Sekarang</button></div>
+      <div id="copySourceList" class="space-y-1.5 mb-3 max-h-[30vh] overflow-y-auto"></div>
+      <div class="flex gap-2"><button onclick="closeCopyRoomsModal()" class="flex-1 py-2 bg-slate-100 border rounded-xl font-bold text-[11px]">Batal</button><button onclick="executeCopyRooms()" class="flex-1 py-2 bg-[#7A0C2E] text-white rounded-xl font-bold text-[11px]">Salin Sekarang</button></div>
     </div>
   </div>
   `;
@@ -193,21 +193,58 @@ function getRoomOrderedList(rooms){
   return [...rooms].sort((a,b)=>(a.fields['SORT ORDER']||9999)-(b.fields['SORT ORDER']||9999));
 }
 function saveRoomOrder(ids){ localStorage.setItem(getRoomOrderKey(), JSON.stringify(ids)); }
+
 let draggedRoomId=null;
-function handleRoomDragStart(e,roomId){ draggedRoomId=roomId; e.dataTransfer.setData('text/plain',roomId); const c=document.querySelector(`[data-room-id="${roomId}"]`); if(c) setTimeout(()=>c.style.opacity='0.4',0); }
-function handleRoomDragEnd(e){ const c=document.querySelector(`[data-room-id="${draggedRoomId}"]`); if(c) c.style.opacity='1'; draggedRoomId=null; document.querySelectorAll('[data-room-id]').forEach(x=>x.classList.remove('ring-2','ring-slate-200')); }
-function handleRoomDragOver(e){ e.preventDefault(); e.currentTarget.classList.add('ring-2','ring-slate-200'); }
-function handleRoomDragLeave(e){ e.currentTarget.classList.remove('ring-2','ring-slate-200'); }
-function handleRoomDrop(e,targetId){
-  e.preventDefault(); const fromId=draggedRoomId||e.dataTransfer.getData('text/plain');
-  if(!fromId||fromId===targetId) return; const grid=document.getElementById('roomingGrid'); const ids=Array.from(grid.querySelectorAll('[data-room-id]')).map(c=>c.dataset.roomId);
-  const f=ids.indexOf(fromId); const t=ids.indexOf(targetId); if(f>-1&&t>-1){ ids.splice(f,1); ids.splice(t,0,fromId); saveRoomOrder(ids); renderRoomingGrid(); }
+function handleRoomDragStart(e, roomId){ draggedRoomId=roomId; e.dataTransfer.effectAllowed='move'; e.target.closest('[data-room-id]')?.classList.add('opacity-50'); }
+function handleRoomDragEnd(e){ e.target.closest('[data-room-id]')?.classList.remove('opacity-50'); draggedRoomId=null; }
+function allowDropRoom(e){ e.preventDefault(); e.currentTarget.classList.add('ring-2','ring-[#7A0C2E]/30'); }
+function handleRoomDragLeave(e){ e.currentTarget.classList.remove('ring-2','ring-[#7A0C2E]/30'); }
+async function dropRoomReorder(e, targetRoomId){
+  e.preventDefault(); e.currentTarget.classList.remove('ring-2','ring-[#7A0C2E]/30');
+  if(!draggedRoomId || draggedRoomId===targetRoomId) return;
+  const rooms=[...allRoomingRecords].filter(r=>(r.fields['LOKASI / CITY']||'MEKAH').toUpperCase()===activeLocation.toUpperCase());
+  const ordered=getRoomOrderedList(rooms);
+  const draggedIdx=ordered.findIndex(r=>r.id===draggedRoomId);
+  const targetIdx=ordered.findIndex(r=>r.id===targetRoomId);
+  if(draggedIdx===-1 || targetIdx===-1) return;
+  const moved=ordered.splice(draggedIdx,1)[0];
+  ordered.splice(targetIdx,0,moved);
+  // Update local sort order
+  ordered.forEach((r,i)=>{ r.fields['SORT ORDER']=i+1; });
+  // Re-render immediately without refresh
+  renderRoomingGrid();
+  // Auto update Airtable in background
+  for(let i=0;i<ordered.length;i++){
+    const rec=ordered[i];
+    try{
+      const base=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base')||localStorage.getItem('effah_base_id'); const pat=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
+      await fetch(`https://api.airtable.com/v0/${base}/ROOMING%20LIST/${rec.id}`,{
+        method:'PATCH',
+        headers:{'Authorization':`Bearer ${pat}`,'Content-Type':'application/json'},
+        body: JSON.stringify({fields:{'SORT ORDER': i+1}})
+      });
+    }catch(err){ console.error('Sort update failed', rec.id, err); }
+  }
 }
+async function updateRoomCatatan(roomId, value){
+  const rec=allRoomingRecords.find(r=>r.id===roomId);
+  if(!rec) return;
+  rec.fields['CATATAN']=value;
+  try{
+    const base=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base')||localStorage.getItem('effah_base_id'); const pat=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
+  await fetch(`https://api.airtable.com/v0/${base}/ROOMING%20LIST/${roomId}`,{
+      method:'PATCH',
+      headers:{'Authorization':`Bearer ${pat}`,'Content-Type':'application/json'},
+      body: JSON.stringify({fields:{'CATATAN': value}})
+    });
+  }catch(e){ console.error('Catatan update failed', e); }
+}
+
 document.addEventListener('dragover',e=>{ const g=document.getElementById('roomingGrid'); if(!g) return; const r=g.getBoundingClientRect(); if(e.clientY>r.bottom-100) g.scrollTop+=14; if(e.clientY<r.top+100) g.scrollTop-=14; });
 
 function renderRoomingOverview(rooms){
   const el=document.getElementById('roomingOverview'); if(!el) return;
-  if(rooms.length===0){ el.innerHTML='<div class="flex items-center gap-2 text- opacity-70"><span class="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span> Tiada bilik untuk '+activeLocation+'</div>'; return; }
+  if(rooms.length===0){ el.innerHTML='<div class="flex items-center gap-2 text-[11px] opacity-70"><span class="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span> Tiada bilik untuk '+activeLocation+'</div>'; return; }
   const byHotel = {};
   rooms.forEach(r=>{
     const hotel = (r.fields['HOTEL NAME']||'TANPA HOTEL').trim().toUpperCase() || 'TANPA HOTEL';
@@ -251,23 +288,23 @@ function renderRoomingOverview(rooms){
     const fbHotel = countFBForHotel(hotelRooms, loc);
     const capsList = Object.keys(caps).sort((a,b)=>b-a).map(cap=>{
       const cnt=caps[cap];
-      return `<span class="inline-flex items-center gap-1 bg-white/15 px-2 py-0.5 rounded-full text- mr-1 mb-1"><span>Bilik ber-${cap}</span><span class="font-bold">(${cnt})</span></span>`;
+      return `<span class="inline-flex items-center gap-1 bg-white/15 px-2 py-0.5 rounded-full text-[10px] mr-1 mb-1"><span>Bilik ber-${cap}</span><span class="font-bold">(${cnt})</span></span>`;
     }).join('');
-    return `<div class="flex flex-col gap-1 py-2 border-b border-white/10 last:border-0"><div class="flex items-center justify-between"><span class="font-bold text- truncate">${hotel}</span>${fbHotel?`<span class="text- bg-white/20 px-1.5 py-0.5 rounded-full">${fbHotel} Board Basis</span>`:''}</div><div class="flex flex-wrap">${capsList}</div></div>`;
+    return `<div class="flex flex-col gap-1 py-2 border-b border-white/10 last:border-0"><div class="flex items-center justify-between"><span class="font-bold text-[11px] truncate">${hotel}</span>${fbHotel?`<span class="text-[9px] bg-white/20 px-1.5 py-0.5 rounded-full">${fbHotel} Board Basis</span>`:''}</div><div class="flex flex-wrap">${capsList}</div></div>`;
   }).join('');
 
   let html=`<div class="space-y-2">
     <div class="flex items-center justify-between">
-      <div class="font-bold text- tracking-widest">${activeLocation} • ${totalBilik} Bilik</div>
+      <div class="font-bold text-[13px] tracking-widest">${activeLocation} • ${totalBilik} Bilik</div>
       <div class="flex items-center gap-1.5">
-        <span class="text- bg-white/20 px-2 py-0.5 rounded-full">${totalJ} J+${totalBaby} I+${totalStaff} S</span>
-        ${fbCount?`<span class="text- bg-emerald-400/90 text-emerald-900 px-2 py-0.5 rounded-full font-bold">${fbCount} Board Basis</span>`:''}
+        <span class="text-[10px] bg-white/20 px-2 py-0.5 rounded-full">${totalJ} J+${totalBaby} I+${totalStaff} S</span>
+        ${fbCount?`<span class="text-[10px] bg-emerald-400/90 text-emerald-900 px-2 py-0.5 rounded-full font-bold">${fbCount} Board Basis</span>`:''}
       </div>
     </div>
-    <div class="bg-white/10 rounded-xl p-2.5 max-h- overflow-y-auto">
-      ${hotelBlocks||'<div class="opacity-70 text-">Tiada data hotel</div>'}
+    <div class="bg-white/10 rounded-xl p-2.5 max-h-[22vh] overflow-y-auto">
+      ${hotelBlocks||'<div class="opacity-70 text-[11px]">Tiada data hotel</div>'}
     </div>
-    <div class="flex justify-between text- opacity-80 px-1">
+    <div class="flex justify-between text-[9px] opacity-80 px-1">
       <span>Total ${totalBilik} bilik</span>
       <span>${totalJ} jemaah${totalBaby?` + ${totalBaby} infant`:''} + ${totalStaff} staff</span>
     </div>
@@ -282,18 +319,18 @@ function renderLocationTabs(){
   let html=all.map(loc=>{
     const label=loc; // V24.6 no emoji
     const c=counts[loc]||0; const active=loc===activeLocation; const isCustom=!['MEKAH','MADINAH','TAIF'].includes(loc);
-    const delBtn=isCustom?`<button onclick="event.stopPropagation(); deleteCustomLocation('${loc}')" class="ml-1 w-4 h-4 rounded-full bg-white/20 hover:bg-red-500 hover:text-white flex items-center justify-center text-">✕</button>`:'';
+    const delBtn=isCustom?`<button onclick="event.stopPropagation(); deleteCustomLocation('${loc}')" class="ml-1 w-4 h-4 rounded-full bg-white/20 hover:bg-red-500 hover:text-white flex items-center justify-center text-[9px]">✕</button>`:'';
     const wrapCls=active?'bg-[#7A0C2E] rounded-full':'bg-white rounded-full border border-slate-200';
-    return `<div class="inline-flex items-center ${wrapCls}"><button onclick="setActiveLocation('${loc}')" class="px-2.5 py-1 rounded-full text- font-bold ${active?'text-white':'text-slate-700'}">${label} (${c})</button>${delBtn}</div>`;
+    return `<div class="inline-flex items-center ${wrapCls}"><button onclick="setActiveLocation('${loc}')" class="px-2.5 py-1 rounded-full text-[11px] font-bold ${active?'text-white':'text-slate-700'}">${label} (${c})</button>${delBtn}</div>`;
   }).join('');
-  html+=`<button onclick="openAddLocationModal()" class="px-2.5 py-1 rounded-full text- font-bold bg-slate-100 border border-slate-200 text-slate-600 hover:bg-slate-200">+ Lokasi</button>`;
+  html+=`<button onclick="openAddLocationModal()" class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-slate-100 border border-slate-200 text-slate-600 hover:bg-slate-200">+ Lokasi</button>`;
   container.innerHTML=html;
 }
-async function fetchRoomingData(){
+async async async function fetchRoomingData(){
   try{
     showRoomingLoading(); populateRoomingTripDropdown();
     const tripId=window.selectedTripRecord?.id||localStorage.getItem('effah_active_trip_id')||localStorage.getItem('effah_last_selected_trip')||localStorage.getItem('selectedTripId');
-    if(!tripId){ document.getElementById('namelistContainer').innerHTML='<div class="p-6 text-center text- text-slate-400">Sila pilih trip terlebih dahulu</div>'; return; }
+    if(!tripId){ document.getElementById('namelistContainer').innerHTML='<div class="p-6 text-center text-[11px] text-slate-400">Sila pilih trip terlebih dahulu</div>'; return; }
     const base=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base')||localStorage.getItem('effah_base_id'); const pat=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
     if(!base||!pat) return;
     let allRooms=[],allJems=[],offset='';
@@ -365,7 +402,7 @@ function renderNamelist(){
   const belumEl=document.getElementById('belumAssignBadge'); if(belumEl) belumEl.textContent=belumInLoc+' Unassigned di '+activeLocation;
   const topBelum=document.getElementById('belumAssignTop'); if(topBelum) topBelum.textContent=belumGlobal+' Unassigned';
   const topAssign=document.getElementById('assignedTop'); if(topAssign) topAssign.textContent=(total-belumGlobal)+' Assigned';
-  if(total===0){ cont.innerHTML='<div class="p-6 text-center text- text-slate-400">Tiada jemaah untuk trip ini</div>'; return; }
+  if(total===0){ cont.innerHTML='<div class="p-6 text-center text-[11px] text-slate-400">Tiada jemaah untuk trip ini</div>'; return; }
   cont.innerHTML=filtered.map((r,i)=>{
         const name=getJemaahName(r.fields);
     const assignedNormalInLoc=isJemaahAssignedInLocation(r.id, activeLocation);
@@ -375,8 +412,8 @@ function renderNamelist(){
     // FIX #1: buang pointer-events-none supaya masih boleh edit inline walau dah assigned
     const rowCls=assignedInLoc?'opacity-60 bg-slate-50':'hover:bg-slate-50';
     const drag=assignedInLoc?'':`draggable="true" ondragstart="dragJemaah(event,'${r.id}')" ondragend="dragEnd(event)"`;
-    let statusIcon = assignedInLoc? `<button onclick="removeJemaahFromCurrentLoc('${r.id}')" class="w-5 h-5 rounded-full bg-amber-100 text-amber-700 text-" title="Keluarkan dari ${activeLocation}">✕</button>` : `<button onclick="quickAssign('${r.id}')" class="w-5 h-5 rounded-full border bg-slate-100 hover:bg-slate-200 text-">+</button>`;
-    if(!assignedInLoc && assignedGlobal) statusIcon = `<button onclick="quickAssign('${r.id}')" class="w-5 h-5 rounded-full border bg-amber-100 hover:bg-amber-200 text-" title="Sudah ada di lokasi lain, boleh tambah di ${activeLocation} juga">+</button>`;
+    let statusIcon = assignedInLoc? `<button onclick="removeJemaahFromCurrentLoc('${r.id}')" class="w-5 h-5 rounded-full bg-amber-100 text-amber-700 text-[10px]" title="Keluarkan dari ${activeLocation}">✕</button>` : `<button onclick="quickAssign('${r.id}')" class="w-5 h-5 rounded-full border bg-slate-100 hover:bg-slate-200 text-[10px]">+</button>`;
+    if(!assignedInLoc && assignedGlobal) statusIcon = `<button onclick="quickAssign('${r.id}')" class="w-5 h-5 rounded-full border bg-amber-100 hover:bg-amber-200 text-[10px]" title="Sudah ada di lokasi lain, boleh tambah di ${activeLocation} juga">+</button>`;
     const fb = getFullboardVal(r.fields) || '-';
     const pk = getPakejVal(r.fields) || '-';
     const trChecked = isTrainChecked(r.fields);
@@ -397,14 +434,14 @@ function renderNamelist(){
         else if(opt==='AL-KHAIRI') cls='bg-blue-400 text-white border-blue-500';
       }
       const label = opt==='TAKAFUL'?'TAK':opt==='AL-KHAIRI'?'KHAIRI':opt;
-      return `<button onclick="toggleInsuran('${r.id}','${opt}')" class="px-1 py-0.5 rounded-full border text- font-bold ${cls}" title="${opt}">${label}</button>`;
+      return `<button onclick="toggleInsuran('${r.id}','${opt}')" class="px-1 py-0.5 rounded-full border text-[7px] font-bold ${cls}" title="${opt}">${label}</button>`;
     }).join('');
 
-    return `<div ${drag} class="grid grid-cols-12 items-center px-1.5 py-1.5 text- border-b border-slate-50 ${rowCls}">
-      <div class="col-span-1 text-slate-400 text-">${String(i+1).padStart(2,'0')}</div>
-      <div class="col-span-3 font-medium truncate text- ${assignedInLoc?'text-slate-500 italic':''}" title="${name}">${name}</div>
+    return `<div ${drag} class="grid grid-cols-12 items-center px-1.5 py-1.5 text-[11px] border-b border-slate-50 ${rowCls}">
+      <div class="col-span-1 text-slate-400 text-[10px]">${String(i+1).padStart(2,'0')}</div>
+      <div class="col-span-3 font-medium truncate text-[10px] ${assignedInLoc?'text-slate-500 italic':''}" title="${name}">${name}</div>
       <div class="col-span-2 flex items-center gap-0.5">
-        <select onchange="updateJemaahField('${r.id}','BOARD BASIS',this.value)" class="text- border rounded-full px-1 py-0.5 bg-white font-bold ${fbCls} outline-none w-full truncate" title="BOARD BASIS">
+        <select onchange="updateJemaahField('${r.id}','BOARD BASIS',this.value)" class="text-[8px] border rounded-full px-1 py-0.5 bg-white font-bold ${fbCls} outline-none w-full truncate" title="BOARD BASIS">
           <option value="" ${!fb || fb==='-' || fb==='NO FULLBOARD'?'selected':''}>- BOARD</option>
           <option value="FULLBOARD" ${fb==='FULLBOARD'?'selected':''}>FULLBOARD</option>
           <option value="FULLBOARD (MEKAH)" ${fb==='FULLBOARD (MEKAH)'?'selected':''}>FULLBOARD (MEKAH)</option>
@@ -420,7 +457,7 @@ function renderNamelist(){
         ${insToggle}
       </div>
       <div class="col-span-1 flex items-center gap-0.5">
-        <select onchange="updateJemaahField('${r.id}','PAKEJ',this.value)" class="text- border rounded-full px-1 py-0.5 bg-white font-bold outline-none w-full ${pk==='-'?'border-dashed text-slate-400':'bg-slate-50'}" title="PAKEJ">
+        <select onchange="updateJemaahField('${r.id}','PAKEJ',this.value)" class="text-[7px] border rounded-full px-1 py-0.5 bg-white font-bold outline-none w-full ${pk==='-'?'border-dashed text-slate-400':'bg-slate-50'}" title="PAKEJ">
           <option value="" ${!pk || pk==='-'?'selected':''}>-</option>
           <option value="JIMAT" ${pk==='JIMAT'?'selected':''}>JIMAT</option>
           <option value="EKONOMI" ${pk==='EKONOMI'?'selected':''}>EKO</option>
@@ -431,6 +468,7 @@ function renderNamelist(){
       <div class="col-span-1 text-center">${statusIcon}</div>
     </div>`;
   }).join('');
+  makeNamelistSticky();
   const sortIconEl=document.getElementById('sortIcon');
   if(sortIconEl) sortIconEl.textContent = roomingSortActive ? (roomingSortDir==='asc'?'↑ A-Z':'↓ Z-A') : '↕';
 }
@@ -447,6 +485,34 @@ function toggleSortNama(){
   renderNamelist();
 }
 
+
+function makeNamelistSticky(){
+  try{
+    const leftWrapper = document.getElementById('namelistContainer')?.parentElement;
+    if(!leftWrapper) return;
+    // Find the grid parent that contains namelist and rooming
+    const mainGrid = leftWrapper.closest('.grid-cols-12') || leftWrapper.closest('.grid') || document.querySelector('.grid');
+    if(leftWrapper){
+      leftWrapper.style.position='sticky';
+      leftWrapper.style.top='12px';
+      leftWrapper.style.maxHeight='calc(100vh - 16px)';
+      leftWrapper.style.overflowY='auto';
+      leftWrapper.style.alignSelf='start';
+      leftWrapper.style.zIndex='20';
+      leftWrapper.setAttribute('data-left-col','true');
+    }
+    const nl = document.getElementById('namelistContainer');
+    if(nl){
+      nl.style.maxHeight='calc(100vh - 240px)';
+      nl.style.overflowY='auto';
+    }
+    const staffCont = document.getElementById('staffListContainer');
+    if(staffCont){
+      staffCont.style.maxHeight='22vh';
+    }
+  }catch(e){}
+}
+
 function filterRoomingNamelist(){ renderNamelist(); }
 
 function renderRoomingGrid(){
@@ -457,7 +523,7 @@ function renderRoomingGrid(){
   const totalJ=rooms.reduce((s,r)=>s+(r.fields['JEMAAH']?.length||0),0); const totalStaff=rooms.reduce((s,r)=>s+(r.fields['STAFF / EXTRA']||'').split(',').filter(Boolean).length,0);
   const occEl=document.getElementById('roomingOccupancy'); if(occEl) occEl.textContent=`${totalJ} Jemaah + ${totalStaff} Staff • ${activeLocation}`;
   renderRoomingOverview(rooms);
-  if(rooms.length===0){ grid.innerHTML=`<div class="col-span-2 p-6 text-center text- border border-dashed rounded-2xl bg-white">Tiada bilik untuk <b>${activeLocation}</b><br><button onclick="openNewRoomModal()" class="mt-2.5 px-3 py-1.5 bg-[#7A0C2E] text-white rounded-full text-">+ Bilik Baru untuk ${activeLocation}</button></div>`; return; }
+  if(rooms.length===0){ grid.innerHTML=`<div class="col-span-2 p-6 text-center text-[11px] border border-dashed rounded-2xl bg-white">Tiada bilik untuk <b>${activeLocation}</b><br><button onclick="openNewRoomModal()" class="mt-2.5 px-3 py-1.5 bg-[#7A0C2E] text-white rounded-full text-[11px]">+ Bilik Baru untuk ${activeLocation}</button></div>`; return; }
   grid.innerHTML=rooms.map(rec=>{
     const f=rec.fields; const roomId=f['Room ID / Nama Bilik']||generateRoomIdFromCap(f['KAPASITI']); const pakej=f['PAKEJ / HOTEL']||'EKONOMI'; const cap=f['KAPASITI']||4; const hotel=f['HOTEL NAME']||''; const staffArr=(f['STAFF / EXTRA']||'').split(',').filter(Boolean); const jIds=f['JEMAAH']||[]; const count=jIds.length+staffArr.length;
     const jSlots=jIds.map(jId=>{ 
@@ -470,37 +536,39 @@ function renderRoomingGrid(){
         const up=fb.toUpperCase();
         const raw=fb;
         if(roomLoc==='MEKAH'){
-          if(up.includes('MEKAH')) fbBadge=`<span class="ml-1 px-1.5 py-0.5 bg-amber-200 text-amber-900 border border-amber-300 rounded-full text- font-bold">${raw}</span>`;
-          else if(up==='FULLBOARD') fbBadge=`<span class="ml-1 px-1.5 py-0.5 bg-emerald-200 text-emerald-900 border border-emerald-300 rounded-full text- font-bold">FULLBOARD</span>`;
+          if(up.includes('MEKAH')) fbBadge=`<span class="ml-1 px-1.5 py-0.5 bg-amber-200 text-amber-900 border border-amber-300 rounded-full text-[8px] font-bold">${raw}</span>`;
+          else if(up==='FULLBOARD') fbBadge=`<span class="ml-1 px-1.5 py-0.5 bg-emerald-200 text-emerald-900 border border-emerald-300 rounded-full text-[8px] font-bold">FULLBOARD</span>`;
         } else if(roomLoc==='MADINAH'){
-          if(up.includes('MADINAH')) fbBadge=`<span class="ml-1 px-1.5 py-0.5 bg-blue-200 text-blue-900 border border-blue-300 rounded-full text- font-bold">${raw}</span>`;
-          else if(up==='FULLBOARD') fbBadge=`<span class="ml-1 px-1.5 py-0.5 bg-emerald-200 text-emerald-900 border border-emerald-300 rounded-full text- font-bold">FULLBOARD</span>`;
+          if(up.includes('MADINAH')) fbBadge=`<span class="ml-1 px-1.5 py-0.5 bg-blue-200 text-blue-900 border border-blue-300 rounded-full text-[8px] font-bold">${raw}</span>`;
+          else if(up==='FULLBOARD') fbBadge=`<span class="ml-1 px-1.5 py-0.5 bg-emerald-200 text-emerald-900 border border-emerald-300 rounded-full text-[8px] font-bold">FULLBOARD</span>`;
         } else {
-          if(up.includes('MEKAH') || up.includes('MADINAH') || up==='FULLBOARD') fbBadge=`<span class="ml-1 px-1.5 py-0.5 bg-emerald-200 text-emerald-900 border border-emerald-300 rounded-full text- font-bold">${raw}</span>`;
-          else if(up.startsWith('BB')) fbBadge=`<span class="ml-1 px-1.5 py-0.5 bg-orange-100 text-orange-800 border border-orange-200 rounded-full text- font-bold">${raw}</span>`;
+          if(up.includes('MEKAH') || up.includes('MADINAH') || up==='FULLBOARD') fbBadge=`<span class="ml-1 px-1.5 py-0.5 bg-emerald-200 text-emerald-900 border border-emerald-300 rounded-full text-[8px] font-bold">${raw}</span>`;
+          else if(up.startsWith('BB')) fbBadge=`<span class="ml-1 px-1.5 py-0.5 bg-orange-100 text-orange-800 border border-orange-200 rounded-full text-[8px] font-bold">${raw}</span>`;
         }
       }
-      return `<div class="flex items-center justify-between px-2.5 py-2 bg-slate-100 text-slate-800 border border-slate-200 rounded-xl text-"><span class="truncate font-medium flex items-center">${jName}${fbBadge}</span><button onclick="removeJemaahFromRoom('${rec.id}','${jId}')" class="ml-2 w-4 h-4 rounded-full bg-white hover:bg-slate-200 text-">✕</button></div>`; 
+      return `<div class="flex items-center justify-between px-2.5 py-2 bg-slate-100 text-slate-800 border border-slate-200 rounded-xl text-[11px]"><span class="truncate font-medium flex items-center">${jName}${fbBadge}</span><button onclick="removeJemaahFromRoom('${rec.id}','${jId}')" class="ml-2 w-4 h-4 rounded-full bg-white hover:bg-slate-200 text-[10px]">✕</button></div>`; 
     }).join('');
-    const sSlots=staffArr.map(s=>`<div class="flex items-center justify-between px-2.5 py-2 bg-[#FADBD8] text-[#7A0C2E] border border-[#F5B7B1] rounded-xl text-"><span class="truncate">👤 ${s}</span><button onclick="removeStaff('${rec.id}','${s.replace(/'/g,"\\'")}')" class="ml-2 w-4 h-4 rounded-full bg-white/70 text-">✕</button></div>`).join('');
+    const sSlots=staffArr.map(s=>`<div class="flex items-center justify-between px-2.5 py-2 bg-[#FADBD8] text-[#7A0C2E] border border-[#F5B7B1] rounded-xl text-[11px]"><span class="truncate">👤 ${s}</span><button onclick="removeStaff('${rec.id}','${s.replace(/'/g,"\\'")}')" class="ml-2 w-4 h-4 rounded-full bg-white/70 text-[10px]">✕</button></div>`).join('');
     const tanpaKatilIds = f['JEMAAH TANPA KATIL'] || f['INFANT'] || [];
-    const tanpaKatilSlots = tanpaKatilIds.map(tId=>{ const tRec=allRoomingJemaah.find(j=>j.id===tId); const tName=tRec?getJemaahName(tRec.fields):'Unknown'; return `<div class="flex items-center justify-between px-2.5 py-2 bg-amber-50 text-amber-900 border border-amber-200 rounded-xl text- border-dashed"><span class="truncate">INFANT ${tName}</span><button onclick="removeTanpaKatilFromRoom('${rec.id}','${tId}')" class="ml-2 w-4 h-4 rounded-full bg-white text-">✕</button></div>`; }).join('');
-    const emptyCount=Math.max(0,cap-count); const emptySlots=Array.from({length:emptyCount}).map((_,i)=>`<div ondragover="allowDrop(event)" ondrop="dropJemaah(event,'${rec.id}')" class="px-2.5 py-2 border border-dashed border-slate-300 rounded-xl text- text-slate-400 text-center">Slot Kosong ${count+i+1}</div>`).join('');
-    return `<div data-room-id="${rec.id}" ondragover="allowDropRoom(event)" ondragleave="handleRoomDragLeave(event)" ondrop="dropJemaah(event,'${rec.id}')" class="bg-white rounded-2xl border border-slate-200 p-2.5 shadow-sm flex flex-col gap-2 h-fit">
+    const tanpaKatilSlots = tanpaKatilIds.map(tId=>{ const tRec=allRoomingJemaah.find(j=>j.id===tId); const tName=tRec?getJemaahName(tRec.fields):'Unknown'; return `<div class="flex items-center justify-between px-2.5 py-2 bg-amber-50 text-amber-900 border border-amber-200 rounded-xl text-[11px] border-dashed"><span class="truncate">INFANT ${tName}</span><button onclick="removeTanpaKatilFromRoom('${rec.id}','${tId}')" class="ml-2 w-4 h-4 rounded-full bg-white text-[10px]">✕</button></div>`; }).join('');
+    const emptyCount=Math.max(0,cap-count); const emptySlots=Array.from({length:emptyCount}).map((_,i)=>`<div ondragover="allowDrop(event)" ondrop="dropJemaah(event,'${rec.id}')" class="px-2.5 py-2 border border-dashed border-slate-300 rounded-xl text-[10px] text-slate-400 text-center">Slot Kosong ${count+i+1}</div>`).join('');
+    const catatanVal = f['CATATAN'] || f['NOTES'] || f['REMARK'] || '';
+    const catatanField = `<div class="mt-1"><textarea id="catatan-${rec.id}" placeholder="Catatan bilik..." onchange="updateRoomCatatan('${rec.id}', this.value)" class="w-full text-[10px] px-2 py-1.5 border border-slate-200 rounded-lg bg-amber-50/50 focus:bg-white focus:outline-none resize-none" rows="2">${catatanVal}</textarea></div>`;
+    return `<div data-room-id="${rec.id}" data-sort="${f['SORT ORDER']||0}" ondragover="allowDropRoom(event)" ondragleave="handleRoomDragLeave(event)" ondrop="dropJemaah(event,'${rec.id}'); dropRoomReorder(event,'${rec.id}')" class="bg-white rounded-2xl border border-slate-200 p-2.5 shadow-sm flex flex-col gap-2 h-fit">
       <div class="flex items-center justify-between gap-1.5">
         <div class="flex items-center gap-1.5 flex-1 min-w-0">
-          <button class="w-6 h-6 rounded-full bg-slate-100 border flex items-center justify-center cursor-grab shrink-0" draggable="true" ondragstart="handleRoomDragStart(event,'${rec.id}')" ondragend="handleRoomDragEnd(event)"><i class="fa-solid fa-grip-lines text-"></i></button>
-          <span class="font-bold text- shrink-0">${roomId}</span>
-          <input id="hotelInput-${rec.id}" value="${hotel}" placeholder="Nama Hotel" onchange="updateHotelInline('${rec.id}', this.value)" onfocus="this.select()" class="flex-1 min-w-0 px-2 py-1 bg-slate-50 border border-slate-200 rounded-full text- font-bold truncate focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#7A0C2E]/30" title="Klik untuk tukar nama hotel">
+          <button class="w-6 h-6 rounded-full bg-slate-100 border flex items-center justify-center cursor-grab shrink-0" draggable="true" ondragstart="handleRoomDragStart(event,'${rec.id}')" ondragend="handleRoomDragEnd(event)"><i class="fa-solid fa-grip-lines text-[9px]"></i></button>
+          <span class="font-bold text-[11px] shrink-0">${roomId}</span>
+          <input id="hotelInput-${rec.id}" value="${hotel}" placeholder="Nama Hotel" onchange="updateHotelInline('${rec.id}', this.value)" onfocus="this.select()" class="flex-1 min-w-0 px-2 py-1 bg-slate-50 border border-slate-200 rounded-full text-[11px] font-bold truncate focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#7A0C2E]/30" title="Klik untuk tukar nama hotel">
         </div>
-        <button onclick="deleteRoom('${rec.id}','${roomId}')" class="w-6 h-6 rounded-full bg-slate-50 hover:bg-red-50 border text- shrink-0"><i class="fa-solid fa-trash"></i></button>
+        <button onclick="deleteRoom('${rec.id}','${roomId}')" class="w-6 h-6 rounded-full bg-slate-50 hover:bg-red-50 border text-[10px] shrink-0"><i class="fa-solid fa-trash"></i></button>
       </div>
-      <div class="flex items-center gap-1.5 text-">
-        <div class="flex items-center gap-1 px-2.5 py-1 bg-slate-50 rounded-full border"><select onchange="updateRoomField('${rec.id}','PAKEJ / HOTEL',this.value)" class="bg-transparent text- font-bold outline-none"><option ${pakej==='JIMAT'?'selected':''}>JIMAT</option><option ${pakej==='EKONOMI'?'selected':''}>EKONOMI</option><option ${pakej==='STANDARD'?'selected':''}>STANDARD</option><option ${pakej==='PREMIUM'?'selected':''}>PREMIUM</option></select></div>
-        <div class="ml-auto flex items-center gap-1 bg-slate-50 rounded-full px-1 py-0.5 border"><button onclick="updateCap('${rec.id}',-1)" class="w-5 h-5 rounded-full bg-white border text-">−</button><span class="font-bold w-4 text-center text-">${cap}</span><button onclick="updateCap('${rec.id}',1)" class="w-5 h-5 rounded-full bg-white border text-">+</button><span class="text- ml-1">${count}/${cap}</span></div>
+      <div class="flex items-center gap-1.5 text-[10px]">
+        <div class="flex items-center gap-1 px-2.5 py-1 bg-slate-50 rounded-full border"><select onchange="updateRoomField('${rec.id}','PAKEJ / HOTEL',this.value)" class="bg-transparent text-[10px] font-bold outline-none"><option ${pakej==='JIMAT'?'selected':''}>JIMAT</option><option ${pakej==='EKONOMI'?'selected':''}>EKONOMI</option><option ${pakej==='STANDARD'?'selected':''}>STANDARD</option><option ${pakej==='PREMIUM'?'selected':''}>PREMIUM</option></select></div>
+        <div class="ml-auto flex items-center gap-1 bg-slate-50 rounded-full px-1 py-0.5 border"><button onclick="updateCap('${rec.id}',-1)" class="w-5 h-5 rounded-full bg-white border text-[10px]">−</button><span class="font-bold w-4 text-center text-[11px]">${cap}</span><button onclick="updateCap('${rec.id}',1)" class="w-5 h-5 rounded-full bg-white border text-[10px]">+</button><span class="text-[9px] ml-1">${count}/${cap}</span></div>
       </div>
-      <div class="space-y-1">${jSlots}${sSlots}${emptySlots}${tanpaKatilSlots?`<div class="pt-2 mt-2 border-t border-dashed border-amber-300"><div class="text- font-bold text-amber-700 mb-1">TANPA KATIL / INFANT</div>${tanpaKatilSlots}</div>`:''}</div>
-      <button onclick="openTanpaKatilModal('${rec.id}')" class="mt-2 w-full py-2 bg-amber-50 hover:bg-amber-100 border border-amber-300 border-dashed text-amber-800 rounded-xl text- font-bold">+ Kanak-kanak / Infant (Tanpa Katil)</button>
+      <div class="space-y-1">${jSlots}${sSlots}${emptySlots}${tanpaKatilSlots?`<div class="pt-2 mt-2 border-t border-dashed border-amber-300"><div class="text-[8px] font-bold text-amber-700 mb-1">TANPA KATIL / INFANT</div>${tanpaKatilSlots}</div>`:''}</div>
+      <button onclick="openTanpaKatilModal('${rec.id}')" class="mt-2 w-full py-2 bg-amber-50 hover:bg-amber-100 border border-amber-300 border-dashed text-amber-800 rounded-xl text-[10px] font-bold">+ Kanak-kanak / Infant (Tanpa Katil)</button>
       <div class="h-1 bg-slate-100 rounded-full overflow-hidden"><div class="h-full bg-[#7A0C2E]" style="width:${Math.min(100,(count/cap)*100)}%"></div></div>
     </div>`;
   }).join('');
@@ -653,11 +721,11 @@ function openCopyRoomsModal(){
   const allLocs=['MEKAH','MADINAH','TAIF','JEDDAH',...customLocations].filter(l=>l!==activeLocation);
   const counts={}; allRoomingRecords.forEach(r=>{ const l=(r.fields['LOKASI / CITY']||'MEKAH').toUpperCase(); counts[l]=(counts[l]||0)+1; });
   if(allLocs.length===0 || allLocs.every(l=>(counts[l]||0)===0)){
-    list.innerHTML='<div class="text- text-slate-400 p-2.5 border border-dashed rounded-xl">Tiada bilik di lokasi lain untuk disalin.</div>';
+    list.innerHTML='<div class="text-[11px] text-slate-400 p-2.5 border border-dashed rounded-xl">Tiada bilik di lokasi lain untuk disalin.</div>';
   } else {
     list.innerHTML=allLocs.map(loc=>{
       const c=counts[loc]||0; const disabled=c===0?'opacity-40 pointer-events-none':'';
-      return `<label class="flex items-center justify-between gap-2 p-2.5 border border-slate-200 rounded-xl cursor-pointer hover:bg-slate-50 ${disabled}"><div class="flex items-center gap-2"><input type="radio" name="copySource" value="${loc}" ${c===0?'disabled':''}><span class="text- font-bold">${loc} (${c} bilik)</span></div><span class="text- text-slate-400">${c>0?'Sedia disalin':'Tiada bilik'}</span></label>`;
+      return `<label class="flex items-center justify-between gap-2 p-2.5 border border-slate-200 rounded-xl cursor-pointer hover:bg-slate-50 ${disabled}"><div class="flex items-center gap-2"><input type="radio" name="copySource" value="${loc}" ${c===0?'disabled':''}><span class="text-[11px] font-bold">${loc} (${c} bilik)</span></div><span class="text-[10px] text-slate-400">${c>0?'Sedia disalin':'Tiada bilik'}</span></label>`;
     }).join('');
   }
   document.getElementById('copyTargetLoc').textContent=activeLocation; m.classList.remove('hidden');
@@ -693,17 +761,11 @@ async function executeCopyRooms(){
 }
 function getStaffStorageKey(){ return `effah_staff_list_${localStorage.getItem('effah_active_trip_id')||'default'}`; }
 function loadStaffList(){ staffList=JSON.parse(localStorage.getItem(getStaffStorageKey())||'[]'); renderStaffList(); }
-function saveStaffList(){ localStorage.setItem(getStaffStorageKey(),JSON.stringify(staffList)); }
-function addNewStaff(){ const input=document.getElementById('newStaffInput'); if(!input) return; let name=input.value.trim().toUpperCase(); if(!name) { alert('Sila masukkan nama staff.'); return; } if(!name.includes('(')) name=`${name} (EFFAH)`; const id=`staff_${Date.now()}_${++staffIdCounter}`; localStorage.setItem('effah_staff_counter',staffIdCounter); staffList.push({id,name}); saveStaffList(); renderStaffList(); }
-function renderStaffList(){
-  const cont=document.getElementById('staffListContainer'); const badge=document.getElementById('staffTotalBadge'); if(!cont) return; if(badge) badge.textContent=staffList.length+' Staff';
-  if(staffList.length===0){ cont.innerHTML='<div class="p-2.5 text-center text- text-slate-400">Tiada staff / extra</div>'; return; }
-  cont.innerHTML=staffList.map((s,idx)=>{
-    const assignedInLoc=isStaffAssignedInLocation(s.id, activeLocation); 
-    const cls=assignedInLoc?'opacity-40 bg-slate-50 pointer-events-none':'bg-white hover:bg-slate-50 cursor-grab'; const drag=assignedInLoc?'':`draggable="true" ondragstart="dragStaff(event,'${s.id}')" ondragend="dragStaffEnd(event)"`;
-    return `<div ${drag} class="flex items-center justify-between px-2.5 py-2 rounded-xl border text- ${cls}"><div class="flex gap-2"><span class="text-slate-400 text-">${String(idx+1).padStart(2,'0')}</span><span class="font-medium">${s.name}</span>${assignedInLoc?'<span class="ml-1 px-1 py-0.5 bg-slate-200 rounded text-">ASSIGNED di '+activeLocation+'</span>':''}</div><div class="flex gap-1"><button onclick="quickAssignStaff('${s.id}')" class="w-5 h-5 rounded-full border ${assignedInLoc?'opacity-30':'hover:bg-[#7A0C2E] hover:text-white'} text-">+</button><button onclick="deleteStaff('${s.id}')" class="w-5 h-5 rounded-full border hover:bg-red-50 text-"><i class="fa-solid fa-trash text-"></i></button></div></div>`;
-  }).join('');
-}
+function saveStaffList(){ localStorage.setItem(getStaffStorageKey(),JSON.stringify(staffList)); try{ localStorage.setItem('effah_staff_board_'+activeLocation, JSON.stringify(staffList)); }catch(e){} }
+function addNewStaff(){ const input=document.getElementById('newStaffInput'); if(!input) return; let name=input.value.trim().toUpperCase(); if(!name) { alert('Sila masukkan nama staff.'); return; } if(!name.includes('(')) name=`${name} (EFFAH)`; const id=`staff_${Date.now()}_${++staffIdCounter}`; staffList.push({id, name, boardBasis:'', train:false}); saveStaffList(); renderStaffList(); input.value=''; }
+function updateStaffField(staffId, field, value){ const s=staffList.find(x=>x.id===staffId); if(!s) return; s[field]=value; saveStaffList(); renderStaffList(); }
+function updateStaffTrain(staffId, checked){ const s=staffList.find(x=>x.id===staffId); if(!s) return; s.train=checked; saveStaffList(); renderStaffList(); }
+
 function deleteStaff(staffId){ if(!confirm('Adakah anda pasti ingin memadamkan staff ini?')) return; staffList=staffList.filter(s=>s.id!==staffId); saveStaffList(); renderStaffList(); renderNamelist(); }
 function dragStaff(e,staffId){ if(isStaffAssignedInLocation(staffId, activeLocation)) return; e.dataTransfer.effectAllowed='move'; e.dataTransfer.setData('text/staff-id',staffId); e.dataTransfer.setData('text/plain',staffId); const row=e.currentTarget; if(row) setTimeout(()=>row.style.opacity='0.3',0); }
 function dragStaffEnd(e){ e.currentTarget.style.opacity='1'; }
@@ -877,7 +939,7 @@ function generateRoomingPrint(){
         jIds.forEach(jId=>{
           const jRec=allRoomingJemaah.find(j=>j.id===jId);
           if(!jRec) return;
-          const fb=(jRec.fields['BOARD']||'').toUpperCase().trim();
+          const fb=(jRec.fields['BOARD BASIS']||jRec.fields['BOARD']||'').toUpperCase().trim();
           if(!fb || fb==='-' || fb==='NO BOARD') return; // BB now included in BOARD list
           let match=false;
           if(loc.toUpperCase()==='MEKAH'){ if(fb.includes('MEKAH')||fb==='BOARD') match=true; }
@@ -911,7 +973,7 @@ function generateRoomingPrint(){
                     if(up.includes('MEKAH')) badge=`<span style="background:#FDE68A;border:1px solid #92400E;padding:1px 6px;border-radius:10px;font-weight:bold;font-size:8px">${fb.fbRaw}</span>`;
                     else if(up.includes('MADINAH')) badge=`<span style="background:#BFDBFE;border:1px solid #1E40AF;padding:1px 6px;border-radius:10px;font-weight:bold;font-size:8px">${fb.fbRaw}</span>`;
                     else badge=`<span style="background:#BBF7D0;border:1px solid #065F46;padding:1px 6px;border-radius:10px;font-weight:bold;font-size:8px">${fb.fbRaw}</span>`;
-                    return `<tr><td style="border:1px solid #ddd;padding:3px 6px;text-align:center">${i+1}</td><td style="border:1px solid #ddd;padding:3px 6px;font-weight:600">${fb.name}</td><td style="border:1px solid #ddd;padding:3px 6px;text-align:center">${badge}</td><td style="border:1px solid #ddd;padding:3px 6px;text-align:center;font-size:8px">${fb.room}</td></tr>`;
+                    return `<tr><td style="border:1px solid #ddd;padding:3px 6px;text-align:center">${i+1}</td><td style="border:1px solid #ddd;padding:3px 6px;font-weight:600">${fb.name}${fb.type==='STAFF'?' <span style="background:#FADBD8;color:#7A0C2E;padding:1px 4px;border-radius:6px;font-size:7px">STAFF</span>':''}</td><td style="border:1px solid #ddd;padding:3px 6px;text-align:center">${badge}</td><td style="border:1px solid #ddd;padding:3px 6px;text-align:center;font-size:8px">${fb.room}</td></tr>`;
                   }).join('')}
                 </table>
               </div>
