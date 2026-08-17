@@ -770,7 +770,7 @@ function renderRoomingGrid(){
     const tanpaKatilSlots = tanpaKatilIds.map(tId=>{ const tRec=allRoomingJemaah.find(j=>j.id===tId); const tName=tRec?getJemaahName(tRec.fields):'Unknown'; return `<div class="flex items-center justify-between px-2.5 py-2 bg-amber-50 text-amber-900 border border-amber-200 rounded-xl text-[11px] border-dashed"><span class="truncate">INFANT ${tName}</span><button onclick="removeTanpaKatilFromRoom('${rec.id}','${tId}')" class="ml-2 w-4 h-4 rounded-full bg-white text-[10px]">✕</button></div>`; }).join('');
     const emptyCount=Math.max(0,cap-count); const emptySlots=Array.from({length:emptyCount}).map((_,i)=>`<div ondragover="allowDrop(event)" ondrop="dropJemaah(event,'${rec.id}')" class="px-2.5 py-2 border border-dashed border-slate-300 rounded-xl text-[10px] text-slate-400 text-center">Slot Kosong ${count+i+1}</div>`).join('');
     const catatanVal = f['CATATAN BILIK'] || f['CATATAN'] || f['NOTES'] || f['REMARK'] || '';
-    const catatanField = `<div class="mt-2"><div class="text-[8px] font-bold text-slate-500 mb-1 flex items-center justify-between"><span>CATATAN BILIK</span><span style="font-weight:normal;color:#999">FAMILY / BILIK PETUGAS / BILIK BOD</span></div><textarea id="catatan-${rec.id}" placeholder="Contoh: FAMILY, BILIK PETUGAS, BILIK BOD..." onchange="updateRoomCatatan('${rec.id}', this.value)" class="w-full text-[10px] px-2.5 py-1.5 border border-slate-200 rounded-xl bg-amber-50/30 focus:bg-white focus:outline-none focus:border-[#7A0C2E]/30 resize-none" rows="2">${catatanVal}</textarea></div>`;
+    const catatanField = `<div class="mt-2"><div class="text-[8px] font-bold text-slate-500 mb-1">CATATAN BILIK</div><textarea id="catatan-${rec.id}" placeholder="Catatan bilik..." onchange="updateRoomCatatan('${rec.id}', this.value)" class="w-full text-[10px] px-2.5 py-1.5 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:outline-none focus:border-[#7A0C2E]/30 resize-none" rows="2">${catatanVal}</textarea></div>`;
     return `<div data-room-id="${rec.id}" data-sort="${f['SORT ORDER']||0}" ondragover="allowDropRoom(event)" ondragleave="handleRoomDragLeave(event)" ondrop="dropJemaah(event,'${rec.id}'); dropRoomReorder(event,'${rec.id}')" class="bg-white rounded-2xl border border-slate-200 p-2.5 shadow-sm flex flex-col gap-2 h-fit">
       <div class="flex items-center justify-between gap-1.5">
         <div class="flex items-center gap-1.5 flex-1 min-w-0">
@@ -1190,6 +1190,7 @@ function generateRoomingPrint(orientation){ orientation = orientation || 'landsc
       const staffInLoc = staffList.filter(s=> s.roomIds && s.roomIds.some(rid=> rooms.some(r=>r.id===rid)));
       
       // Build overview - FIXED BOARD count
+      const sortedRoomsForPrintEarly = [...rooms].sort((a,b)=>(a.fields['SORT ORDER']||9999)-(b.fields['SORT ORDER']||9999));
       let overviewRows = '';
       // Group by hotel
       const hotels = {};
@@ -1240,7 +1241,7 @@ function generateRoomingPrint(orientation){ orientation = orientation || 'landsc
       // Room blocks - smaller for portrait
       const isPortrait = orientation==='portrait';
       // Ensure rooms sorted by SORT ORDER for print
-      const sortedRoomsForPrint = [...rooms].sort((a,b)=>(a.fields['SORT ORDER']||9999)-(b.fields['SORT ORDER']||9999));
+      const sortedRoomsForPrint = sortedRoomsForPrintEarly;
       const roomBlocks = sortedRoomsForPrint.map((rec, idx)=>{
         const f=rec.fields;
         const roomName = f['Room ID / Nama Bilik'] || f['ROOM ID'] || `B${f['KAPASITI']||4}-${idx+1}`;
@@ -1260,16 +1261,18 @@ function generateRoomingPrint(orientation){ orientation = orientation || 'landsc
         let babyHtml = babyIds.length ? babyIds.map((jid, jIdx)=>{
           const jRec = allRoomingJemaah.find(r=>r.id===jid);
           const name = jRec ? getJemaahName(jRec.fields) : jid;
-          return `<div style="font-size:${isPortrait ? '6.5px' : '7.5px'};padding:1px 0;color:#92400E;background:#FEF3C7">${jIdx+1}. ${name} (Infant)</div>`;
+          return `<div style="font-size:${isPortrait ? '6.5px' : '7.5px'};padding:1px 0;color:#92400E;background:#FEF3C7">NA. ${name} (Tanpa Katil)</div>`;
         }).join('') : '';
         
         let staffHtml = staffForRoom.length ? staffForRoom.map((s, sIdx)=>{
           return `<div style="font-size:${isPortrait ? '6.5px' : '7.5px'};padding:1px 0;color:#7A0C2E;background:#FADBD8">S${sIdx+1}. ${s.name}</div>`;
         }).join('') : '';
         
+        const catatanBilik = (f['CATATAN BILIK'] || f['CATATAN'] || '').trim();
+        const catatanPrint = catatanBilik ? ` (${catatanBilik})` : '';
         return `<div style="border:1px solid #000;margin-bottom:${isPortrait ? '4px' : '6px'};background:#fff;break-inside:avoid">
           <div style="background:#fff;border-bottom:1px solid #000;padding:${isPortrait ? '2px 4px' : '3px 6px'};display:flex;justify-content:space-between;align-items:center">
-            <span style="font-weight:bold;font-size:${isPortrait ? '8px' : '9px'}">${idx+1}. ${roomName} ${pakej ? '('+pakej+')' : ''} ${hotel ? '- '+hotel : ''}</span>
+            <span style="font-weight:bold;font-size:${isPortrait ? '8px' : '9px'}">${idx+1}. ${roomName} ${pakej ? '('+pakej+')' : ''} ${hotel ? '- '+hotel : ''}${catatanPrint}</span>
             <span style="font-size:${isPortrait ? '7px' : '8px'};font-weight:bold">${jIds.length + staffForRoom.length}/${cap}</span>
           </div>
           <div style="padding:${isPortrait ? '3px 4px' : '4px 6px'}">
@@ -1283,15 +1286,19 @@ function generateRoomingPrint(orientation){ orientation = orientation || 'landsc
       // FB Table with actual board basis badges
       let fbTableHTML = '';
       if(fbListForLoc.length>0){
-        // Group by hotel for FB list
+        // Group by hotel for FB list - with room number
+        const roomNumberMap = {};
+        sortedRoomsForPrintEarly.forEach((r, idx)=>{ roomNumberMap[r.id]=idx+1; });
+        // Also include unsorted rooms if any
+        rooms.forEach((r, idx)=>{ if(!roomNumberMap[r.id]) roomNumberMap[r.id]=idx+1; });
         const grouped = {};
         fbListForLoc.forEach(jRec=>{
-          // Find room for this jemaah
           const room = rooms.find(r=> (r.fields['JEMAAH']||[]).includes(jRec.id));
           const hotel = room ? (room.fields['HOTEL NAME']||'TANPA HOTEL') : 'TANPA BILIK';
+          const roomNo = room ? (roomNumberMap[room.id]||'-') : '-';
           const roomName = room ? (room.fields['Room ID / Nama Bilik']||room.fields['ROOM ID']||'B?') : '-';
           if(!grouped[hotel]) grouped[hotel]=[];
-          grouped[hotel].push({rec:jRec, room:roomName});
+          grouped[hotel].push({rec:jRec, room:roomNo, roomLabel:roomName});
         });
         
         fbTableHTML = `
@@ -1302,7 +1309,7 @@ function generateRoomingPrint(orientation){ orientation = orientation || 'landsc
             </div>
             ${Object.keys(grouped).sort().map(hotelName=>`
               <div style="border-bottom:1px solid #000">
-                <div style="background:#f0fdf4;padding:3px 8px;font-weight:bold;font-size:9px;border-bottom:1px solid #ddd">${hotelName} (${grouped[hotelName].length} FB)</div>
+                <div style="background:#f0fdf4;padding:3px 8px;font-weight:bold;font-size:9px;border-bottom:1px solid #ddd">${hotelName} (${grouped[hotelName].length} Jemaah)</div>
                 <table style="width:100%;border-collapse:collapse;font-size:9px">
                   <tr style="background:#f8f8f8;font-weight:bold"><th style="border:1px solid #ddd;padding:3px 6px;width:30px">NO</th><th style="border:1px solid #ddd;padding:3px 6px;text-align:left">NAMA JEMAAH</th><th style="border:1px solid #ddd;padding:3px 6px;text-align:center">BOARD BASIS</th><th style="border:1px solid #ddd;padding:3px 6px;text-align:center">BILIK</th></tr>
                   ${grouped[hotelName].map((item,i)=>{
