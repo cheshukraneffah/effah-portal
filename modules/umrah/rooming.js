@@ -1373,45 +1373,32 @@ function generateRoomingPrint(orientation){ orientation = orientation || 'landsc
               const staffOnly = allItems.filter(x=>x.rec._isStaff).sort((a,b)=>{ const na=parseInt(a.room)||9999; const nb=parseInt(b.room)||9999; return na-nb; });
               const sortedItems = [...jemaahOnly, ...staffOnly];
               const totalPax = allItems.length;
-              return `
-              <div style="border-bottom:1px solid #000">
-                <div style="background:#f0fdf4;padding:3px 8px;font-weight:bold;font-size:9px;border-bottom:1px solid #ddd">${hotelName} (${totalPax} pax)</div>
-                <table style="width:100%;border-collapse:collapse;font-size:9px">
-                  <tr style="background:#f8f8f8;font-weight:bold"><th style="border:1px solid #ddd;padding:3px 6px;width:30px">NO</th><th style="border:1px solid #ddd;padding:3px 6px;text-align:left">NAMA JEMAAH</th><th style="border:1px solid #ddd;padding:3px 6px;text-align:center">BOARD BASIS</th><th style="border:1px solid #ddd;padding:3px 6px;text-align:center">BILIK</th></tr>
-                  ${sortedItems.map((item,i)=>{
+              return '<div style="border-bottom:1px solid #000"><div style="background:#f0fdf4;padding:3px 8px;font-weight:bold;font-size:9px;border-bottom:1px solid #ddd">'+hotelName+' ('+totalPax+' pax)</div><table style="width:100%;border-collapse:collapse;font-size:9px"><tr style="background:#f8f8f8;font-weight:bold"><th style="border:1px solid #ddd;padding:3px 6px;width:30px">NO</th><th style="border:1px solid #ddd;padding:3px 6px;text-align:left">NAMA JEMAAH</th><th style="border:1px solid #ddd;padding:3px 6px;text-align:center">BOARD BASIS</th><th style="border:1px solid #ddd;padding:3px 6px;text-align:center">BILIK</th></tr>'+ sortedItems.map((item,i)=>{
                     const isStaffRow = item.rec._isStaff;
                     let rawStaffName = (item.rec.fields['NAMA JEMAAH']||'');
-                    // remove double (EFFAH)
                     rawStaffName = rawStaffName.replace(/\s*\(EFFAH\)\s*/gi,'').trim();
                     rawStaffName = rawStaffName.replace(/\(EFFAH\)/i,'').trim();
                     const displayName = isStaffRow ? rawStaffName + ' (EFFAH)' : getJemaahName(item.rec.fields);
-                    // recalc proper numbering for staff
                     const fbRaw = isStaffRow ? (item.rec.fields['BOARD']||'FULLBOARD') : (getFullboardVal(item.rec.fields)||'');
-                    const up=fbRaw.toUpperCase();
+                    const up=(fbRaw||'').toUpperCase();
                     let badge='';
-                    if(up.includes('MEKAH') && up.includes('BB')) badge=`<span style="background:#FDE68A;border:1px solid #92400E;padding:1px 6px;border-radius:10px;font-weight:bold;font-size:8px">${fbRaw}</span>`;
-                    else if(up.includes('MEKAH') && up.includes('FULLBOARD')) badge=`<span style="background:#FDE68A;border:1px solid #92400E;padding:1px 6px;border-radius:10px;font-weight:bold;font-size:8px">${fbRaw}</span>`;
-                    else if(up.includes('MADINAH') && up.includes('BB')) badge=`<span style="background:#BFDBFE;border:1px solid #1E40AF;padding:1px 6px;border-radius:10px;font-weight:bold;font-size:8px">${fbRaw}</span>`;
-                    else if(up.includes('MADINAH')) badge=`<span style="background:#BFDBFE;border:1px solid #1E40AF;padding:1px 6px;border-radius:10px;font-weight:bold;font-size:8px">${fbRaw}</span>`;
-                    else if(up==='FULLBOARD') badge=`<span style="background:#BBF7D0;border:1px solid #065F46;padding:1px 6px;border-radius:10px;font-weight:bold;font-size:8px">${fbRaw}</span>`;
-                    else badge=`<span style="background:#BBF7D0;border:1px solid #065F46;padding:1px 6px;border-radius:10px;font-weight:bold;font-size:8px">${fbRaw}</span>`;
-                    const jemaahOnlyCount = grouped[hotelName].filter(x=>!x.rec._isStaff).length;
-                    let rowNo = '';
+                    if(up.includes('MEKAH')) badge='<span style="background:#FDE68A;border:1px solid #92400E;padding:1px 6px;border-radius:10px;font-weight:bold;font-size:8px">'+fbRaw+'</span>';
+                    else if(up.includes('MADINAH')) badge='<span style="background:#BFDBFE;border:1px solid #1E40AF;padding:1px 6px;border-radius:10px;font-weight:bold;font-size:8px">'+fbRaw+'</span>';
+                    else badge='<span style="background:#BBF7D0;border:1px solid #065F46;padding:1px 6px;border-radius:10px;font-weight:bold;font-size:8px">'+fbRaw+'</span>';
+                    let rowNo='';
                     if(isStaffRow){
-                      const staffIdx = grouped[hotelName].filter(x=>x.rec._isStaff).sort((a,b)=>{ const na=parseInt(a.room)||9999; const nb=parseInt(b.room)||9999; return na-nb; }).findIndex(x=>x.rec.id===item.rec.id);
-                      // Use actual staff position in sorted staffOnly
                       const staffSorted = grouped[hotelName].filter(x=>x.rec._isStaff).sort((a,b)=>{ const na=parseInt(a.room)||9999; const nb=parseInt(b.room)||9999; return na-nb; });
                       const pos = staffSorted.findIndex(x=>x.rec.id===item.rec.id);
-                      rowNo = `S${pos+1}`;
+                      rowNo = 'S'+(pos+1);
                     } else {
-                      rowNo = `${i+1}`;
+                      rowNo = ''+(i+1);
                     }
                     const rowStyle = isStaffRow ? ' style="background:#FDF2F4"' : '';
-                    return `<tr${rowStyle}><td style="border:1px solid #ddd;padding:3px 6px;text-align:center;${isStaffRow?'background:#F9D5D9;font-weight:bold;color:#7A0C2E':''}">${rowNo}</td><td style="border:1px solid #ddd;padding:3px 6px;font-weight:600;${isStaffRow?'color:#7A0C2E':''}">${displayName}</td><td style="border:1px solid #ddd;padding:3px 6px;text-align:center">${badge}</td><td style="border:1px solid #ddd;padding:3px 6px;text-align:center;font-size:8px">${item.room}</td></tr>`;
-                  }).join('')}
-                </table>
-              </div>
-            `).join('')}
+                    const cellStyle = isStaffRow ? 'background:#F9D5D9;font-weight:bold;color:#7A0C2E' : '';
+                    const nameStyle = isStaffRow ? 'color:#7A0C2E' : '';
+                    return '<tr'+rowStyle+'><td style="border:1px solid #ddd;padding:3px 6px;text-align:center;'+cellStyle+'">'+rowNo+'</td><td style="border:1px solid #ddd;padding:3px 6px;font-weight:600;'+nameStyle+'">'+displayName+'</td><td style="border:1px solid #ddd;padding:3px 6px;text-align:center">'+badge+'</td><td style="border:1px solid #ddd;padding:3px 6px;text-align:center;font-size:8px">'+item.room+'</td></tr>';
+                  }).join('') + '</table></div>';
+            }).join('')}
           </div>
         `;
       } else {
