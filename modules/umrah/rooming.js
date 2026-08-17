@@ -737,9 +737,9 @@ function toggleSortNama(){
 
 function makeNamelistSticky(){
   try{
-    const cont = document.getElementById('namelistContainer');
-    if(!cont) return;
-    const leftCard = cont.closest('.w-full.lg\:w-\[52\%\]') || cont.parentElement;
+    const nl = document.getElementById('namelistContainer');
+    if(!nl) return;
+    const leftCard = nl.closest('.w-full.lg\\:w-\\[52\\%\\]') || nl.parentElement;
     if(leftCard){
       leftCard.style.position='sticky';
       leftCard.style.top='12px';
@@ -748,21 +748,18 @@ function makeNamelistSticky(){
       leftCard.style.maxHeight='calc(100vh - 24px)';
       leftCard.style.display='flex';
       leftCard.style.flexDirection='column';
+      leftCard.style.backgroundColor='#ffffff';
     }
-    const nl = document.getElementById('namelistContainer');
-    if(nl){
-      nl.style.flex='1 1 auto';
-      nl.style.maxHeight='52vh';
-      nl.style.overflowY='auto';
-      nl.style.overflowX='hidden';
-      nl.style.backgroundColor='#ffffff';
-    }
+    nl.style.flex='1 1 auto';
+    nl.style.maxHeight='52vh';
+    nl.style.overflowY='auto';
+    nl.style.overflowX='hidden';
+    nl.style.backgroundColor='#ffffff';
     const staffSec = document.getElementById('staffListContainer')?.parentElement;
     if(staffSec){
       staffSec.style.flex='0 0 auto';
       staffSec.style.backgroundColor='#ffffff';
-      staffSec.style.position='relative';
-      staffSec.style.zIndex='1';
+      staffSec.style.borderTop='2px solid #e2e8f0';
     }
     const staffCont = document.getElementById('staffListContainer');
     if(staffCont){
@@ -772,6 +769,73 @@ function makeNamelistSticky(){
       staffCont.style.backgroundColor='#ffffff';
     }
   }catch(e){}
+}
+
+function filterRoomingNamelist(){ renderNamelist(); }
+
+function renderRoomingGrid(){
+  const grid=document.getElementById('roomingGrid'); if(!grid) return;
+  let rooms=[...allRoomingRecords].filter(r=>(r.fields['LOKASI / CITY']||'MEKAH').toUpperCase()===activeLocation.toUpperCase());
+  rooms=getRoomOrderedList(rooms);
+  const bilikEl=document.getElementById('roomingBiliks'); if(bilikEl) bilikEl.textContent=rooms.length+' Bilik';
+  const totalJ=rooms.reduce((s,r)=>s+(r.fields['JEMAAH']?.length||0),0);
+  // Fix: count staff from both STAFF/EXTRA text field AND staffList linked records
+  const staffFromText = rooms.reduce((s,r)=>s+(r.fields['STAFF / EXTRA']||'').split(',').filter(Boolean).length,0);
+  const staffFromLinked = rooms.reduce((s,r)=>s+getStaffForRoom(r.id).length,0);
+  const totalStaff = staffFromText + staffFromLinked;
+
+  const occEl=document.getElementById('roomingOccupancy'); if(occEl) occEl.textContent=`${totalJ} Jemaah + ${totalStaff} Staff • ${activeLocation}`;
+  renderRoomingOverview(rooms);
+  if(rooms.length===0){ grid.innerHTML=`<div class="col-span-2 p-6 text-center text-[11px] border border-dashed rounded-2xl bg-white">Tiada bilik untuk <b>${activeLocation}</b><br><button onclick="openNewRoomModal()" class="mt-2.5 px-3 py-1.5 bg-[#7A0C2E] text-white rounded-full text-[11px]">+ Bilik Baru untuk ${activeLocation}</button></div>`; return; }
+  grid.innerHTML=rooms.map((rec, roomIdx)=>{
+    const f=rec.fields; const roomId=f['Room ID / Nama Bilik']||generateRoomIdFromCap(f['KAPASITI']); const pakej=f['PAKEJ / HOTEL']||'EKONOMI'; const cap=f['KAPASITI']||4; const hotel=f['HOTEL NAME']||''; const staffForRoom=getStaffForRoom(rec.id); const staffArr=staffForRoom.map(s=>s.name); const jIds=f['JEMAAH']||[]; const count=jIds.length+staffArr.length;
+    const jSlots=jIds.map(jId=>{ 
+      const jRec=allRoomingJemaah.find(j=>j.id===jId); 
+      const jName=getJemaahName(jRec?.fields);
+      const fb=(jRec?.fields?.['BOARD']||'').trim();
+      const roomLoc = (f['LOKASI / CITY']||activeLocation||'').toUpperCase();
+      let fbBadge='';
+      if(fb && fb!=='-' && fb.toUpperCase()!=='NO FULLBOARD' && fb!==''){
+        const up=fb.toUpperCase();
+        const raw=fb;
+        if(roomLoc==='MEKAH'){
+          if(up.includes('MEKAH')) fbBadge=`<span class="ml-1 px-1.5 py-0.5 bg-amber-200 text-amber-900 border border-amber-300 rounded-full text-[8px] font-bold">${raw}</span>`;
+          else if(up==='FULLBOARD') fbBadge=`<span class="ml-1 px-1.5 py-0.5 bg-emerald-200 text-emerald-900 border border-emerald-300 rounded-full text-[8px] font-bold">FULLBOARD</span>`;
+        } else if(roomLoc==='MADINAH'){
+          if(up.includes('MADINAH')) fbBadge=`<span class="ml-1 px-1.5 py-0.5 bg-blue-200 text-blue-900 border border-blue-300 rounded-full text-[8px] font-bold">${raw}</span>`;
+          else if(up==='FULLBOARD') fbBadge=`<span class="ml-1 px-1.5 py-0.5 bg-emerald-200 text-emerald-900 border border-emerald-300 rounded-full text-[8px] font-bold">FULLBOARD</span>`;
+        } else {
+          if(up.includes('MEKAH') || up.includes('MADINAH') || up==='FULLBOARD') fbBadge=`<span class="ml-1 px-1.5 py-0.5 bg-emerald-200 text-emerald-900 border border-emerald-300 rounded-full text-[8px] font-bold">${raw}</span>`;
+          else if(up.startsWith('BB')) fbBadge=`<span class="ml-1 px-1.5 py-0.5 bg-orange-100 text-orange-800 border border-orange-200 rounded-full text-[8px] font-bold">${raw}</span>`;
+        }
+      }
+      return `<div class="flex items-center justify-between px-2.5 py-2 bg-slate-100 text-slate-800 border border-slate-200 rounded-xl text-[11px]"><span class="truncate font-medium flex items-center">${jName}${fbBadge}</span><button onclick="removeJemaahFromRoom('${rec.id}','${jId}')" class="ml-2 w-4 h-4 rounded-full bg-white hover:bg-slate-200 text-[10px]">✕</button></div>`; 
+    }).join('');
+    const sSlots=staffArr.map(s=>`<div class="flex items-center justify-between px-2.5 py-2 bg-[#FADBD8] text-[#7A0C2E] border border-[#F5B7B1] rounded-xl text-[11px]"><span class="truncate">👤 ${s}</span><button onclick="removeStaff('${rec.id}','${s.replace(/'/g,"\\'")}')" class="ml-2 w-4 h-4 rounded-full bg-white/70 text-[10px]">✕</button></div>`).join('');
+    const tanpaKatilIds = f['JEMAAH TANPA KATIL'] || f['INFANT'] || [];
+    const tanpaKatilSlots = tanpaKatilIds.map(tId=>{ const tRec=allRoomingJemaah.find(j=>j.id===tId); const tName=tRec?getJemaahName(tRec.fields):'Unknown'; return `<div class="flex items-center justify-between px-2.5 py-2 bg-amber-50 text-amber-900 border border-amber-200 rounded-xl text-[11px] border-dashed"><span class="truncate">INFANT ${tName}</span><button onclick="removeTanpaKatilFromRoom('${rec.id}','${tId}')" class="ml-2 w-4 h-4 rounded-full bg-white text-[10px]">✕</button></div>`; }).join('');
+    const emptyCount=Math.max(0,cap-count); const emptySlots=Array.from({length:emptyCount}).map((_,i)=>`<div ondragover="allowDrop(event)" ondrop="dropJemaah(event,'${rec.id}')" class="px-2.5 py-2 border border-dashed border-slate-300 rounded-xl text-[10px] text-slate-400 text-center">Slot Kosong ${count+i+1}</div>`).join('');
+    const catatanVal = f['CATATAN BILIK'] || f['CATATAN'] || f['NOTES'] || f['REMARK'] || '';
+    const catatanField = `<div class="mt-2"><div class="text-[8px] font-bold text-slate-500 mb-1">CATATAN BILIK</div><textarea id="catatan-${rec.id}" placeholder="Catatan bilik..." onchange="updateRoomCatatan('${rec.id}', this.value)" class="w-full text-[10px] px-2.5 py-1.5 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:outline-none focus:border-[#7A0C2E]/30 resize-none" rows="2">${catatanVal}</textarea></div>`;
+    return `<div data-room-id="${rec.id}" data-sort="${f['SORT ORDER']||0}" ondragover="allowDropRoom(event)" ondragleave="handleRoomDragLeave(event)" ondrop="dropJemaah(event,'${rec.id}'); dropRoomReorder(event,'${rec.id}')" class="bg-white rounded-2xl border border-slate-200 p-2.5 shadow-sm flex flex-col gap-2 h-fit">
+      <div class="flex items-center justify-between gap-1.5">
+        <div class="flex items-center gap-1.5 flex-1 min-w-0">
+          <button class="w-6 h-6 rounded-full bg-slate-100 border flex items-center justify-center cursor-grab shrink-0" draggable="true" ondragstart="handleRoomDragStart(event,'${rec.id}')" ondragend="handleRoomDragEnd(event)"><i class="fa-solid fa-grip-lines text-[9px]"></i></button>
+          <span class="flex items-center gap-1.5 shrink-0"><span class="w-5 h-5 rounded-full bg-[#7A0C2E] text-white flex items-center justify-center text-[9px] font-bold">${roomIdx+1}</span><span class="font-bold text-[11px]">${roomId}</span></span>
+          <input id="hotelInput-${rec.id}" value="${hotel}" placeholder="Nama Hotel" onchange="updateHotelInline('${rec.id}', this.value)" onfocus="this.select()" class="flex-1 min-w-0 px-2 py-1 bg-slate-50 border border-slate-200 rounded-full text-[11px] font-bold truncate focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#7A0C2E]/30" title="Klik untuk tukar nama hotel">
+        </div>
+        <button onclick="deleteRoom('${rec.id}','${roomId}')" class="w-6 h-6 rounded-full bg-slate-50 hover:bg-red-50 border text-[10px] shrink-0"><i class="fa-solid fa-trash"></i></button>
+      </div>
+      <div class="flex items-center gap-1.5 text-[10px]">
+        <div class="flex items-center gap-1 px-2.5 py-1 bg-slate-50 rounded-full border"><select onchange="updateRoomField('${rec.id}','PAKEJ / HOTEL',this.value)" class="bg-transparent text-[10px] font-bold outline-none"><option ${pakej==='JIMAT'?'selected':''}>JIMAT</option><option ${pakej==='EKONOMI'?'selected':''}>EKONOMI</option><option ${pakej==='STANDARD'?'selected':''}>STANDARD</option><option ${pakej==='PREMIUM'?'selected':''}>PREMIUM</option></select></div>
+        <div class="ml-auto flex items-center gap-1 bg-slate-50 rounded-full px-1 py-0.5 border"><button onclick="updateCap('${rec.id}',-1)" class="w-5 h-5 rounded-full bg-white border text-[10px]">−</button><span class="font-bold w-4 text-center text-[11px]">${cap}</span><button onclick="updateCap('${rec.id}',1)" class="w-5 h-5 rounded-full bg-white border text-[10px]">+</button><span class="text-[9px] ml-1">${count}/${cap}</span></div>
+      </div>
+      <div class="space-y-1">${jSlots}${sSlots}${emptySlots}${tanpaKatilSlots?`<div class="pt-2 mt-2 border-t border-dashed border-amber-300"><div class="text-[8px] font-bold text-amber-700 mb-1">TANPA KATIL / INFANT</div>${tanpaKatilSlots}</div>`:''}</div>
+      <button onclick="openTanpaKatilModal('${rec.id}')" class="mt-2 w-full py-2 bg-amber-50 hover:bg-amber-100 border border-amber-300 border-dashed text-amber-800 rounded-xl text-[10px] font-bold">+ Kanak-kanak / Infant (Tanpa Katil)</button>
+      ${catatanField}
+      <div class="h-1 bg-slate-100 rounded-full overflow-hidden mt-2"><div class="h-full bg-[#7A0C2E]" style="width:${Math.min(100,(count/cap)*100)}%"></div></div>
+    </div>`;
+  }).join('');
 }
 function setActiveLocation(loc){ activeLocation=loc.toUpperCase(); localStorage.setItem('effah_active_location',activeLocation); const el=document.getElementById('copyTargetLoc'); if(el) el.textContent=activeLocation; renderLocationTabs(); renderRoomingGrid(); renderNamelist(); renderStaffList(); }
 function allowDrop(e){ e.preventDefault(); }
