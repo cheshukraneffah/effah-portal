@@ -656,15 +656,34 @@ function removeStaff(roomId,staffName){ const rec=allRoomingRecords.find(r=>r.id
 
 function openTanpaKatilModal(roomId){
   try{
-    const available = allRoomingJemaah.filter(j=> !isJemaahAssignedAny(j.id));
-    if(available.length===0){ alert('Tiada jemaah belum assign untuk tanpa katil.'); return; }
+    // V24.13 FIX: check unassigned di lokasi semasa, bukan global
+    const available = allRoomingJemaah.filter(j=>{
+      const alreadyTanpa = isJemaahAssignedTanpaKatil(j.id);
+      const assignedInLoc = isJemaahAssignedInLocation(j.id, activeLocation);
+      const assignedTanpaInLoc = allRoomingRecords.some(r=> (r.fields['LOKASI / CITY']||'MEKAH').toUpperCase()===activeLocation.toUpperCase() && ((r.fields['JEMAAH TANPA KATIL']||[]).includes(j.id)));
+      return !alreadyTanpa && !assignedInLoc && !assignedTanpaInLoc;
+    });
+    // Jika masih kosong, bagi option untuk pilih dari yang dah assigned biasa juga (baby share dengan parent yang dah ada dalam bilik tu)
+    let pool = available;
+    let allowSharedParent = false;
+    if(pool.length===0){
+      const rec=allRoomingRecords.find(r=>r.id===roomId);
+      const parentIds=rec? (rec.fields['JEMAAH']||[]) : [];
+      // cari jemaah yang belum jadi tanpa katil dan bukan parent sendiri, tapi masih unassigned global
+      const fallback = allRoomingJemaah.filter(j=> !isJemaahAssignedAny(j.id));
+      if(fallback.length>0){ pool=fallback; }
+      else {
+        alert('Tiada jemaah belum assign untuk tanpa katil.\n\nTip: Lepaskan 1 jemaah kanak-kanak dari bilik lain atau tambah jemaah baru di DATA JEMAAH UMRAH sebagai INFANT.');
+        return;
+      }
+    }
     let listText='';
-    for(let i=0;i<available.length;i++){ listText+=(i+1)+'. '+getJemaahName(available[i].fields)+'\n'; }
-    const input=prompt('PILIH JEMAAH TANPA KATIL (Infant share katil):\n\n'+listText+'\nMasukkan nombor:');
+    for(let i=0;i<pool.length;i++){ listText+=(i+1)+'. '+getJemaahName(pool[i].fields)+'\n'; }
+    const input=prompt('PILIH JEMAAH TANPA KATIL (Infant share katil - tidak kira kapasiti):\n\n'+listText+'\nMasukkan nombor 1-'+pool.length+':');
     if(input===null) return;
     const idx=parseInt(input)-1;
-    if(isNaN(idx)||idx<0||idx>=available.length){ alert('Nombor tidak sah'); return; }
-    addTanpaKatilToRoom(roomId, available[idx].id);
+    if(isNaN(idx)||idx<0||idx>=pool.length){ alert('Nombor tidak sah'); return; }
+    addTanpaKatilToRoom(roomId, pool[idx].id);
   }catch(e){ alert('Error openTanpaKatil: '+e.message); console.error(e); }
 }
 async function addTanpaKatilToRoom(roomId, jId){
