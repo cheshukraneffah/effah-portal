@@ -373,7 +373,7 @@ function renderRoomingHTML(){
           <div id="roomingOverview" class="mt-2.5 p-2.5 bg-[#7A0C2E] text-white rounded-xl text-[11px]"></div>
           <div id="locationTabs" class="flex flex-wrap gap-1 mt-2.5"></div>
         </div>
-        <div id="roomingGrid" class="grid grid-cols-1 lg:grid-cols-2 gap-2.5 overflow-y-auto max-h-[78vh] pr-1 content-start min-h-[280px]"></div>
+        <div id="roomingGrid" class="grid grid-cols-1 lg:grid-cols-2 gap-2.5 content-start min-h-[280px]"></div>
       </div>
     </div>
   </div>
@@ -744,15 +744,13 @@ function makeNamelistSticky(){
     if(leftWrapper){
       leftWrapper.style.position='sticky';
       leftWrapper.style.top='12px';
-      leftWrapper.style.maxHeight='calc(100vh - 16px)';
-      leftWrapper.style.overflowY='auto';
       leftWrapper.style.alignSelf='start';
       leftWrapper.style.zIndex='20';
       leftWrapper.setAttribute('data-left-col','true');
     }
     const nl = document.getElementById('namelistContainer');
     if(nl){
-      nl.style.maxHeight='calc(100vh - 240px)';
+      nl.style.maxHeight='calc(100vh - 200px)';
       nl.style.overflowY='auto';
     }
     const staffCont = document.getElementById('staffListContainer');
