@@ -338,7 +338,7 @@ function renderRoomingHTML(){
           </div>
           <div class="col-span-2 text-center">BOARD BASIS</div><div class="col-span-1 text-center">TRAIN</div><div class="col-span-3 text-center">INSURAN (TAKAFUL/ETIQA/KHAIRI)</div><div class="col-span-1 text-center">PAKEJ</div><div class="col-span-1 text-center">+</div>
         </div>
-        <div id="namelistContainer" class="flex-1 overflow-y-auto max-h-[42vh] divide-y divide-slate-50 bg-white min-h-[180px]"></div>
+        <div id="namelistContainer" class="flex-1 divide-y divide-slate-50 bg-white min-h-[180px]"></div>
         <div class="border-t border-slate-200 bg-slate-50/50">
           <div class="p-2.5 flex items-center justify-between">
             <h4 class="font-bold text-[11px] tracking-widest text-slate-700">STAFF / EXTRA LIST</h4>
@@ -348,7 +348,7 @@ function renderRoomingHTML(){
             <input id="newStaffInput" placeholder="Taip nama staff" class="flex-1 text-[11px] px-2.5 py-2 border border-slate-200 rounded-xl bg-white focus:outline-none" onkeydown="if(event.key==='Enter'){ addNewStaff(); }">
             <button onclick="addNewStaff()" class="px-3 py-2 bg-slate-100 border border-slate-200 text-slate-700 rounded-xl text-[11px] font-bold hover:bg-slate-200">+ Add</button>
           </div>
-          <div id="staffListContainer" class="px-2 pb-2.5 max-h-[22vh] overflow-y-auto space-y-1 bg-slate-50/50 min-h-[70px]"></div>
+          <div id="staffListContainer" class="px-2 pb-2.5 space-y-1 bg-slate-50/50 min-h-[70px]"></div>
         </div>
       </div>
 
@@ -744,14 +744,22 @@ function makeNamelistSticky(){
     if(leftWrapper){
       leftWrapper.style.position='sticky';
       leftWrapper.style.top='12px';
+      leftWrapper.style.maxHeight='calc(100vh - 16px)';
+      leftWrapper.style.overflowY='auto';
       leftWrapper.style.alignSelf='start';
       leftWrapper.style.zIndex='20';
+      leftWrapper.style.paddingRight='4px';
       leftWrapper.setAttribute('data-left-col','true');
     }
     const nl = document.getElementById('namelistContainer');
     if(nl){
-      nl.style.maxHeight='calc(100vh - 200px)';
-      nl.style.overflowY='auto';
+      nl.style.maxHeight='none';
+      nl.style.overflowY='visible';
+    }
+    const staffCont = document.getElementById('staffListContainer');
+    if(staffCont){
+      staffCont.style.maxHeight='none';
+      staffCont.style.overflowY='visible';
     }
     const staffCont = document.getElementById('staffListContainer');
     if(staffCont){
@@ -767,7 +775,12 @@ function renderRoomingGrid(){
   let rooms=[...allRoomingRecords].filter(r=>(r.fields['LOKASI / CITY']||'MEKAH').toUpperCase()===activeLocation.toUpperCase());
   rooms=getRoomOrderedList(rooms);
   const bilikEl=document.getElementById('roomingBiliks'); if(bilikEl) bilikEl.textContent=rooms.length+' Bilik';
-  const totalJ=rooms.reduce((s,r)=>s+(r.fields['JEMAAH']?.length||0),0); const totalStaff=rooms.reduce((s,r)=>s+(r.fields['STAFF / EXTRA']||'').split(',').filter(Boolean).length,0);
+  const totalJ=rooms.reduce((s,r)=>s+(r.fields['JEMAAH']?.length||0),0);
+  // Fix: count staff from both STAFF/EXTRA text field AND staffList linked records
+  const staffFromText = rooms.reduce((s,r)=>s+(r.fields['STAFF / EXTRA']||'').split(',').filter(Boolean).length,0);
+  const staffFromLinked = rooms.reduce((s,r)=>s+getStaffForRoom(r.id).length,0);
+  const totalStaff = staffFromText + staffFromLinked;
+
   const occEl=document.getElementById('roomingOccupancy'); if(occEl) occEl.textContent=`${totalJ} Jemaah + ${totalStaff} Staff • ${activeLocation}`;
   renderRoomingOverview(rooms);
   if(rooms.length===0){ grid.innerHTML=`<div class="col-span-2 p-6 text-center text-[11px] border border-dashed rounded-2xl bg-white">Tiada bilik untuk <b>${activeLocation}</b><br><button onclick="openNewRoomModal()" class="mt-2.5 px-3 py-1.5 bg-[#7A0C2E] text-white rounded-full text-[11px]">+ Bilik Baru untuk ${activeLocation}</button></div>`; return; }
