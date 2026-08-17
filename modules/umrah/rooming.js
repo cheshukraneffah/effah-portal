@@ -441,13 +441,14 @@ async function dropRoomReorder(e, targetRoomId){
 async function updateRoomCatatan(roomId, value){
   const rec=allRoomingRecords.find(r=>r.id===roomId);
   if(!rec) return;
+  rec.fields['CATATAN BILIK']=value;
   rec.fields['CATATAN']=value;
   try{
     const base=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base')||localStorage.getItem('effah_base_id'); const pat=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
   await fetch(`https://api.airtable.com/v0/${base}/ROOMING%20LIST/${roomId}`,{
       method:'PATCH',
       headers:{'Authorization':`Bearer ${pat}`,'Content-Type':'application/json'},
-      body: JSON.stringify({fields:{'CATATAN': value}})
+      body: JSON.stringify({fields:{'CATATAN BILIK': value, 'CATATAN': value}})
     });
   }catch(e){ console.error('Catatan update failed', e); }
 }
@@ -768,8 +769,8 @@ function renderRoomingGrid(){
     const tanpaKatilIds = f['JEMAAH TANPA KATIL'] || f['INFANT'] || [];
     const tanpaKatilSlots = tanpaKatilIds.map(tId=>{ const tRec=allRoomingJemaah.find(j=>j.id===tId); const tName=tRec?getJemaahName(tRec.fields):'Unknown'; return `<div class="flex items-center justify-between px-2.5 py-2 bg-amber-50 text-amber-900 border border-amber-200 rounded-xl text-[11px] border-dashed"><span class="truncate">INFANT ${tName}</span><button onclick="removeTanpaKatilFromRoom('${rec.id}','${tId}')" class="ml-2 w-4 h-4 rounded-full bg-white text-[10px]">✕</button></div>`; }).join('');
     const emptyCount=Math.max(0,cap-count); const emptySlots=Array.from({length:emptyCount}).map((_,i)=>`<div ondragover="allowDrop(event)" ondrop="dropJemaah(event,'${rec.id}')" class="px-2.5 py-2 border border-dashed border-slate-300 rounded-xl text-[10px] text-slate-400 text-center">Slot Kosong ${count+i+1}</div>`).join('');
-    const catatanVal = f['CATATAN'] || f['NOTES'] || f['REMARK'] || '';
-    const catatanField = `<div class="mt-1"><textarea id="catatan-${rec.id}" placeholder="Catatan bilik..." onchange="updateRoomCatatan('${rec.id}', this.value)" class="w-full text-[10px] px-2 py-1.5 border border-slate-200 rounded-lg bg-amber-50/50 focus:bg-white focus:outline-none resize-none" rows="2">${catatanVal}</textarea></div>`;
+    const catatanVal = f['CATATAN BILIK'] || f['CATATAN'] || f['NOTES'] || f['REMARK'] || '';
+    const catatanField = `<div class="mt-2"><div class="text-[8px] font-bold text-slate-500 mb-1 flex items-center justify-between"><span>CATATAN BILIK</span><span style="font-weight:normal;color:#999">FAMILY / BILIK PETUGAS / BILIK BOD</span></div><textarea id="catatan-${rec.id}" placeholder="Contoh: FAMILY, BILIK PETUGAS, BILIK BOD..." onchange="updateRoomCatatan('${rec.id}', this.value)" class="w-full text-[10px] px-2.5 py-1.5 border border-slate-200 rounded-xl bg-amber-50/30 focus:bg-white focus:outline-none focus:border-[#7A0C2E]/30 resize-none" rows="2">${catatanVal}</textarea></div>`;
     return `<div data-room-id="${rec.id}" data-sort="${f['SORT ORDER']||0}" ondragover="allowDropRoom(event)" ondragleave="handleRoomDragLeave(event)" ondrop="dropJemaah(event,'${rec.id}'); dropRoomReorder(event,'${rec.id}')" class="bg-white rounded-2xl border border-slate-200 p-2.5 shadow-sm flex flex-col gap-2 h-fit">
       <div class="flex items-center justify-between gap-1.5">
         <div class="flex items-center gap-1.5 flex-1 min-w-0">
@@ -785,7 +786,8 @@ function renderRoomingGrid(){
       </div>
       <div class="space-y-1">${jSlots}${sSlots}${emptySlots}${tanpaKatilSlots?`<div class="pt-2 mt-2 border-t border-dashed border-amber-300"><div class="text-[8px] font-bold text-amber-700 mb-1">TANPA KATIL / INFANT</div>${tanpaKatilSlots}</div>`:''}</div>
       <button onclick="openTanpaKatilModal('${rec.id}')" class="mt-2 w-full py-2 bg-amber-50 hover:bg-amber-100 border border-amber-300 border-dashed text-amber-800 rounded-xl text-[10px] font-bold">+ Kanak-kanak / Infant (Tanpa Katil)</button>
-      <div class="h-1 bg-slate-100 rounded-full overflow-hidden"><div class="h-full bg-[#7A0C2E]" style="width:${Math.min(100,(count/cap)*100)}%"></div></div>
+      ${catatanField}
+      <div class="h-1 bg-slate-100 rounded-full overflow-hidden mt-2"><div class="h-full bg-[#7A0C2E]" style="width:${Math.min(100,(count/cap)*100)}%"></div></div>
     </div>`;
   }).join('');
 }
@@ -798,6 +800,17 @@ function dropJemaah(e,roomId){
   document.querySelectorAll('[draggable="true"]').forEach(el=>el.style.opacity='1');
   const staffId=e.dataTransfer.getData('text/staff-id'); const jId=e.dataTransfer.getData('text/plain');
   const id=staffId||jId; if(!id) return;
+  const rec=allRoomingRecords.find(r=>r.id===roomId);
+  if(rec){
+    const cap=rec.fields['KAPASITI']||4;
+    const curCount=(rec.fields['JEMAAH']||[]).length + getStaffForRoom(rec.id).length;
+    if(curCount>=cap && !staffId){
+      alert('Bilik '+(rec.fields['Room ID / Nama Bilik']||roomId)+' sudah penuh ('+curCount+'/'+cap+').');
+      const el=document.querySelector(`[data-room-id="${roomId}"]`);
+      if(el){ el.classList.add('ring-2','ring-red-400'); setTimeout(()=>el.classList.remove('ring-2','ring-red-400'),800); }
+      return;
+    }
+  }
   if(staffList.some(s=>s.id===id) || id.startsWith('staff_')){ assignStaffToRoom(id,roomId); }
   else { if(!isJemaahAssignedInLocation(id, activeLocation)) assignJemaahToRoom(id,roomId); }
 }
@@ -806,7 +819,20 @@ function removeJemaahFromCurrentLoc(jId){
   const rec = allRoomingRecords.find(r=>(r.fields['LOKASI / CITY']||'MEKAH').toUpperCase()===activeLocation && (r.fields['JEMAAH']||[]).includes(jId));
   if(rec) removeJemaahFromRoom(rec.id, jId);
 }
-async function assignJemaahToRoom(jId,roomId){ if(isJemaahAssignedInLocation(jId, activeLocation)) return; const rec=allRoomingRecords.find(r=>r.id===roomId); if(!rec) return; await updateRoomField(roomId,'JEMAAH',[...(rec.fields['JEMAAH']||[]),jId],true); }
+async function assignJemaahToRoom(jId,roomId){ 
+  if(isJemaahAssignedInLocation(jId, activeLocation)) return; 
+  const rec=allRoomingRecords.find(r=>r.id===roomId); if(!rec) return;
+  const cap=rec.fields['KAPASITI']||4;
+  const curCount=(rec.fields['JEMAAH']||[]).length + getStaffForRoom(rec.id).length;
+  if(curCount>=cap){ 
+    alert('Bilik '+ (rec.fields['Room ID / Nama Bilik']||rec.id) +' sudah penuh ('+curCount+'/'+cap+'). Tidak boleh tambah jemaah lagi.');
+    // shake animation
+    const el=document.querySelector(`[data-room-id="${roomId}"]`);
+    if(el){ el.classList.add('ring-2','ring-red-400'); setTimeout(()=>el.classList.remove('ring-2','ring-red-400'),800); }
+    return; 
+  }
+  await updateRoomField(roomId,'JEMAAH',[...(rec.fields['JEMAAH']||[]),jId],true); 
+}
 async function removeJemaahFromRoom(roomId,jId){ const rec=allRoomingRecords.find(r=>r.id===roomId); await updateRoomField(roomId,'JEMAAH',(rec.fields['JEMAAH']||[]).filter(id=>id!==jId),true); }
 async function updateCap(roomId,delta){
   const rec=allRoomingRecords.find(r=>r.id===roomId); if(!rec) return;
@@ -899,17 +925,46 @@ async function deleteRoom(roomId,roomName){
 }
 function openTanpaKatilModal(roomId){
   try{
-    const available = allRoomingJemaah.filter(j=>{ const alreadyTanpa = isJemaahAssignedTanpaKatil(j.id); const assignedInLoc = isJemaahAssignedInLocation(j.id, activeLocation); return !alreadyTanpa && !assignedInLoc; });
-    if(available.length===0){ alert('Tiada jemaah belum assign untuk tanpa katil.'); return; }
-    let listText='';
-    for(let i=0;i<available.length;i++){ listText+=(i+1)+'. '+getJemaahName(available[i].fields)+'\n'; }
-    const input=prompt('PILIH JEMAAH TANPA KATIL (Infant share katil):\n\n'+listText+'\nMasukkan nombor:');
-    if(input===null) return;
-    const idx=parseInt(input)-1;
-    if(isNaN(idx)||idx<0||idx>=available.length){ alert('Nombor tidak sah'); return; }
-    addTanpaKatilToRoom(roomId, available[idx].id);
+    const available = allRoomingJemaah.filter(j=>{ 
+      const alreadyTanpa = isJemaahAssignedTanpaKatil(j.id); 
+      const assignedNormal = isJemaahAssignedInLocation(j.id, activeLocation);
+      const assignedTanpaAny = allRoomingRecords.some(r=> (r.fields['JEMAAH TANPA KATIL']||[]).includes(j.id));
+      return !alreadyTanpa && !assignedNormal && !assignedTanpaAny;
+    });
+    if(available.length===0){ alert('Tiada jemaah belum assign untuk tanpa katil.\nSemua jemaah sudah ada bilik atau sudah jadi infant.'); return; }
+    
+    // Create inline selector modal
+    let existingModal = document.getElementById('tanpaKatilSelectorModal');
+    if(existingModal) existingModal.remove();
+    
+    const modalHtml = `<div id="tanpaKatilSelectorModal" style="position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px">
+      <div style="background:#fff;border-radius:16px;max-width:400px;width:100%;max-height:70vh;overflow:hidden;box-shadow:0 20px 40px rgba(0,0,0,0.2)">
+        <div style="padding:12px 16px;border-bottom:1px solid #eee;display:flex;justify-content:space-between;align-items:center">
+          <span style="font-weight:bold;font-size:13px">Pilih Infant / Tanpa Katil</span>
+          <button onclick="document.getElementById('tanpaKatilSelectorModal').remove()" style="w-6 h-6 rounded-full bg-slate-100">✕</button>
+        </div>
+        <div style="padding:8px;max-height:50vh;overflow-y:auto" id="tanpaKatilList">
+          <input type="text" id="tanpaKatilSearch" placeholder="Cari nama..." style="width:100%;padding:6px 10px;border:1px solid #ddd;border-radius:20px;font-size:11px;margin-bottom:8px" oninput="filterTanpaKatilList(this.value)">
+          <div id="tanpaKatilOptions">
+            ${available.map((j, idx)=>`<button onclick="addTanpaKatilToRoom('${roomId}','${j.id}'); document.getElementById('tanpaKatilSelectorModal').remove()" style="width:100%;text-align:left;padding:8px 10px;border:1px solid #eee;border-radius:10px;margin-bottom:4px;font-size:11px;background:#fff" class="hover:bg-amber-50">${idx+1}. ${getJemaahName(j.fields)}</button>`).join('')}
+          </div>
+        </div>
+      </div>
+    </div>`;
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+    window._tanpaKatilAvailable = available;
+    window._tanpaKatilRoomId = roomId;
   }catch(e){ alert('Error openTanpaKatil: '+e.message); console.error(e); }
 }
+function filterTanpaKatilList(q){
+  const list = document.getElementById('tanpaKatilOptions');
+  if(!list || !window._tanpaKatilAvailable) return;
+  const low = q.toLowerCase();
+  const roomId = window._tanpaKatilRoomId;
+  const filtered = window._tanpaKatilAvailable.filter(j=> getJemaahName(j.fields).toLowerCase().includes(low));
+  list.innerHTML = filtered.map((j, idx)=>`<button onclick="addTanpaKatilToRoom('${roomId}','${j.id}'); document.getElementById('tanpaKatilSelectorModal').remove()" style="width:100%;text-align:left;padding:8px 10px;border:1px solid #eee;border-radius:10px;margin-bottom:4px;font-size:11px;background:#fff" class="hover:bg-amber-50">${idx+1}. ${getJemaahName(j.fields)}</button>`).join('') || '<div style="padding:8px;text-align:center;color:#999;font-size:11px">Tiada carian ditemui</div>';
+}
+
 async function addTanpaKatilToRoom(roomId, jId){
   const rec=allRoomingRecords.find(r=>r.id===roomId);
   if(!rec) return;
