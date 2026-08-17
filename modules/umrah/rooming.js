@@ -897,6 +897,49 @@ async function deleteRoom(roomId,roomName){
     renderRoomingGrid(); renderNamelist(); renderStaffList(); renderLocationTabs();
   }catch(e){ alert('Gagal memadamkan bilik: '+e.message); }
 }
+function openTanpaKatilModal(roomId){
+  try{
+    const available = allRoomingJemaah.filter(j=>{ const alreadyTanpa = isJemaahAssignedTanpaKatil(j.id); const assignedInLoc = isJemaahAssignedInLocation(j.id, activeLocation); return !alreadyTanpa && !assignedInLoc; });
+    if(available.length===0){ alert('Tiada jemaah belum assign untuk tanpa katil.'); return; }
+    let listText='';
+    for(let i=0;i<available.length;i++){ listText+=(i+1)+'. '+getJemaahName(available[i].fields)+'\n'; }
+    const input=prompt('PILIH JEMAAH TANPA KATIL (Infant share katil):\n\n'+listText+'\nMasukkan nombor:');
+    if(input===null) return;
+    const idx=parseInt(input)-1;
+    if(isNaN(idx)||idx<0||idx>=available.length){ alert('Nombor tidak sah'); return; }
+    addTanpaKatilToRoom(roomId, available[idx].id);
+  }catch(e){ alert('Error openTanpaKatil: '+e.message); console.error(e); }
+}
+async function addTanpaKatilToRoom(roomId, jId){
+  const rec=allRoomingRecords.find(r=>r.id===roomId);
+  if(!rec) return;
+  const cur = rec.fields['JEMAAH TANPA KATIL'] || [];
+  if(cur.includes(jId)) return;
+  const newVal=[...cur, jId];
+  rec.fields['JEMAAH TANPA KATIL']=newVal;
+  renderRoomingGrid();
+  renderNamelist();
+  const b=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base')||localStorage.getItem('effah_base_id');
+  const p=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
+  try{
+    const res=await fetch(`https://api.airtable.com/v0/${b}/ROOMING%20LIST/${roomId}`,{method:'PATCH',headers:{Authorization:`Bearer ${p}`,'Content-Type':'application/json'},body:JSON.stringify({fields:{'JEMAAH TANPA KATIL':newVal}})});
+    const d=await res.json();
+    if(d.error) console.warn('Airtable save warning', d.error);
+  }catch(e){ console.error(e); }
+}
+async function removeTanpaKatilFromRoom(roomId, jId){
+  const rec=allRoomingRecords.find(r=>r.id===roomId);
+  if(!rec) return;
+  const cur = rec.fields['JEMAAH TANPA KATIL'] || rec.fields['INFANT'] || [];
+  const newVal=cur.filter(x=>x!==jId);
+  rec.fields['JEMAAH TANPA KATIL']=newVal;
+  renderRoomingGrid();
+  renderNamelist();
+  const b=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base')||localStorage.getItem('effah_base_id');
+  const p=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
+  try{ await fetch(`https://api.airtable.com/v0/${b}/ROOMING%20LIST/${roomId}`,{method:'PATCH',headers:{Authorization:`Bearer ${p}`,'Content-Type':'application/json'},body:JSON.stringify({fields:{'JEMAAH TANPA KATIL':newVal}})}); }catch(e){}
+}
+
 function updateNewRoomIdFromCap(){ const cap=parseInt(document.getElementById('newRoomCap').value)||4; const el=document.getElementById('newRoomId'); if(el) el.value=generateRoomIdFromCap(cap); }
 function changeNewRoomCap(d){ const i=document.getElementById('newRoomCap'); let v=parseInt(i.value)||4; v=Math.max(1,Math.min(8,v+d)); i.value=v; updateNewRoomIdFromCap(); }
 function openNewRoomModal(){ const m=document.getElementById('newRoomModal'); if(!m) return; m.classList.remove('hidden'); document.getElementById('newRoomLokasi').value=activeLocation; document.getElementById('newRoomCap').value=roomingDefaultCap; updateNewRoomIdFromCap(); }
@@ -1107,14 +1150,14 @@ function generateRoomingPrint(orientation){ orientation = orientation || 'landsc
         const countFB = allRoomingJemaah.filter(r=> (getFullboardVal(r.fields)||'').toUpperCase()==='FULLBOARD').length;
         const countFBMekah = allRoomingJemaah.filter(r=> (getFullboardVal(r.fields)||'').toUpperCase()==='FULLBOARD (MEKAH)').length;
         const countBBMekah = allRoomingJemaah.filter(r=> (getFullboardVal(r.fields)||'').toUpperCase()==='BB (MEKAH)').length;
-        boardSummary = `FB: ${countFB}, FB Mekah: ${countFBMekah}, BB Mekah: ${countBBMekah}`;
-        if(fbListForLoc.length>0) boardSummary = `${fbListForLoc.length} orang (FB:${countFB} + FB(M):${countFBMekah} + BB(M):${countBBMekah})`;
+        boardSummary = `FULLBOARD: ${countFB}, FULLBOARD MEKAH: ${countFBMekah}, BB MEKAH: ${countBBMekah}`;
+        if(fbListForLoc.length>0) boardSummary = `${fbListForLoc.length} orang (FULLBOARD: ${countFB} + FULLBOARD (MEKAH): ${countFBMekah} + BB (MEKAH): ${countBBMekah})`;
         else boardSummary = '-';
       } else if(loc==='MADINAH'){
         const countFB = allRoomingJemaah.filter(r=> (getFullboardVal(r.fields)||'').toUpperCase()==='FULLBOARD').length;
         const countFBMad = allRoomingJemaah.filter(r=> (getFullboardVal(r.fields)||'').toUpperCase()==='FULLBOARD (MADINAH)').length;
         const countBBMad = allRoomingJemaah.filter(r=> (getFullboardVal(r.fields)||'').toUpperCase()==='BB (MADINAH)').length;
-        if(fbListForLoc.length>0) boardSummary = `${fbListForLoc.length} orang (FB:${countFB} + FB(Med):${countFBMad} + BB(Med):${countBBMad})`;
+        if(fbListForLoc.length>0) boardSummary = `${fbListForLoc.length} orang (FULLBOARD: ${countFB} + FULLBOARD (MADINAH): ${countFBMad} + BB (MADINAH): ${countBBMad})`;
         else boardSummary = '-';
       } else if(loc==='TAIF'){
         boardSummary = fbListForLoc.length>0 ? `${fbListForLoc.length} FULLBOARD` : '-';
@@ -1132,7 +1175,7 @@ function generateRoomingPrint(orientation){ orientation = orientation || 'landsc
         overviewRows += `<tr><td style="border:1px solid #ddd;padding:4px 6px;font-weight:bold">${hotelName}</td><td style="border:1px solid #ddd;padding:4px 6px;text-align:center">${bilikStr}</td><td style="border:1px solid #ddd;padding:4px 6px;text-align:center">${boardSummary}</td><td style="border:1px solid #ddd;padding:4px 6px;text-align:center">${hRooms.length} bilik</td></tr>`;
       });
       
-      let overviewProfessionalHTML = `<table style="width:100%;border-collapse:collapse;font-size:9px"><tr style="background:#f8f8f8;font-weight:bold"><th style="border:1px solid #ddd;padding:4px 6px;text-align:left">HOTEL</th><th style="border:1px solid #ddd;padding:4px 6px;text-align:center">BILIK</th><th style="border:1px solid #ddd;padding:4px 6px;text-align:center">BOARD</th><th style="border:1px solid #ddd;padding:4px 6px;text-align:center">JUMLAH</th></tr>${overviewRows}</table>`;
+      let overviewProfessionalHTML = `<table style="width:100%;border-collapse:collapse;font-size:9px"><tr style="background:#f8f8f8;font-weight:bold"><th style="border:1px solid #ddd;padding:4px 6px;text-align:left">HOTEL</th><th style="border:1px solid #ddd;padding:4px 6px;text-align:center">BILIK</th><th style="border:1px solid #ddd;padding:4px 6px;text-align:center">BOARD BASIS</th><th style="border:1px solid #ddd;padding:4px 6px;text-align:center">JUMLAH</th></tr>${overviewRows}</table>`;
       
       const totalJemaahLoc = rooms.reduce((sum,r)=> sum + (r.fields['JEMAAH']||[]).length, 0);
       const totalBabyLoc = rooms.reduce((sum,r)=> sum + (r.fields['JEMAAH TANPA KATIL']||[]).length, 0);
