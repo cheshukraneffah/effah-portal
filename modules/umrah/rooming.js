@@ -739,19 +739,21 @@ function makeNamelistSticky(){
   try{
     const nl = document.getElementById('namelistContainer');
     if(!nl) return;
-    const leftCard = nl.closest('.w-full.lg\\:w-\\[52\\%\\]') || nl.parentElement;
+    const leftCard = nl.closest('.w-full.lg\:w-\[52\%\]') || nl.parentElement;
     if(leftCard){
       leftCard.style.position='sticky';
       leftCard.style.top='12px';
       leftCard.style.alignSelf='flex-start';
       leftCard.style.zIndex='20';
-      leftCard.style.maxHeight='calc(100vh - 24px)';
       leftCard.style.display='flex';
       leftCard.style.flexDirection='column';
       leftCard.style.backgroundColor='#ffffff';
+      leftCard.style.maxHeight='calc(100vh - 16px)';
+      leftCard.style.overflow='hidden';
     }
     nl.style.flex='1 1 auto';
-    nl.style.maxHeight='52vh';
+    nl.style.maxHeight='48vh';
+    nl.style.minHeight='200px';
     nl.style.overflowY='auto';
     nl.style.overflowX='hidden';
     nl.style.backgroundColor='#ffffff';
@@ -760,16 +762,27 @@ function makeNamelistSticky(){
       staffSec.style.flex='0 0 auto';
       staffSec.style.backgroundColor='#ffffff';
       staffSec.style.borderTop='2px solid #e2e8f0';
+      staffSec.style.display='flex';
+      staffSec.style.flexDirection='column';
+      staffSec.style.maxHeight='38vh';
+      staffSec.style.overflow='hidden';
     }
     const staffCont = document.getElementById('staffListContainer');
     if(staffCont){
-      staffCont.style.maxHeight='32vh';
+      staffCont.style.flex='1';
       staffCont.style.overflowY='auto';
       staffCont.style.overflowX='hidden';
       staffCont.style.backgroundColor='#ffffff';
     }
+    // Ensure rooming grid can scroll via window
+    const rg=document.getElementById('roomingGrid');
+    if(rg){
+      rg.style.overflow='visible';
+      rg.style.maxHeight='none';
+    }
   }catch(e){}
 }
+
 
 function filterRoomingNamelist(){ renderNamelist(); }
 
@@ -817,7 +830,7 @@ function renderRoomingGrid(){
     const emptyCount=Math.max(0,cap-count); const emptySlots=Array.from({length:emptyCount}).map((_,i)=>`<div ondragover="allowDrop(event)" ondrop="dropJemaah(event,'${rec.id}')" class="px-2.5 py-2 border border-dashed border-slate-300 rounded-xl text-[10px] text-slate-400 text-center">Slot Kosong ${count+i+1}</div>`).join('');
     const catatanVal = f['CATATAN BILIK'] || f['CATATAN'] || f['NOTES'] || f['REMARK'] || '';
     const catatanField = `<div class="mt-2"><div class="text-[8px] font-bold text-slate-500 mb-1">CATATAN BILIK</div><textarea id="catatan-${rec.id}" placeholder="Catatan bilik..." onchange="updateRoomCatatan('${rec.id}', this.value)" class="w-full text-[10px] px-2.5 py-1.5 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:outline-none focus:border-[#7A0C2E]/30 resize-none" rows="2">${catatanVal}</textarea></div>`;
-    return `<div data-room-id="${rec.id}" draggable="true" ondragstart="dragRoom(event,'${rec.id}')" ondragend="dragRoomEnd(event)" ondragover="allowDropRoom(event)" ondragleave="leaveDropRoom(event)" ondrop="dropRoom(event,'${rec.id}')" data-sort="${f['SORT ORDER']||0}" ondragover="allowDropRoom(event)" ondragleave="handleRoomDragLeave(event)" ondrop="dropJemaah(event,'${rec.id}'); dropRoomReorder(event,'${rec.id}')" class="bg-white rounded-2xl border border-slate-200 p-2.5 shadow-sm flex flex-col gap-2 h-fit">
+    return `<div data-room-id="${rec.id}" data-sort="${f['SORT ORDER']||0}" ondragover="allowDropRoom(event)" ondragleave="handleRoomDragLeave(event)" ondrop="dropJemaah(event,'${rec.id}'); dropRoomReorder(event,'${rec.id}')" class="bg-white rounded-2xl border border-slate-200 p-2.5 shadow-sm flex flex-col gap-2 h-fit">
       <div class="flex items-center justify-between gap-1.5">
         <div class="flex items-center gap-1.5 flex-1 min-w-0">
           <button class="w-6 h-6 rounded-full bg-slate-100 border flex items-center justify-center cursor-grab shrink-0" draggable="true" ondragstart="handleRoomDragStart(event,'${rec.id}')" ondragend="handleRoomDragEnd(event)"><i class="fa-solid fa-grip-lines text-[9px]"></i></button>
@@ -844,8 +857,8 @@ function _startAutoScroll(){
   if(_autoScrollInterval) return;
   _autoScrollInterval=setInterval(()=>{
     const y=window._lastDragY||0;
-    if(y<120) window.scrollBy(0, -18);
-    else if(y>window.innerHeight-120) window.scrollBy(0, 18);
+    if(y<140){ window.scrollBy(0, -22); document.documentElement.scrollTop-=22; }
+    else if(y>window.innerHeight-140){ window.scrollBy(0, 22); document.documentElement.scrollTop+=22; }
     // also scroll left panels if near edge
     const nl=document.getElementById('namelistContainer');
     const sl=document.getElementById('staffListContainer');
@@ -1407,8 +1420,8 @@ function generateRoomingPrint(orientation){ orientation = orientation || 'landsc
         
         const catatanBilik = (f['CATATAN BILIK'] || f['CATATAN'] || '').trim();
         const catatanPrint = catatanBilik ? ` (${catatanBilik})` : '';
-        return `<div style="border:1px solid #000;margin-bottom:${isPortrait ? '4px' : '6px'};background:#fff;break-inside:avoid">
-          <div style="background:#fff;border-bottom:1px solid #000;padding:${isPortrait ? '2px 4px' : '3px 6px'};display:flex;justify-content:space-between;align-items:center">
+        return `<div style="border:1px solid #000;margin-bottom:${isPortrait ? '4px' : '6px'};background:#fff;break-inside:avoid" data-room-card="${rec.id}" ondragover="allowDropRoom(event)" ondragleave="leaveDropRoom(event)" ondrop="dropRoom(event,'${rec.id}')">
+          <div draggable="true" ondragstart="dragRoom(event,'${rec.id}')" ondragend="dragRoomEnd(event)" style="background:#fff;border-bottom:1px solid #000;padding:${isPortrait ? '2px 4px' : '3px 6px'};display:flex;justify-content:space-between;align-items:center;cursor:grab" title="Drag untuk susun bilik">
             <span style="font-weight:bold;font-size:${isPortrait ? '8px' : '9px'}">${idx+1}. ${roomName} ${pakej ? '('+pakej+')' : ''} ${hotel ? '- '+hotel : ''}${catatanPrint}</span>
             <span style="font-size:${isPortrait ? '7px' : '8px'};font-weight:bold">${jIds.length + staffForRoom.length}/${cap}</span>
           </div>
