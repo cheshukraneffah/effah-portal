@@ -494,6 +494,7 @@ function renderRoomingOverview(rooms){
   const totalJ=rooms.reduce((s,r)=>s+(r.fields['JEMAAH']?.length||0),0);
   const totalBaby=rooms.reduce((s,r)=>s+(r.fields['JEMAAH TANPA KATIL']?.length||0),0);
   const totalStaff=rooms.reduce((s,r)=>s+(r.fields['STAFF / EXTRA']||'').split(',').filter(Boolean).length,0);
+  const totalJemaahFull = totalJ + totalBaby; // infant masuk dalam jemaah count
 
   let hotelBlocks = Object.keys(byHotel).sort().map(hotel=>{
     const caps=byHotel[hotel];
@@ -510,16 +511,12 @@ function renderRoomingOverview(rooms){
     <div class="flex items-center justify-between">
       <div class="font-bold text-[13px] tracking-widest">${activeLocation} • ${totalBilik} Bilik</div>
       <div class="flex items-center gap-1.5">
-        <span class="text-[10px] bg-white/20 px-2 py-0.5 rounded-full">${totalJ} J+${totalBaby} I+${totalStaff} S</span>
+        <span class="text-[10px] bg-white/20 px-2.5 py-1 rounded-full font-bold">${totalJemaahFull} Jemaah + ${totalStaff} Staff</span>
         ${fbCount?`<span class="text-[10px] bg-emerald-400/90 text-emerald-900 px-2 py-0.5 rounded-full font-bold">${fbCount} Board Basis</span>`:''}
       </div>
     </div>
-    <div class="bg-white/10 rounded-xl p-2.5 max-h-[22vh] overflow-y-auto">
+    <div class="bg-white/10 rounded-xl p-2.5 max-h-[26vh] overflow-y-auto">
       ${hotelBlocks||'<div class="opacity-70 text-[11px]">Tiada data hotel</div>'}
-    </div>
-    <div class="flex justify-between text-[9px] opacity-80 px-1">
-      <span>Total ${totalBilik} bilik</span>
-      <span>${totalJ} jemaah${totalBaby?` + ${totalBaby} infant`:''} + ${totalStaff} staff</span>
     </div>
   </div>`;
   el.innerHTML=html;
