@@ -338,8 +338,8 @@ function renderRoomingHTML(){
           </div>
           <div class="col-span-2 text-center">BOARD BASIS</div><div class="col-span-1 text-center">TRAIN</div><div class="col-span-3 text-center">INSURAN (TAKAFUL/ETIQA/KHAIRI)</div><div class="col-span-1 text-center">PAKEJ</div><div class="col-span-1 text-center">+</div>
         </div>
-        <div id="namelistContainer" class="flex-1 divide-y divide-slate-100 bg-white min-h-[180px] relative z-0"></div>
-        <div class="border-t-2 border-slate-200 bg-white relative z-10">
+        <div id="namelistContainer" class="flex-1 overflow-y-auto max-h-[58vh] divide-y divide-slate-100 bg-white min-h-[180px] relative"></div>
+        <div class="border-t-2 border-slate-200 bg-white relative">
           <div class="p-2.5 flex items-center justify-between">
             <h4 class="font-bold text-[11px] tracking-widest text-slate-700">STAFF / EXTRA LIST</h4>
             <span id="staffTotalBadge" class="px-2 py-0.5 bg-slate-100 border border-slate-200 text-slate-700 rounded-full text-[10px] font-bold">0 Staff</span>
@@ -348,7 +348,7 @@ function renderRoomingHTML(){
             <input id="newStaffInput" placeholder="Taip nama staff" class="flex-1 text-[11px] px-2.5 py-2 border border-slate-200 rounded-xl bg-white focus:outline-none" onkeydown="if(event.key==='Enter'){ addNewStaff(); }">
             <button onclick="addNewStaff()" class="px-3 py-2 bg-slate-100 border border-slate-200 text-slate-700 rounded-xl text-[11px] font-bold hover:bg-slate-200">+ Add</button>
           </div>
-          <div id="staffListContainer" class="px-2 pb-2.5 space-y-1 bg-white min-h-[70px] relative"></div>
+          <div id="staffListContainer" class="px-2 pb-2.5 max-h-[34vh] overflow-y-auto space-y-1 bg-white min-h-[70px] relative"></div>
         </div>
       </div>
 
@@ -746,13 +746,9 @@ function makeNamelistSticky(){
       leftWrapper.style.top='12px';
       leftWrapper.style.maxHeight='calc(100vh - 16px)';
       leftWrapper.style.overflowY='auto';
-      leftWrapper.style.overflowX='hidden';
       leftWrapper.style.alignSelf='start';
       leftWrapper.style.zIndex='20';
       leftWrapper.style.paddingRight='4px';
-      leftWrapper.style.backgroundColor='#ffffff';
-      leftWrapper.style.borderRadius='16px';
-      leftWrapper.style.isolation='isolate';
       leftWrapper.setAttribute('data-left-col','true');
     }
     const nl = document.getElementById('namelistContainer');
