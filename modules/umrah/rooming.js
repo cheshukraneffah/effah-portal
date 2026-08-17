@@ -802,7 +802,7 @@ function dropJemaah(e,roomId){
     const cap=rec.fields['KAPASITI']||4;
     const curCount=(rec.fields['JEMAAH']||[]).length + getStaffForRoom(rec.id).length;
     if(curCount>=cap && !staffId){
-      alert('Bilik '+(rec.fields['Room ID / Nama Bilik']||roomId)+' sudah penuh ('+curCount+'/'+cap+').');
+      alert('Bilik Penuh\n\nBilik '+(rec.fields['Room ID / Nama Bilik']||roomId)+' telah mencapai kapasiti maksimum ('+curCount+'/'+cap+').\nSila pilih bilik lain.');
       const el=document.querySelector(`[data-room-id="${roomId}"]`);
       if(el){ el.classList.add('ring-2','ring-red-400'); setTimeout(()=>el.classList.remove('ring-2','ring-red-400'),800); }
       return;
@@ -928,7 +928,7 @@ function openTanpaKatilModal(roomId){
       const assignedTanpaAny = allRoomingRecords.some(r=> (r.fields['JEMAAH TANPA KATIL']||[]).includes(j.id));
       return !alreadyTanpa && !assignedNormal && !assignedTanpaAny;
     });
-    if(available.length===0){ alert('Tiada jemaah belum assign untuk tanpa katil.\nSemua jemaah sudah ada bilik atau sudah jadi infant.'); return; }
+    if(available.length===0){ alert('Tiada Baki Jemaah\n\nSemua jemaah telah selesai ditempatkan di bilik masing-masing.\nTiada jemaah tanpa bilik untuk ditambah sebagai Tanpa Katil.'); return; }
     
     // Create inline selector modal
     let existingModal = document.getElementById('tanpaKatilSelectorModal');
@@ -1150,7 +1150,7 @@ function generateRoomingPrint(orientation){ orientation = orientation || 'landsc
     if(typeof staffList!=='undefined') staffList.forEach(s=>{ if(s.name && !allStaffForPrint.includes(s.name)) allStaffForPrint.push(s.name); });
     if(typeof allRoomingRecords!=='undefined') allRoomingRecords.forEach(r=>{ (r.fields['STAFF / EXTRA']||'').split(',').filter(Boolean).forEach(sn=>{ const c=sn.trim(); if(c && !allStaffForPrint.includes(c)) allStaffForPrint.push(c); }); });
     if(typeof combinedStaff!=='undefined') combinedStaff.forEach(n=>{ const c=(typeof n==='string'?n:n.name||'').trim(); if(c && !allStaffForPrint.includes(c)) allStaffForPrint.push(c); });
-    allStaffForPrint.forEach((sName, sIdx)=>{ const cleanName=sName.replace(/\(EFFAH\)/i,'').trim(); if(!cleanName) return; namelistRows+=`<tr><td style="border:1px solid #ddd;padding:3px 6px;text-align:center">S${sIdx+1}</td><td style="border:1px solid #ddd;padding:3px 6px;font-weight:600">${cleanName} (EFFAH)</td><td style="border:1px solid #ddd;padding:3px 6px;text-align:center"><span style="color:#999">-</span></td><td style="border:1px solid #ddd;padding:3px 6px;text-align:center"><span style="color:#999">-</span></td><td style="border:1px solid #ddd;padding:3px 6px;text-align:center"><span style="color:#999">-</span></td><td style="border:1px solid #ddd;padding:3px 6px;text-align:center"><span style="color:#999">-</span></td></tr>`; });
+    allStaffForPrint.forEach((sName, sIdx)=>{ const cleanName=sName.replace(/\(EFFAH\)/i,'').trim(); if(!cleanName) return; namelistRows+=`<tr style="background:#FDF2F4"><td style="border:1px solid #ddd;padding:3px 6px;text-align:center;background:#F9D5D9;font-weight:bold;color:#7A0C2E">S${sIdx+1}</td><td style="border:1px solid #ddd;padding:3px 6px;font-weight:700;background:#FDF2F4;color:#7A0C2E">${cleanName} (EFFAH)</td><td style="border:1px solid #ddd;padding:3px 6px;text-align:center;background:#FDF2F4"><span style="color:#999">-</span></td><td style="border:1px solid #ddd;padding:3px 6px;text-align:center;background:#FDF2F4"><span style="color:#999">-</span></td><td style="border:1px solid #ddd;padding:3px 6px;text-align:center;background:#FDF2F4"><span style="color:#999">-</span></td><td style="border:1px solid #ddd;padding:3px 6px;text-align:center;background:#FDF2F4"><span style="color:#999">-</span></td></tr>`; });
 
     let locationPages = '';
     allLocations.forEach(loc=>{
