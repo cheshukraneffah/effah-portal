@@ -1,3 +1,6 @@
+// ROOMING V72 - FIX STACK OVERFLOW + GHOST + MULTI-BOARD + LOADING 410 - 2026-08-19
+// Version: V72
+console.log('ROOMING V72 loaded - getBoardArray fixed, no recursion');
 // ROOMING V24 - Fix grayed still editable + print highlight (TAKAFUL hijau, ETIQA kuning, KHAIRI biru, TRAIN kuning)
 // Base: V23 exact layout, only 2 patches
 var allRoomingRecords = window.allRoomingRecords || [];
