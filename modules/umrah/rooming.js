@@ -1,3 +1,7 @@
+// ROOMING V82 - PRINT BOARD SEPARATE TAGS (BB MEKAH) (FULLBOARD MADINAH) + INSURAN HEADER ONLY - 2026-08-19
+console.log('ROOMING V82 loaded - print board separate tags, no overlap');
+// ROOMING V81 - HEADER INSURAN ONLY + 3 OPTIONS TAKAFUL,ETIQA,AL-KHAIRI - 2026-08-19
+console.log('ROOMING V81 loaded - INSURAN header only, 3 options');
 // ROOMING V80 - FULL 1767 LINES BASE PRESERVED + MULTI STAFF + MULTI INSURAN + OUTSIDE CLICK + BLANK AUTO-CREATE - 2026-08-19
 console.log('ROOMING V80 loaded - FULL BASE 1767 preserved + staff multi + insuran multi + blank fix');
 // ROOMING V72 - FIX STACK OVERFLOW + GHOST + MULTI-BOARD + LOADING 410 - 2026-08-19
@@ -413,7 +417,7 @@ function renderRoomingHTML(){
             <span id="headerNamaJemaah" class="bg-[#7A0C2E] text-white px-1.5 py-0.5 rounded text-[9px]">NAMA JEMAAH</span>
             <span id="sortIcon" class="text-[10px]">${roomingSortActive ? (roomingSortDir==='asc'?'↑':'↓') : '↕'}</span>
           </div>
-          <div class="col-span-2 text-center">BOARD BASIS</div><div class="col-span-1 text-center">TRAIN</div><div class="col-span-3 text-center">INSURAN (TAKAFUL/ETIQA/KHAIRI)</div><div class="col-span-1 text-center">PAKEJ</div><div class="col-span-1 text-center">+</div>
+          <div class="col-span-2 text-center">BOARD BASIS</div><div class="col-span-1 text-center">TRAIN</div><div class="col-span-3 text-center">INSURAN</div><div class="col-span-1 text-center">PAKEJ</div><div class="col-span-1 text-center">+</div>
         </div>
         <div id="namelistContainer" class="flex-1 overflow-y-auto max-h-[58vh] divide-y divide-slate-100 bg-white min-h-[180px] relative"></div>
         <div class="border-t-2 border-slate-200 bg-white relative">
@@ -987,13 +991,13 @@ function renderRoomingGrid(){
           const up=raw.toUpperCase();
           let badge='';
           if(roomLoc==='MEKAH'){
-            if(up.includes('MEKAH')) badge=`<span class="ml-1 px-1.5 py-0.5 bg-amber-200 text-amber-900 border border-amber-300 rounded-full text-[8px] font-bold">${raw}</span>`;
-            else if(up==='FULLBOARD') badge=`<span class="ml-1 px-1.5 py-0.5 bg-emerald-200 text-emerald-900 border border-emerald-300 rounded-full text-[8px] font-bold">FULLBOARD</span>`;
+            if(up.includes('MEKAH')) badge=`<span style="background:#FDE68A;border:1px solid #92400E;padding:2px 6px;border-radius:10px;font-weight:bold;font-size:7px;display:inline-block;margin:1px 2px;white-space:nowrap;">${raw}</span>`;
+            else if(up==='FULLBOARD') badge=`<span style="background:#BBF7D0;border:1px solid #065F46;padding:2px 6px;border-radius:10px;font-weight:bold;font-size:7px;display:inline-block;margin:1px 2px;white-space:nowrap;" font-bold">FULLBOARD</span>`;
           } else if(roomLoc==='MADINAH'){
-            if(up.includes('MADINAH')) badge=`<span class="ml-1 px-1.5 py-0.5 bg-blue-200 text-blue-900 border border-blue-300 rounded-full text-[8px] font-bold">${raw}</span>`;
-            else if(up==='FULLBOARD') badge=`<span class="ml-1 px-1.5 py-0.5 bg-emerald-200 text-emerald-900 border border-emerald-300 rounded-full text-[8px] font-bold">FULLBOARD</span>`;
+            if(up.includes('MADINAH')) badge=`<span style="background:#BFDBFE;border:1px solid #1E40AF;padding:2px 6px;border-radius:10px;font-weight:bold;font-size:7px;display:inline-block;margin:1px 2px;white-space:nowrap;" text-blue-900 border border-blue-300 rounded-full text-[8px] font-bold">${raw}</span>`;
+            else if(up==='FULLBOARD') badge=`<span style="background:#BBF7D0;border:1px solid #065F46;padding:2px 6px;border-radius:10px;font-weight:bold;font-size:7px;display:inline-block;margin:1px 2px;white-space:nowrap;" font-bold">FULLBOARD</span>`;
           } else {
-            if(up.includes('MEKAH') || up.includes('MADINAH') || up==='FULLBOARD') badge=`<span class="ml-1 px-1.5 py-0.5 bg-emerald-200 text-emerald-900 border border-emerald-300 rounded-full text-[8px] font-bold">${raw}</span>`;
+            if(up.includes('MEKAH') || up.includes('MADINAH') || up==='FULLBOARD') badge=`<span style="background:#BBF7D0;border:1px solid #065F46;padding:2px 6px;border-radius:10px;font-weight:bold;font-size:7px;display:inline-block;margin:1px 2px;white-space:nowrap;" font-bold">${raw}</span>`;
             else if(up.startsWith('BB')) badge=`<span class="ml-1 px-1.5 py-0.5 bg-orange-100 text-orange-800 border border-orange-200 rounded-full text-[8px] font-bold">${raw}</span>`;
           }
           fbBadge+=badge;
@@ -1493,21 +1497,17 @@ function generateRoomingPrint(orientation){ orientation = orientation || 'landsc
       const f=r.fields;
       const name=getJemaahName(f);
       const fbArr=getBoardArray(f);
-      const fbRaw=fbArr.join(', ')||'';
-      const fbUpper=fbRaw.toUpperCase();
       let fbBadge = '-';
-      if(fbRaw){
-        if(fbUpper.includes('MEKAH') && (fbUpper.includes('FULLBOARD') || fbUpper.includes('BB'))) {
-          if(fbUpper.includes('BB')) fbBadge=`<span style="background:#FDE68A;border:1px solid #92400E;padding:1px 6px;border-radius:10px;font-weight:bold;font-size:8px">${fbRaw}</span>`;
-          else fbBadge=`<span style="background:#FDE68A;border:1px solid #92400E;padding:1px 6px;border-radius:10px;font-weight:bold;font-size:8px">${fbRaw}</span>`;
-        } else if(fbUpper.includes('MADINAH')) {
-          if(fbUpper.includes('BB')) fbBadge=`<span style="background:#BFDBFE;border:1px solid #1E40AF;padding:1px 6px;border-radius:10px;font-weight:bold;font-size:8px">${fbRaw}</span>`;
-          else fbBadge=`<span style="background:#BFDBFE;border:1px solid #1E40AF;padding:1px 6px;border-radius:10px;font-weight:bold;font-size:8px">${fbRaw}</span>`;
-        } else if(fbUpper.includes('FULLBOARD')) {
-          fbBadge=`<span style="background:#BBF7D0;border:1px solid #065F46;padding:1px 6px;border-radius:10px;font-weight:bold;font-size:8px">${fbRaw}</span>`;
-        } else {
-          fbBadge=`<span style="background:#BBF7D0;border:1px solid #065F46;padding:1px 6px;border-radius:10px;font-weight:bold;font-size:8px">${fbRaw}</span>`;
-        }
+      if(fbArr.length>0){
+        fbBadge=fbArr.map(raw=>{
+          const up=raw.toUpperCase();
+          let bg='#BBF7D0', border='#065F46';
+          if(up.includes('MEKAH')){ bg='#FDE68A'; border='#92400E'; }
+          else if(up.includes('MADINAH')){ bg='#BFDBFE'; border='#1E40AF'; }
+          else if(up.includes('FULLBOARD')){ bg='#BBF7D0'; border='#065F46'; }
+          else if(up.includes('BB')){ bg='#FDE68A'; border='#92400E'; }
+          return `<span style="background:${bg};border:1px solid ${border};padding:2px 6px;border-radius:10px;font-weight:bold;font-size:7px;display:inline-block;margin:1px 2px;white-space:nowrap;">${raw}</span>`;
+        }).join('');
       }
       const train = isTrainChecked(f) ? '<span style="background:#FEF3C7;padding:1px 6px;border-radius:10px;font-size:8px">TRAIN</span>' : '-';
       const pakej = getPakejVal(f) || '-';
@@ -1906,10 +1906,10 @@ renderNamelist = function(){
       }).join('');
       const insArr = getInsuranArrayV2(r.fields);
       const insDisplay = insArr.length ? insArr.join(', ') : '- INSURAN';
-      const insuranOptions = ['TAKAFUL','ETIQA','KHAIRI','AL-KHAIRI','TRAIN'];
+      const insuranOptions = ['TAKAFUL','ETIQA','AL-KHAIRI'];
       const insCheckboxes = insuranOptions.map(opt=>{
         const checked = insArr.includes(opt);
-        const color = opt==='TAKAFUL'?'bg-emerald-100':opt==='ETIQA'?'bg-amber-100':opt.includes('KHAIRI')?'bg-blue-100':'bg-slate-100';
+        const color = opt==='TAKAFUL'?'bg-emerald-100':opt==='ETIQA'?'bg-amber-100':opt==='AL-KHAIRI'?'bg-blue-100':'bg-slate-100';
         return `<label class="flex items-center gap-1.5 px-2 py-1 hover:bg-slate-50 rounded text-[10px] cursor-pointer"><input type="checkbox" ${checked?'checked':''} onchange="toggleInsuranMulti('${r.id}','${opt}')" class="w-3 h-3 accent-[#7A0C2E]"> <span class="px-1.5 py-0.5 rounded-full text-[8px] ${color}">${opt}</span></label>`;
       }).join('');
       return `<div ${drag} class="grid grid-cols-12 items-center px-1.5 py-1.5 text-[11px] border-b border-slate-50 ${rowCls}">
