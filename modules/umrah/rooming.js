@@ -1079,19 +1079,21 @@ function openTanpaKatilModal(roomId){
   try{
     const targetRec = allRoomingRecords.find(r=>r.id===roomId);
     const currentTripId = window.selectedTripRecord?.id || localStorage.getItem('effah_active_trip_id') || '';
-    console.log('openTanpaKatil trip', currentTripId, 'total', allRoomingJemaah.length);
+    console.log('openTanpaKatil trip', currentTripId, 'activeLoc', activeLocation, 'total', allRoomingJemaah.length);
     const available = allRoomingJemaah.filter(j=>{
       const nameUpper = (getJemaahName(j.fields)||'').toUpperCase();
       if(nameUpper.includes('MUTAWIF') || nameUpper.includes('EFFAH')) return false;
       if(isJemaahAssignedTanpaKatil(j.id)) return false;
-      if(isJemaahAssignedAny(j.id)) return false;
       if(targetRec && (targetRec.fields['JEMAAH']||[]).includes(j.id)) return false;
       if(targetRec && (targetRec.fields['JEMAAH TANPA KATIL']||[]).includes(j.id)) return false;
+      // For Tanpa Katil, allow jemaah not assigned in THIS location (activeLocation), even if assigned elsewhere
+      // This fixes TAIF case where MEKAH has 6 bilik but TAIF also 6, jemaah may be assigned in MEKAH but not TAIF
+      if(isJemaahAssignedInLocation(j.id, activeLocation)) return false;
       return true;
     });
-    console.log('available tanpa katil', available.length);
+    console.log('available tanpa katil for', activeLocation, available.length);
     if(available.length===0){
-      alert('Tiada Baki Jemaah\n\nSemua jemaah telah selesai ditempatkan di bilik masing-masing.\nTiada jemaah tanpa bilik untuk ditambah sebagai Tanpa Katil.');
+      alert('Tiada Baki Jemaah\n\nSemua jemaah telah selesai ditempatkan di bilik masing-masing untuk lokasi ' + activeLocation + '.\nTiada jemaah tanpa bilik untuk ditambah sebagai Tanpa Katil di ' + activeLocation + '.');
       return;
     }
     let existingModal = document.getElementById('tanpaKatilSelectorModal');
@@ -1099,7 +1101,7 @@ function openTanpaKatilModal(roomId){
     const modalHtml = `<div id="tanpaKatilSelectorModal" style="position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px">
       <div style="background:#fff;border-radius:16px;max-width:400px;width:100%;max-height:70vh;overflow:hidden;box-shadow:0 20px 40px rgba(0,0,0,0.2)">
         <div style="padding:12px 16px;border-bottom:1px solid #eee;display:flex;justify-content:space-between;align-items:center">
-          <span style="font-weight:bold;font-size:13px">Pilih Infant / Tanpa Katil (Trip Semasa Sahaja)</span>
+          <span style="font-weight:bold;font-size:13px">Pilih Infant / Tanpa Katil - ${activeLocation} (${available.length} baki)</span>
           <button onclick="document.getElementById('tanpaKatilSelectorModal').remove()" style="w-6 h-6 rounded-full bg-slate-100">X</button>
         </div>
         <div style="padding:8px;max-height:50vh;overflow-y:auto" id="tanpaKatilList">
@@ -1115,6 +1117,7 @@ function openTanpaKatilModal(roomId){
     window._tanpaKatilRoomId = roomId;
   }catch(e){ alert('Error openTanpaKatil: '+e.message); console.error(e); }
 }
+
 
 function filterTanpaKatilList(q){
   const list = document.getElementById('tanpaKatilOptions');
