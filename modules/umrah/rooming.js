@@ -1079,31 +1079,33 @@ function openTanpaKatilModal(roomId){
   try{
     const targetRec = allRoomingRecords.find(r=>r.id===roomId);
     const currentTripId = window.selectedTripRecord?.id || localStorage.getItem('effah_active_trip_id') || '';
-    console.log('openTanpaKatil trip', currentTripId, 'activeLoc', activeLocation, 'total', allRoomingJemaah.length);
+    console.log('openTanpaKatil TAIF fix', currentTripId, activeLocation, 'total', allRoomingJemaah.length);
+    // For TAIF case where all assigned but user still wants to add infant beyond capacity,
+    // allow ANY jemaah in current trip who is not already Tanpa Katil anywhere and not already in target room
+    // This includes those already assigned as normal in activeLocation, so TAIF full can still add infant as extra
     const available = allRoomingJemaah.filter(j=>{
       const nameUpper = (getJemaahName(j.fields)||'').toUpperCase();
       if(nameUpper.includes('MUTAWIF') || nameUpper.includes('EFFAH')) return false;
       if(isJemaahAssignedTanpaKatil(j.id)) return false;
-      if(targetRec && (targetRec.fields['JEMAAH']||[]).includes(j.id)) return false;
       if(targetRec && (targetRec.fields['JEMAAH TANPA KATIL']||[]).includes(j.id)) return false;
-      // For Tanpa Katil, allow jemaah not assigned in THIS location (activeLocation), even if assigned elsewhere
-      // This fixes TAIF case where MEKAH has 6 bilik but TAIF also 6, jemaah may be assigned in MEKAH but not TAIF
-      if(isJemaahAssignedInLocation(j.id, activeLocation)) return false;
+      if(targetRec && (targetRec.fields['JEMAAH']||[]).includes(j.id)) return false;
+      // Do NOT check isJemaahAssignedInLocation - allow even if assigned in TAIF, so TAIF full can still add infant as extra sharing
       return true;
     });
-    console.log('available tanpa katil for', activeLocation, available.length);
+    console.log('available tanpa katil (allow assigned) for', activeLocation, available.length);
     if(available.length===0){
-      alert('Tiada Baki Jemaah\n\nSemua jemaah telah selesai ditempatkan di bilik masing-masing untuk lokasi ' + activeLocation + '.\nTiada jemaah tanpa bilik untuk ditambah sebagai Tanpa Katil di ' + activeLocation + '.');
+      alert('Tiada Baki Jemaah\n\nSemua jemaah telah ada sebagai Tanpa Katil atau sudah ada di bilik ini.');
       return;
     }
     let existingModal = document.getElementById('tanpaKatilSelectorModal');
     if(existingModal) existingModal.remove();
     const modalHtml = `<div id="tanpaKatilSelectorModal" style="position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px">
-      <div style="background:#fff;border-radius:16px;max-width:400px;width:100%;max-height:70vh;overflow:hidden;box-shadow:0 20px 40px rgba(0,0,0,0.2)">
+      <div style="background:#fff;border-radius:16px;max-width:420px;width:100%;max-height:75vh;overflow:hidden;box-shadow:0 20px 40px rgba(0,0,0,0.2)">
         <div style="padding:12px 16px;border-bottom:1px solid #eee;display:flex;justify-content:space-between;align-items:center">
-          <span style="font-weight:bold;font-size:13px">Pilih Infant / Tanpa Katil - ${activeLocation} (${available.length} baki)</span>
+          <span style="font-weight:bold;font-size:12px">Pilih Infant / Tanpa Katil - ${activeLocation} (${available.length} calon)</span>
           <button onclick="document.getElementById('tanpaKatilSelectorModal').remove()" style="w-6 h-6 rounded-full bg-slate-100">X</button>
         </div>
+        <div style="padding:6px 8px;background:#fffbe6;border-bottom:1px solid #fde68a;font-size:9px;color:#92400e">Infant tidak kira kapasiti bilik. Boleh tambah walaupun bilik penuh 4/4. Pilih jemaah yang akan share katil.</div>
         <div style="padding:8px;max-height:50vh;overflow-y:auto" id="tanpaKatilList">
           <input type="text" id="tanpaKatilSearch" placeholder="Cari nama..." style="width:100%;padding:6px 10px;border:1px solid #ddd;border-radius:20px;font-size:11px;margin-bottom:8px" oninput="filterTanpaKatilList(this.value)">
           <div id="tanpaKatilOptions">
