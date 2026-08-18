@@ -1124,11 +1124,20 @@ function openTanpaKatilModal(roomId){
 function filterTanpaKatilList(q){
   const list = document.getElementById('tanpaKatilOptions');
   if(!list || !window._tanpaKatilAvailable) return;
-  const low = q.toLowerCase();
+  const low = (q||'').toLowerCase().trim();
   const roomId = window._tanpaKatilRoomId;
-  const filtered = window._tanpaKatilAvailable.filter(j=> getJemaahName(j.fields).toLowerCase().includes(low));
-  list.innerHTML = filtered.map((j, idx)=>`<button onclick="addTanpaKatilToRoom('${roomId}','${j.id}'); document.getElementById('tanpaKatilSelectorModal').remove()" style="width:100%;text-align:left;padding:8px 10px;border:1px solid #eee;border-radius:10px;margin-bottom:4px;font-size:11px;background:#fff" class="hover:bg-amber-50">${idx+1}. ${getJemaahName(j.fields)}</button>`).join('') || '<div style="padding:8px;text-align:center;color:#999;font-size:11px">Tiada carian ditemui</div>';
+  let filtered = window._tanpaKatilAvailable;
+  if(low){
+    filtered = window._tanpaKatilAvailable.filter(j=>{
+      const name = (getJemaahName(j.fields)||'').toLowerCase();
+      const raw = (j.fields['NAMA JEMAAH']||j.fields['NAMA']||'').toLowerCase();
+      return name.includes(low) || raw.includes(low);
+    });
+  }
+  console.log('filter tanpa katil q=', low, 'available', window._tanpaKatilAvailable.length, 'filtered', filtered.length);
+  list.innerHTML = filtered.map((j, idx)=>`<button onclick="addTanpaKatilToRoom('${roomId}','${j.id}'); document.getElementById('tanpaKatilSelectorModal').remove()" style="width:100%;text-align:left;padding:8px 10px;border:1px solid #eee;border-radius:10px;margin-bottom:4px;font-size:11px;background:#fff" class="hover:bg-amber-50">${idx+1}. ${getJemaahName(j.fields)}</button>`).join('') || '<div style="padding:8px;text-align:center;color:#999;font-size:11px">Tiada carian ditemui ('+low+') - ada '+window._tanpaKatilAvailable.length+' calon</div>';
 }
+
 
 async function addTanpaKatilToRoom(roomId, jId){
   const rec=allRoomingRecords.find(r=>r.id===roomId);
