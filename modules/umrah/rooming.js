@@ -98,15 +98,20 @@ async function updateStaffField(staffId, field, value){
   const s=staffList.find(x=>x.id===staffId||x.airtableId===staffId); if(!s) return;
   if(field==='boardBasis') s.boardBasis=value; else s[field]=value;
   saveStaffList(); renderStaffList();
+  // if clearing board, set value to null for Airtable to clear
+
   const base=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base')||localStorage.getItem('effah_base_id');
   const pat=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
   if(!base||!pat||!s.airtableId) return;
   try{
     const airtableField = field==='boardBasis' ? 'BOARD BASIS' : field.toUpperCase();
+    const payloadValue = (value==='' || value===null) ? null : value;
+    const bodyFields = {};
+    if(payloadValue===null){ bodyFields[airtableField]=null; } else { bodyFields[airtableField]=value; }
     await fetch(`https://api.airtable.com/v0/${base}/STAFF%20LIST%20%28ROOMING%29/${s.airtableId}`,{
       method:'PATCH',
       headers:{'Authorization':`Bearer ${pat}`,'Content-Type':'application/json'},
-      body: JSON.stringify({fields:{[airtableField]: value}})
+      body: JSON.stringify({fields: bodyFields})
     });
   }catch(e){ console.error('updateStaffField failed', e); }
 }
@@ -557,8 +562,19 @@ function renderRoomingOverview(rooms){
 
 function renderLocationTabs(){
   const container=document.getElementById('locationTabs'); if(!container) return;
-  const base=['MEKAH','MADINAH','TAIF']; const all=[...base,...customLocations.filter(l=>!base.includes(l))];
-  const counts={}; all.forEach(l=>counts[l]=0); allRoomingRecords.forEach(r=>{ const l=(r.fields['LOKASI / CITY']||'').trim().toUpperCase(); if(counts[l]!==undefined) counts[l]++; else if(l){ counts[l]=1; if(!all.includes(l)) all.push(l); } });
+  const base=['MEKAH','MADINAH','TAIF']; 
+  const all=[...base,...customLocations.filter(l=>!base.includes(l))];
+  // collect all distinct locations from records
+  const allLocFromRecords = new Set();
+  allRoomingRecords.forEach(r=>{ const l=(r.fields['LOKASI / CITY']||'').trim().toUpperCase(); if(l) allLocFromRecords.add(l); });
+  allLocFromRecords.forEach(l=>{ if(!all.includes(l)) all.push(l); });
+  const counts={}; all.forEach(l=>counts[l]=0); 
+  allRoomingRecords.forEach(r=>{ 
+    let l=(r.fields['LOKASI / CITY']||'').trim().toUpperCase(); 
+    if(!l) l='MEKAH'; // default
+    if(counts[l]!==undefined) counts[l]++; 
+    else { counts[l]=1; if(!all.includes(l)) all.push(l); } 
+  });
   let html=all.map(loc=>{
     const label=loc; // V24.6 no emoji
     const c=counts[loc]||0; const active=loc===activeLocation; const isCustom=!['MEKAH','MADINAH','TAIF'].includes(loc);
@@ -1053,13 +1069,28 @@ async function deleteRoom(roomId,roomName){
 }
 function openTanpaKatilModal(roomId){
   try{
+    const targetRec = allRoomingRecords.find(r=>r.id===roomId);
     const available = allRoomingJemaah.filter(j=>{ 
       const alreadyTanpa = isJemaahAssignedTanpaKatil(j.id); 
-      const assignedNormal = isJemaahAssignedInLocation(j.id, activeLocation);
+      const alreadyInTargetRoomJemaah = targetRec && (targetRec.fields['JEMAAH']||[]).includes(j.id);
+      const alreadyInTargetTanpa = targetRec && (targetRec.fields['JEMAAH TANPA KATIL']||[]).includes(j.id);
       const assignedTanpaAny = allRoomingRecords.some(r=> (r.fields['JEMAAH TANPA KATIL']||[]).includes(j.id));
-      return !alreadyTanpa && !assignedNormal && !assignedTanpaAny;
+      // Allow if not already Tanpa Katil anywhere, and not already in this room (either as JEMAAH or TANPA)
+      // Also allow even if assigned normally elsewhere - infant can share
+      return !assignedTanpaAny && !alreadyTanpa && !alreadyInTargetRoomJemaah && !alreadyInTargetTanpa;
     });
-    if(available.length===0){ alert('Tiada Baki Jemaah\n\nSemua jemaah telah selesai ditempatkan di bilik masing-masing.\nTiada jemaah tanpa bilik untuk ditambah sebagai Tanpa Katil.'); return; }
+    // If still none, fallback to include unassigned globally
+    let finalAvailable = available;
+    if(finalAvailable.length===0){
+      finalAvailable = allRoomingJemaah.filter(j=>{
+        const notAssignedAny = !isJemaahAssignedAny(j.id) && !isJemaahAssignedTanpaKatil(j.id);
+        return notAssignedAny;
+      });
+    }
+    // Use finalAvailable for display
+    const displayAvailable = finalAvailable.length>0 ? finalAvailable : available;
+    const availForCheck = (typeof displayAvailable!=='undefined' ? displayAvailable : available);
+    if(availForCheck.length===0){ alert('Tiada Baki Jemaah\n\nSemua jemaah telah selesai ditempatkan di bilik masing-masing.\nTiada jemaah tanpa bilik untuk ditambah sebagai Tanpa Katil.'); return; }
     
     // Create inline selector modal
     let existingModal = document.getElementById('tanpaKatilSelectorModal');
@@ -1074,13 +1105,13 @@ function openTanpaKatilModal(roomId){
         <div style="padding:8px;max-height:50vh;overflow-y:auto" id="tanpaKatilList">
           <input type="text" id="tanpaKatilSearch" placeholder="Cari nama..." style="width:100%;padding:6px 10px;border:1px solid #ddd;border-radius:20px;font-size:11px;margin-bottom:8px" oninput="filterTanpaKatilList(this.value)">
           <div id="tanpaKatilOptions">
-            ${available.map((j, idx)=>`<button onclick="addTanpaKatilToRoom('${roomId}','${j.id}'); document.getElementById('tanpaKatilSelectorModal').remove()" style="width:100%;text-align:left;padding:8px 10px;border:1px solid #eee;border-radius:10px;margin-bottom:4px;font-size:11px;background:#fff" class="hover:bg-amber-50">${idx+1}. ${getJemaahName(j.fields)}</button>`).join('')}
+            ${(typeof displayAvailable!=='undefined' ? displayAvailable : available).map((j, idx)=>`<button onclick="addTanpaKatilToRoom('${roomId}','${j.id}'); document.getElementById('tanpaKatilSelectorModal').remove()" style="width:100%;text-align:left;padding:8px 10px;border:1px solid #eee;border-radius:10px;margin-bottom:4px;font-size:11px;background:#fff" class="hover:bg-amber-50">${idx+1}. ${getJemaahName(j.fields)}</button>`).join('')}
           </div>
         </div>
       </div>
     </div>`;
     document.body.insertAdjacentHTML('beforeend', modalHtml);
-    window._tanpaKatilAvailable = available;
+    window._tanpaKatilAvailable = (typeof displayAvailable!=='undefined' ? displayAvailable : available);
     window._tanpaKatilRoomId = roomId;
   }catch(e){ alert('Error openTanpaKatil: '+e.message); console.error(e); }
 }
@@ -1553,11 +1584,10 @@ function generateRoomingPrint(orientation){ orientation = orientation || 'landsc
     });
 
     // --- NAMELIST OVERVIEW: Speedtrain & Insuran unique ---
-    const trainCount = allRoomingJemaah.filter(j=> isTrainChecked(j.fields)).length;
-    const insuranUnique = allRoomingJemaah.filter(j=> getInsuranArray(j.fields).length>0).length;
+    const trainCount = allRoomingJemaah.filter(j=> { try{ return isTrainChecked(j.fields); }catch(e){ return !!j.fields['TRAIN']; } }).length;
+    const insuranUnique = allRoomingJemaah.filter(j=> { try{ return getInsuranArray(j.fields).length>0; }catch(e){ const v=j.fields['INSURAN']; return Array.isArray(v) ? v.length>0 : !!v; } }).length;
     const totalInsuranUnique = insuranUnique;
-
-    const namelistOverviewHTML = '<div style="margin-top:12px;border:1px solid #000;padding:8px 10px;background:#f9fafb"><div style="font-weight:bold;font-size:10px;margin-bottom:6px">RINGKASAN NAMELIST</div><div style="display:flex;gap:20px;font-size:9px"><div><b>Bilangan Speedtrain:</b> ' + trainCount + ' orang</div><div><b>Bilangan Insuran:</b> ' + totalInsuranUnique + ' orang <span style="color:#666;font-size:8px">(kira unik, 2-3 insuran tetap 1)</span></div><div><b>Total Jemaah:</b> ' + allRoomingJemaah.length + '</div></div></div>';
+    const namelistOverviewHTML = '<div style="margin-top:12px;border:1px solid #000;padding:8px 10px;background:#f9fafb"><div style="font-weight:bold;font-size:10px;margin-bottom:6px">RINGKASAN NAMELIST</div><div style="display:flex;gap:20px;font-size:9px"><div><b>Bilangan Speedtrain:</b> ' + trainCount + ' orang</div><div><b>Bilangan Insuran:</b> ' + totalInsuranUnique + ' orang</div><div><b>Total Jemaah:</b> ' + allRoomingJemaah.length + '</div></div></div>';
 
     const html=`<html><head><title>Rooming ${tripName} - ${orientation}</title><style>body{font-family:Arial,Helvetica,sans-serif;font-size:10px;margin:12px;color:#000}table{border-collapse:collapse;width:100%}th,td{border:1px solid #000;padding:4px 6px;font-size:9px}th{background:#7A0C2E;color:#fff;font-weight:bold;text-transform:uppercase}.header{display:flex;justify-content:space-between;font-weight:bold;font-size:12px;border-bottom:2px solid #000;padding-bottom:6px;margin-bottom:8px}.page-break{page-break-before:always}.namelist-page{max-width:900px;margin:0 auto}.location-page{max-width:100%}@media print{@page{size:A4 ${orientation};margin:${orientation==='portrait' ? '8mm' : '10mm'}}body{-webkit-print-color-adjust:exact;print-color-adjust:exact}.page-break{page-break-before:always}}</style></head><body>
       <div class="namelist-page"><div class="header"><span>NAMELIST ${tripName}</span><span>Total: ${allRoomingJemaah.length} Jemaah + ${combinedStaff.length} Staff</span></div><div style="font-size:9px;margin-bottom:8px"><b>Trip:</b> ${tripName} | <b>Tarikh Cetak:</b> ${new Date().toLocaleDateString('ms-MY')} | <b>Orientasi:</b> ${orientation.toUpperCase()}</div><table style="table-layout:fixed"><colgroup><col style="width:32px"><col style="width:44%"><col style="width:110px"><col style="width:52px"><col style="width:62px"><col style="width:90px"></colgroup><tr><th>NO</th><th style="text-align:left">NAMA JEMAAH</th><th>BOARD</th><th>TRAIN</th><th>PAKEJ</th><th>INSURAN</th></tr>${namelistRows}</table>${namelistOverviewHTML}</div>
