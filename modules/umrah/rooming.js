@@ -755,7 +755,10 @@ function makeNamelistSticky(){
   try{
     const nl = document.getElementById('namelistContainer');
     if(!nl) return;
-    const leftCard = nl.closest('.w-full.lg\:w-\[52\%\]') || nl.parentElement;
+    // Find left card - the 52% width card
+    let leftCard = nl.closest('[class*="lg:w-"]');
+    if(!leftCard) leftCard = nl.parentElement;
+    // The outer left column wrapper is the parent of leftCard's parent? Actually structure: flex-col lg:flex-row > w-[52%] card
     if(leftCard){
       leftCard.style.position='sticky';
       leftCard.style.top='12px';
@@ -766,10 +769,11 @@ function makeNamelistSticky(){
       leftCard.style.backgroundColor='#ffffff';
       leftCard.style.maxHeight='calc(100vh - 16px)';
       leftCard.style.overflow='hidden';
+      leftCard.style.borderRadius='16px';
     }
     nl.style.flex='1 1 auto';
     nl.style.maxHeight='48vh';
-    nl.style.minHeight='200px';
+    nl.style.minHeight='220px';
     nl.style.overflowY='auto';
     nl.style.overflowX='hidden';
     nl.style.backgroundColor='#ffffff';
@@ -790,13 +794,17 @@ function makeNamelistSticky(){
       staffCont.style.overflowX='hidden';
       staffCont.style.backgroundColor='#ffffff';
     }
-    // Ensure rooming grid can scroll via window
     const rg=document.getElementById('roomingGrid');
     if(rg){
       rg.style.overflow='visible';
       rg.style.maxHeight='none';
     }
-  }catch(e){}
+    // Ensure parent flex row allows sticky
+    const flexRow = leftCard?.parentElement;
+    if(flexRow){
+      flexRow.style.alignItems='flex-start';
+    }
+  }catch(e){ console.error('sticky fail', e); }
 }
 
 
@@ -1070,24 +1078,38 @@ async function deleteRoom(roomId,roomName){
 function openTanpaKatilModal(roomId){
   try{
     const targetRec = allRoomingRecords.find(r=>r.id===roomId);
+    const currentTripId = window.selectedTripRecord?.id || localStorage.getItem('effah_active_trip_id') || localStorage.getItem('selectedTripId') || '';
     const available = allRoomingJemaah.filter(j=>{ 
+      // STRICT: only jemaah from current trip
+      if(currentTripId){
+        const jTrip = j.fields['TRIP']||[];
+        const inTrip = Array.isArray(jTrip) ? jTrip.includes(currentTripId) : String(jTrip).includes(currentTripId);
+        if(!inTrip) return false;
+      }
+      // Exclude staff names that sneaked into jemaah list (MUTAWIF, EFFAH, STAFF)
+      const nameUpper = (j.fields['NAMA JEMAAH']||j.fields['Name']||'').toUpperCase();
+      if(nameUpper.includes('(MUTAWIF)') || nameUpper.includes('(EFFAH)') || nameUpper.includes('STAFF')) return false;
       const alreadyTanpa = isJemaahAssignedTanpaKatil(j.id); 
       const alreadyInTargetRoomJemaah = targetRec && (targetRec.fields['JEMAAH']||[]).includes(j.id);
       const alreadyInTargetTanpa = targetRec && (targetRec.fields['JEMAAH TANPA KATIL']||[]).includes(j.id);
       const assignedTanpaAny = allRoomingRecords.some(r=> (r.fields['JEMAAH TANPA KATIL']||[]).includes(j.id));
-      // Allow if not already Tanpa Katil anywhere, and not already in this room (either as JEMAAH or TANPA)
-      // Also allow even if assigned normally elsewhere - infant can share
       return !assignedTanpaAny && !alreadyTanpa && !alreadyInTargetRoomJemaah && !alreadyInTargetTanpa;
     });
-    // If still none, fallback to include unassigned globally
+    // Fallback: unassigned globally in this trip
     let finalAvailable = available;
     if(finalAvailable.length===0){
       finalAvailable = allRoomingJemaah.filter(j=>{
+        if(currentTripId){
+          const jTrip = j.fields['TRIP']||[];
+          const inTrip = Array.isArray(jTrip) ? jTrip.includes(currentTripId) : String(jTrip).includes(currentTripId);
+          if(!inTrip) return false;
+        }
+        const nameUpper = (j.fields['NAMA JEMAAH']||j.fields['Name']||'').toUpperCase();
+        if(nameUpper.includes('(MUTAWIF)') || nameUpper.includes('(EFFAH)')) return false;
         const notAssignedAny = !isJemaahAssignedAny(j.id) && !isJemaahAssignedTanpaKatil(j.id);
         return notAssignedAny;
       });
     }
-    // Use finalAvailable for display
     const displayAvailable = finalAvailable.length>0 ? finalAvailable : available;
     const availForCheck = (typeof displayAvailable!=='undefined' ? displayAvailable : available);
     if(availForCheck.length===0){ alert('Tiada Baki Jemaah\n\nSemua jemaah telah selesai ditempatkan di bilik masing-masing.\nTiada jemaah tanpa bilik untuk ditambah sebagai Tanpa Katil.'); return; }
