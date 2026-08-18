@@ -1,8 +1,8 @@
-// ROOMING V75 - MULTI STAFF BOARD + MULTI INSURAN + OUTSIDE CLICK CLOSE + FIX STACK - 2026-08-19
-console.log('ROOMING V75 loaded - staff multi, insuran multi, outside click close');
+// ROOMING V76 - MULTI STAFF BOARD + MULTI INSURAN + OUTSIDE CLICK CLOSE + FIX STACK - 2026-08-19
+console.log('ROOMING V76 loaded - staff multi, insuran multi, outside click, blank fix');
 // ROOMING V72 - FIX STACK OVERFLOW + GHOST + MULTI-BOARD + LOADING 410 - 2026-08-19
 // Version: V72
-console.log('ROOMING V72 loaded - getBoardArray fixed, no recursion');
+
 // ROOMING V24 - Fix grayed still editable + print highlight (TAKAFUL hijau, ETIQA kuning, KHAIRI biru, TRAIN kuning)
 // Base: V23 exact layout, only 2 patches
 var allRoomingRecords = window.allRoomingRecords || [];
@@ -1314,3 +1314,33 @@ function generateRoomingPrint(orientation){ orientation = orientation || 'landsc
 }
 
 async function autoAssignRooming(){ if(!confirm('Adakah anda pasti ingin menetapkan semua jemaah yang belum ditetapkan untuk lokasi '+activeLocation+' secara automatik?')) return; let rooms=[...allRoomingRecords].filter(r=>(r.fields['LOKASI / CITY']||'MEKAH').toUpperCase()===activeLocation.toUpperCase()); if(rooms.length===0) rooms=[...allRoomingRecords]; rooms=getRoomOrderedList(rooms); const unassigned=allRoomingJemaah.filter(j=>!isJemaahAssignedInLocation(j.id, activeLocation)); let idx=0; for(let room of rooms){ const cap=room.fields['KAPASITI']||roomingDefaultCap; const staffCount=(room.fields['STAFF / EXTRA']||'').split(',').filter(Boolean).length; let cur=[...(room.fields['JEMAAH']||[])]; while((cur.length+staffCount)<cap && idx<unassigned.length){ cur.push(unassigned[idx].id); idx++; } if(cur.length!==(room.fields['JEMAAH']||[]).length){ await updateRoomField(room.id,'JEMAAH',cur,false); } } setTimeout(fetchRoomingData,800); }
+
+// V76 INIT FIX BLANK
+document.addEventListener('DOMContentLoaded', ()=>{
+  console.log('V76 DOMContentLoaded - checking rooming init');
+  setTimeout(()=>{
+    const cont=document.getElementById('namelistContainer');
+    const grid=document.getElementById('roomingGrid')||document.getElementById('roomingGridContainer');
+    console.log('V76 check containers', !!cont, !!grid, 'trip', window.selectedTripRecord?.id||localStorage.getItem('effah_active_trip_id'));
+    if(cont && cont.innerHTML.trim()===''){
+      console.log('V76 container empty, forcing fetchRoomingData');
+      if(typeof fetchRoomingData==='function') fetchRoomingData();
+    }
+    // If still blank, show helper
+    setTimeout(()=>{
+      if(cont && (cont.innerHTML.trim()==='' || cont.innerHTML.includes('Memuatkan'))){
+        cont.innerHTML='<div class="p-6 text-center text-[11px] text-slate-500">Blank dikesan.<br>1. Pastikan trip dipilih di atas.<br>2. Hard reload Ctrl+Shift+R<br>3. Check console untuk V76 loaded<br><button onclick="fetchRoomingData()" class="mt-2 px-3 py-1 bg-[#7A0C2E] text-white rounded-full">Reload Data</button></div>';
+      }
+    }, 3000);
+  }, 1000);
+});
+// Also wrap renderNamelist and renderRoomingGrid in try-catch to prevent blank
+const _origRenderNamelist = renderNamelist;
+renderNamelist = function(){
+  try{ return _origRenderNamelist.apply(this, arguments); }catch(e){ console.error('V76 renderNamelist error', e); const cont=document.getElementById('namelistContainer'); if(cont) cont.innerHTML='<div class="p-4 text-red-500 text-[11px]">Error renderNamelist: '+e.message+'</div>'; }
+};
+const _origRenderRoomingGrid = renderRoomingGrid;
+renderRoomingGrid = function(){
+  try{ return _origRenderRoomingGrid.apply(this, arguments); }catch(e){ console.error('V76 renderRoomingGrid error', e); }
+};
+console.log('ROOMING V76 blank fix applied');
