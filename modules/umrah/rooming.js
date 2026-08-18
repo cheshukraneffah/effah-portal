@@ -1078,65 +1078,44 @@ async function deleteRoom(roomId,roomName){
 function openTanpaKatilModal(roomId){
   try{
     const targetRec = allRoomingRecords.find(r=>r.id===roomId);
-    const currentTripId = window.selectedTripRecord?.id || localStorage.getItem('effah_active_trip_id') || localStorage.getItem('selectedTripId') || '';
-    const available = allRoomingJemaah.filter(j=>{ 
-      // STRICT: only jemaah from current trip
-      if(currentTripId){
-        const jTrip = j.fields['TRIP']||[];
-        const inTrip = Array.isArray(jTrip) ? jTrip.includes(currentTripId) : String(jTrip).includes(currentTripId);
-        if(!inTrip) return false;
-      }
-      // Exclude staff names that sneaked into jemaah list (MUTAWIF, EFFAH, STAFF)
-      const nameUpper = (j.fields['NAMA JEMAAH']||j.fields['Name']||'').toUpperCase();
-      if(nameUpper.includes('(MUTAWIF)') || nameUpper.includes('(EFFAH)') || nameUpper.includes('STAFF')) return false;
-      const alreadyTanpa = isJemaahAssignedTanpaKatil(j.id); 
-      const alreadyInTargetRoomJemaah = targetRec && (targetRec.fields['JEMAAH']||[]).includes(j.id);
-      const alreadyInTargetTanpa = targetRec && (targetRec.fields['JEMAAH TANPA KATIL']||[]).includes(j.id);
-      const assignedTanpaAny = allRoomingRecords.some(r=> (r.fields['JEMAAH TANPA KATIL']||[]).includes(j.id));
-      return !assignedTanpaAny && !alreadyTanpa && !alreadyInTargetRoomJemaah && !alreadyInTargetTanpa;
+    const currentTripId = window.selectedTripRecord?.id || localStorage.getItem('effah_active_trip_id') || '';
+    console.log('openTanpaKatil trip', currentTripId, 'total', allRoomingJemaah.length);
+    const available = allRoomingJemaah.filter(j=>{
+      const nameUpper = (getJemaahName(j.fields)||'').toUpperCase();
+      if(nameUpper.includes('MUTAWIF') || nameUpper.includes('EFFAH')) return false;
+      if(isJemaahAssignedTanpaKatil(j.id)) return false;
+      if(isJemaahAssignedAny(j.id)) return false;
+      if(targetRec && (targetRec.fields['JEMAAH']||[]).includes(j.id)) return false;
+      if(targetRec && (targetRec.fields['JEMAAH TANPA KATIL']||[]).includes(j.id)) return false;
+      return true;
     });
-    // Fallback: unassigned globally in this trip
-    let finalAvailable = available;
-    if(finalAvailable.length===0){
-      finalAvailable = allRoomingJemaah.filter(j=>{
-        if(currentTripId){
-          const jTrip = j.fields['TRIP']||[];
-          const inTrip = Array.isArray(jTrip) ? jTrip.includes(currentTripId) : String(jTrip).includes(currentTripId);
-          if(!inTrip) return false;
-        }
-        const nameUpper = (j.fields['NAMA JEMAAH']||j.fields['Name']||'').toUpperCase();
-        if(nameUpper.includes('(MUTAWIF)') || nameUpper.includes('(EFFAH)')) return false;
-        const notAssignedAny = !isJemaahAssignedAny(j.id) && !isJemaahAssignedTanpaKatil(j.id);
-        return notAssignedAny;
-      });
+    console.log('available tanpa katil', available.length);
+    if(available.length===0){
+      alert('Tiada Baki Jemaah\n\nSemua jemaah telah selesai ditempatkan di bilik masing-masing.\nTiada jemaah tanpa bilik untuk ditambah sebagai Tanpa Katil.');
+      return;
     }
-    const displayAvailable = finalAvailable.length>0 ? finalAvailable : available;
-    const availForCheck = (typeof displayAvailable!=='undefined' ? displayAvailable : available);
-    if(availForCheck.length===0){ alert('Tiada Baki Jemaah\n\nSemua jemaah telah selesai ditempatkan di bilik masing-masing.\nTiada jemaah tanpa bilik untuk ditambah sebagai Tanpa Katil.'); return; }
-    
-    // Create inline selector modal
     let existingModal = document.getElementById('tanpaKatilSelectorModal');
     if(existingModal) existingModal.remove();
-    
     const modalHtml = `<div id="tanpaKatilSelectorModal" style="position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px">
       <div style="background:#fff;border-radius:16px;max-width:400px;width:100%;max-height:70vh;overflow:hidden;box-shadow:0 20px 40px rgba(0,0,0,0.2)">
         <div style="padding:12px 16px;border-bottom:1px solid #eee;display:flex;justify-content:space-between;align-items:center">
-          <span style="font-weight:bold;font-size:13px">Pilih Infant / Tanpa Katil</span>
-          <button onclick="document.getElementById('tanpaKatilSelectorModal').remove()" style="w-6 h-6 rounded-full bg-slate-100">✕</button>
+          <span style="font-weight:bold;font-size:13px">Pilih Infant / Tanpa Katil (Trip Semasa Sahaja)</span>
+          <button onclick="document.getElementById('tanpaKatilSelectorModal').remove()" style="w-6 h-6 rounded-full bg-slate-100">X</button>
         </div>
         <div style="padding:8px;max-height:50vh;overflow-y:auto" id="tanpaKatilList">
           <input type="text" id="tanpaKatilSearch" placeholder="Cari nama..." style="width:100%;padding:6px 10px;border:1px solid #ddd;border-radius:20px;font-size:11px;margin-bottom:8px" oninput="filterTanpaKatilList(this.value)">
           <div id="tanpaKatilOptions">
-            ${(typeof displayAvailable!=='undefined' ? displayAvailable : available).map((j, idx)=>`<button onclick="addTanpaKatilToRoom('${roomId}','${j.id}'); document.getElementById('tanpaKatilSelectorModal').remove()" style="width:100%;text-align:left;padding:8px 10px;border:1px solid #eee;border-radius:10px;margin-bottom:4px;font-size:11px;background:#fff" class="hover:bg-amber-50">${idx+1}. ${getJemaahName(j.fields)}</button>`).join('')}
+            ${available.map((j, idx)=>`<button onclick="addTanpaKatilToRoom('${roomId}','${j.id}'); document.getElementById('tanpaKatilSelectorModal').remove()" style="width:100%;text-align:left;padding:8px 10px;border:1px solid #eee;border-radius:10px;margin-bottom:4px;font-size:11px;background:#fff" class="hover:bg-amber-50">${idx+1}. ${getJemaahName(j.fields)}</button>`).join('')}
           </div>
         </div>
       </div>
     </div>`;
     document.body.insertAdjacentHTML('beforeend', modalHtml);
-    window._tanpaKatilAvailable = (typeof displayAvailable!=='undefined' ? displayAvailable : available);
+    window._tanpaKatilAvailable = available;
     window._tanpaKatilRoomId = roomId;
   }catch(e){ alert('Error openTanpaKatil: '+e.message); console.error(e); }
 }
+
 function filterTanpaKatilList(q){
   const list = document.getElementById('tanpaKatilOptions');
   if(!list || !window._tanpaKatilAvailable) return;
