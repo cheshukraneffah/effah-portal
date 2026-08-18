@@ -1,3 +1,5 @@
+// ROOMING V84 - INSURAN PILL ASING (TAKAFUL) (ETIQA) (AL-KHAIRI) + BOARD SEPARATE - 2026-08-19
+console.log('ROOMING V84 loaded - insuran pills separate, no overlap');
 // ROOMING V83 - FIX INSURAN CANNOT PARSE VALUE - SEND ARRAY FOR MULTIPLE SELECT - 2026-08-19
 console.log('ROOMING V83 loaded - fix INSURAN parse error, send array');
 // ROOMING V82 - PRINT BOARD SEPARATE TAGS (BB MEKAH) (FULLBOARD MADINAH) + INSURAN HEADER ONLY - 2026-08-19
@@ -1543,14 +1545,19 @@ function generateRoomingPrint(orientation){ orientation = orientation || 'landsc
       }
       const train = isTrainChecked(f) ? '<span style="background:#FEF3C7;padding:1px 6px;border-radius:10px;font-size:8px">TRAIN</span>' : '-';
       const pakej = getPakejVal(f) || '-';
-      const insArr = getInsuranArray(f);
-      let insHtml = insArr.length ? insArr.map(ins=>{
-        const up=ins.toUpperCase();
-        if(up.includes('TAKAFUL')) return `<span style="background:#10B981;color:#fff;padding:1px 5px;border-radius:8px;font-size:7px">${ins}</span>`;
-        if(up.includes('ETIQA')) return `<span style="background:#FDE68A;color:#92400E;padding:1px 5px;border-radius:8px;font-size:7px">${ins}</span>`;
-        if(up.includes('KHAIRI') || up.includes('AL-KHAIRI')) return `<span style="background:#3B82F6;color:#fff;padding:1px 5px;border-radius:8px;font-size:7px">${ins}</span>`;
-        return `<span style="background:#eee;padding:1px 5px;border-radius:8px;font-size:7px">${ins}</span>`;
-      }).join(' ') : '-';
+            const insArr = getInsuranArray(f);
+      let insHtml = '-';
+      if(insArr.length>0){
+        insHtml=insArr.map(ins=>{
+          const up=ins.toUpperCase();
+          let bg='#BBF7D0', border='#065F46', color='#065F46';
+          if(up==='TAKAFUL'){ bg='#BBF7D0'; border='#065F46'; color='#065F46'; }
+          else if(up==='ETIQA'){ bg='#FEF3C7'; border='#92400E'; color='#92400E'; }
+          else if(up.includes('KHAIRI')){ bg='#BFDBFE'; border='#1E40AF'; color='#1E40AF'; }
+          return `<span style="background:${bg};border:1px solid ${border};color:${color};padding:2px 6px;border-radius:10px;font-weight:bold;font-size:7px;display:inline-block;margin:1px 2px;white-space:nowrap;">${ins}</span>`;
+        }).join('');
+      }
+      
       return `<tr><td style="border:1px solid #ddd;padding:3px 6px;text-align:center">${i+1}</td><td style="border:1px solid #ddd;padding:3px 6px;font-weight:600">${name}</td><td style="border:1px solid #ddd;padding:3px 6px;text-align:center">${fbBadge}</td><td style="border:1px solid #ddd;padding:3px 6px;text-align:center">${train}</td><td style="border:1px solid #ddd;padding:3px 6px;text-align:center">${pakej}</td><td style="border:1px solid #ddd;padding:3px 6px;text-align:center">${insHtml}</td></tr>`;
     }).join('');
     // --- STAFF IN NAMELIST (S1, S2...) ---
