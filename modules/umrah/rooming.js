@@ -1,8 +1,8 @@
-// ROOMING V78 - MULTI STAFF BOARD + MULTI INSURAN + OUTSIDE CLICK CLOSE + FIX STACK - 2026-08-19
-console.log('ROOMING V78 loaded - staff multi, insuran multi, outside click, blank fix v2');
+// ROOMING V79 - FULL 1750 LINES BASE + MULTI STAFF + MULTI INSURAN + OUTSIDE CLICK + BLANK AUTO-CREATE - 2026-08-19
+console.log('ROOMING V79 loaded - full base 1750 lines + staff multi + insuran multi + outside click + blank fix');
 // ROOMING V72 - FIX STACK OVERFLOW + GHOST + MULTI-BOARD + LOADING 410 - 2026-08-19
 // Version: V72
-
+console.log('ROOMING V72 loaded - getBoardArray fixed, no recursion');
 // ROOMING V24 - Fix grayed still editable + print highlight (TAKAFUL hijau, ETIQA kuning, KHAIRI biru, TRAIN kuning)
 // Base: V23 exact layout, only 2 patches
 var allRoomingRecords = window.allRoomingRecords || [];
@@ -231,7 +231,6 @@ async function deleteStaff(staffId){
   saveStaffList(); renderStaffList();
 }
 
-
 function renderStaffList(){
   const cont=document.getElementById('staffListContainer'); if(!cont) return;
   const q=(document.getElementById('searchStaff')?.value||'').toLowerCase();
@@ -341,8 +340,7 @@ function renderNamelist(){
     const fbDisplay = fbArr.length ? fbArr.join(', ') : '-';
     const pk = getPakejVal(r.fields) || '-';
     const trChecked = isTrainChecked(r.fields);
-    const insArr = getInsuranArray(r.fields);
-    let fbCls = 'bg-white border-slate-200';
+        let fbCls = 'bg-white border-slate-200';
     // Determine class based on first or combined
     if(fbArr.some(x=>x.includes('MEKAH'))) fbCls='bg-orange-100 border-orange-200 text-orange-800';
     else if(fbArr.some(x=>x.includes('MADINAH'))) fbCls='bg-blue-100 border-blue-200 text-blue-800';
@@ -352,7 +350,7 @@ function renderNamelist(){
     const boardCheckboxes = boardOptions.map(opt=>{
       const checked = fbArr.includes(opt);
       return `<label class="flex items-center gap-1.5 px-2 py-1 hover:bg-slate-50 rounded text-[10px] cursor-pointer"><input type="checkbox" ${checked?'checked':''} onchange="toggleBoardMulti('${r.id}','${opt}')" class="w-3 h-3 accent-[#7A0C2E]"> ${opt}</label>`;
-    const insArr = getInsuranArray(r.fields);
+    }).join('');
     const insDisplay = insArr.length ? insArr.join(', ') : '- INSURAN';
     const insuranOptions = ['TAKAFUL','ETIQA','KHAIRI','AL-KHAIRI','TRAIN'];
     const insCheckboxes = insuranOptions.map(opt=>{
@@ -361,7 +359,6 @@ function renderNamelist(){
       return `<label class="flex items-center gap-1.5 px-2 py-1 hover:bg-slate-50 rounded text-[10px] cursor-pointer"><input type="checkbox" ${checked?'checked':''} onchange="toggleInsuranMulti('${r.id}','${opt}')" class="w-3 h-3 accent-[#7A0C2E]"> <span class="px-1.5 py-0.5 rounded-full text-[8px] ${color}">${opt}</span></label>`;
     }).join('');
 
-    }).join('');
     
 
     const insToggle = ['TAKAFUL','ETIQA','AL-KHAIRI'].map(opt=>{
@@ -739,7 +736,15 @@ function toggleBoardMulti(jemaahId, option){
   // If selects FULLBOARD generic, remove specific ones? Keep simple allow combo
   updateJemaahBoardMulti(jemaahId, arr);
 }
-
+function toggleBoardDropdown(jemaahId){ const el=document.getElementById('boardDrop-'+jemaahId); if(!el) return; // close others
+  document.querySelectorAll('[id^="boardDrop-"]').forEach(d=>{ if(d.id!=='boardDrop-'+jemaahId) d.classList.add('hidden'); });
+  el.classList.toggle('hidden'); }
+function closeBoardDropdown(jemaahId){ const el=document.getElementById('boardDrop-'+jemaahId); if(el) el.classList.add('hidden'); }
+// Close on outside click
+if(!window._boardDropListener){ window._boardDropListener=true; document.addEventListener('click', (e)=>{ if(!e.target.closest('[id^="boardDrop-"]') && !e.target.closest('button[onclick*="toggleBoardDropdown"]')){ document.querySelectorAll('[id^="boardDrop-"]').forEach(d=>d.classList.add('hidden')); } }); }
+function clearBoardMulti(jemaahId){
+  updateJemaahBoardMulti(jemaahId, []);
+}
 
 async function updateJemaahCheckbox(jemaahId, field, checked){
   const base=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base')||localStorage.getItem('effah_base_id'); const pat=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
@@ -751,6 +756,40 @@ async function updateJemaahCheckbox(jemaahId, field, checked){
     const data=await res.json();
     if(!data.id && data.error) throw new Error(data.error.message);
   }catch(e){ console.error(e); alert('Gagal update checkbox '+field+': '+e.message); fetchRoomingData(); }
+}
+async function updateJemaahInsuran(jemaahId, value){
+  const base=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base')||localStorage.getItem('effah_base_id'); const pat=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
+  if(!base||!pat) return alert('Airtable config missing');
+  const rec=allRoomingJemaah.find(r=>r.id===jemaahId); 
+  if(rec){
+    rec.fields['INSURAN'] = value ? [value] : [];
+  }
+  renderNamelist();
+  try{
+    const payload = value ? {[ 'INSURAN']: [value]} : {['INSURAN']: []};
+    const res=await fetch(`https://api.airtable.com/v0/${base}/DATA%20JEMAAH%20UMRAH/${jemaahId}`,{method:'PATCH',headers:{Authorization:`Bearer ${pat}`,'Content-Type':'application/json'},body:JSON.stringify({fields: payload})});
+    const data=await res.json();
+    if(!data.id && data.error) throw new Error(data.error.message);
+  }catch(e){ console.error(e); alert('Gagal update INSURAN: '+e.message); fetchRoomingData(); }
+}
+async function toggleInsuran(jemaahId, opt){
+  const base=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base')||localStorage.getItem('effah_base_id'); const pat=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
+  if(!base||!pat) return alert('Airtable config missing');
+  const rec=allRoomingJemaah.find(r=>r.id===jemaahId);
+  if(!rec) return;
+  let curr = getInsuranArray(rec.fields);
+  if(curr.includes(opt)){
+    curr = curr.filter(x=>x!==opt);
+  } else {
+    curr.push(opt);
+  }
+  rec.fields['INSURAN'] = curr;
+  renderNamelist();
+  try{
+    const res=await fetch(`https://api.airtable.com/v0/${base}/DATA%20JEMAAH%20UMRAH/${jemaahId}`,{method:'PATCH',headers:{Authorization:`Bearer ${pat}`,'Content-Type':'application/json'},body:JSON.stringify({fields: {'INSURAN': curr}})});
+    const data=await res.json();
+    if(!data.id && data.error) throw new Error(data.error.message);
+  }catch(e){ console.error(e); alert('Gagal update INSURAN multi: '+e.message); fetchRoomingData(); }
 }
 function updateHotelInline(roomId, newName){
   const name = (newName||'').trim().toUpperCase();
@@ -1314,48 +1353,26 @@ function generateRoomingPrint(orientation){ orientation = orientation || 'landsc
 }
 
 async function autoAssignRooming(){ if(!confirm('Adakah anda pasti ingin menetapkan semua jemaah yang belum ditetapkan untuk lokasi '+activeLocation+' secara automatik?')) return; let rooms=[...allRoomingRecords].filter(r=>(r.fields['LOKASI / CITY']||'MEKAH').toUpperCase()===activeLocation.toUpperCase()); if(rooms.length===0) rooms=[...allRoomingRecords]; rooms=getRoomOrderedList(rooms); const unassigned=allRoomingJemaah.filter(j=>!isJemaahAssignedInLocation(j.id, activeLocation)); let idx=0; for(let room of rooms){ const cap=room.fields['KAPASITI']||roomingDefaultCap; const staffCount=(room.fields['STAFF / EXTRA']||'').split(',').filter(Boolean).length; let cur=[...(room.fields['JEMAAH']||[])]; while((cur.length+staffCount)<cap && idx<unassigned.length){ cur.push(unassigned[idx].id); idx++; } if(cur.length!==(room.fields['JEMAAH']||[]).length){ await updateRoomField(room.id,'JEMAAH',cur,false); } } setTimeout(fetchRoomingData,800); }
-
-
-
-
-
-// V78 - Inspect modul-rooming and auto-create missing structure
-function inspectModulRooming(){
-  const modul=document.getElementById('modul-rooming');
-  console.log('V78 inspect modul-rooming exists:', !!modul);
-  if(modul){
-    console.log('V78 modul-rooming innerHTML length:', modul.innerHTML.length);
-    console.log('V78 modul-rooming innerHTML preview:', modul.innerHTML.substring(0,2000));
-    // Check if it has any children
-    console.log('V78 modul-rooming children count:', modul.children.length);
-    // Try to find any existing rooming elements inside
-    const innerIds=[...modul.querySelectorAll('[id]')].map(el=>el.id);
-    console.log('V78 inner IDs inside modul-rooming:', innerIds.slice(0,50));
-  }
-  // Check for other possible containers
-  const allModules=['modul-home','modul-pakej-umrah','modul-jemaah-umrah','modul-rooming','modul-trip-luar'];
-  allModules.forEach(mid=>{
-    const el=document.getElementById(mid);
-    if(el) console.log(`V78 module ${mid}: display=${getComputedStyle(el).display}, visible=${!!(el.offsetParent)}, htmlLen=${el.innerHTML.length}`);
-  });
+// V79 BLANK FIX + AUTO-CREATE
+function findRoomingContainers(){
+  const selectors={namelist:['#namelistContainer','#namelist-container','[data-testid="namelist"]','.namelist-container','#jemaahList','#jemaahListContainer'],grid:['#roomingGrid','#roomingGridContainer','#rooming-grid','.rooming-grid','#bilikGrid','#roomingListGrid']};
+  let namelist=null,grid=null;
+  for(let sel of selectors.namelist){ const el=document.querySelector(sel); if(el){ namelist=el; break; } }
+  for(let sel of selectors.grid){ const el=document.querySelector(sel); if(el){ grid=el; break; } }
+  return {namelist,grid};
 }
-
 function createMissingRoomingStructure(){
   const modul=document.getElementById('modul-rooming');
   if(!modul) return false;
-  // If modul is empty or doesn't have our expected containers, create them
   const hasNamelist=modul.querySelector('#namelistContainer');
   const hasGrid=modul.querySelector('#roomingGrid')||modul.querySelector('#roomingGridContainer');
-  console.log('V78 create check: hasNamelist', !!hasNamelist, 'hasGrid', !!hasGrid, 'innerLen', modul.innerHTML.length);
-  if(!hasNamelist || !hasGrid){
-    console.log('V78 creating missing rooming structure...');
-    // Preserve existing content if any
+  if(!hasNamelist || !hasGrid || modul.innerHTML.trim().length<100){
+    console.log('V79 creating missing rooming structure, modul innerLen', modul.innerHTML.length);
     const existingHTML=modul.innerHTML;
-    // Create basic structure that matches what render functions expect
     modul.innerHTML=`
-      <div id="roomingHeader" class="p-4 border-b">
+      <div id="roomingHeader" class="p-4 border-b bg-white">
         <div class="flex justify-between items-center">
-          <h2 class="text-sm font-bold">Rooming List - V78 Auto-Created</h2>
+          <h2 class="text-sm font-bold">Rooming List - V79 Auto-Created</h2>
           <div class="flex gap-2">
             <select id="roomingTripSelect" class="text-[11px] border rounded px-2 py-1"></select>
             <button onclick="fetchRoomingData()" class="text-[11px] bg-[#7A0C2E] text-white px-3 py-1 rounded-full">Reload</button>
@@ -1370,45 +1387,33 @@ function createMissingRoomingStructure(){
               <span class="text-[11px] font-bold">NAMELIST JEMAAH</span>
               <span id="topUnassignedBadge" class="text-[9px] bg-amber-100 px-2 py-0.5 rounded-full">0</span>
             </div>
-            <div class="p-2">
-              <input id="searchNamelist" placeholder="Cari jemaah..." class="w-full text-[11px] border rounded-full px-3 py-1.5 mb-2" oninput="renderNamelist()">
-            </div>
-            <div id="namelistContainer" class="max-h-[60vh] overflow-y-auto">
-              <div class="p-6 text-center text-[11px] text-slate-400">Memuatkan jemaah...</div>
-            </div>
+            <div class="p-2"><input id="searchNamelist" placeholder="Cari jemaah..." class="w-full text-[11px] border rounded-full px-3 py-1.5 mb-2" oninput="renderNamelist()"></div>
+            <div id="namelistContainer" class="max-h-[60vh] overflow-y-auto"><div class="p-6 text-center text-[11px] text-slate-400">Memuatkan jemaah...</div></div>
           </div>
           <div class="bg-white rounded-xl border mt-4">
-            <div class="p-3 border-b flex justify-between">
-              <span class="text-[11px] font-bold">STAFF / EXTRA</span>
-              <span id="staffTotalBadge" class="text-[9px] bg-slate-100 px-2 py-0.5 rounded-full">0</span>
-            </div>
-            <div class="p-2">
-              <input id="searchStaff" placeholder="Cari staff..." class="w-full text-[11px] border rounded-full px-3 py-1.5 mb-2" oninput="renderStaffList()">
-            </div>
+            <div class="p-3 border-b flex justify-between"><span class="text-[11px] font-bold">STAFF / EXTRA</span><span id="staffTotalBadge" class="text-[9px] bg-slate-100 px-2 py-0.5 rounded-full">0</span></div>
+            <div class="p-2"><input id="searchStaff" placeholder="Cari staff..." class="w-full text-[11px] border rounded-full px-3 py-1.5 mb-2" oninput="renderStaffList()"></div>
             <div id="staffListContainer" class="max-h-[30vh] overflow-y-auto"></div>
           </div>
         </div>
-        <div class="lg:col-span-2">
-          <div id="roomingGrid" class="grid gap-3"></div>
-          <div id="roomingGridContainer" class="hidden"></div>
-        </div>
+        <div class="lg:col-span-2"><div id="roomingGrid" class="grid gap-3"></div><div id="roomingGridContainer" class="hidden"></div></div>
       </div>
-      <div id="v78-existing-preserved" style="display:none;">${existingHTML}</div>
+      <div id="v79-existing" style="display:none;">${existingHTML}</div>
     `;
-    console.log('V78 structure created, now calling fetchRoomingData');
     setTimeout(()=>{ if(typeof populateRoomingTripDropdown==='function') populateRoomingTripDropdown(); if(typeof fetchRoomingData==='function') fetchRoomingData(); }, 500);
     return true;
   }
   return false;
 }
-
 setTimeout(()=>{
-  inspectModulRooming();
-  const created=createMissingRoomingStructure();
-  if(!created){
-    console.log('V78 structure already exists or modul not found, trying fetch');
-    if(typeof fetchRoomingData==='function') fetchRoomingData();
+  const modul=document.getElementById('modul-rooming');
+  console.log('V79 inspect modul-rooming exists:', !!modul, 'len', modul?.innerHTML.length, 'children', modul?.children.length);
+  if(modul){
+    const innerIds=[...modul.querySelectorAll('[id]')].map(el=>el.id).slice(0,30);
+    console.log('V79 inner IDs:', innerIds);
   }
-}, 2000);
-
-console.log('ROOMING V78 auto-create structure loaded');
+  const {namelist,grid}=findRoomingContainers();
+  console.log('V79 containers found:', !!namelist, !!grid);
+  if(!namelist||!grid){ createMissingRoomingStructure(); } else { if(typeof fetchRoomingData==='function') fetchRoomingData(); }
+}, 1500);
+console.log('ROOMING V79 full (1750 lines base + multi staff + multi insuran + blank auto-create) loaded');
