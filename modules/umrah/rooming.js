@@ -266,7 +266,7 @@ function cleanTripNameForRooming(name){
 function getJemaahName(f){ if(!f) return '-'; return f['NAMA'] || f['NAME'] || f['NAMA JEMAAH'] || f['NAMA PENUH'] || f['Name'] || '-'; }
 function generateRoomIdFromCap(cap){ return `B${parseInt(cap)||4}`; }
 function getBoardArray(f){
-  const raw = f['BOARD BASIS'] || f['BOARD'] || '';
+  const raw = getBoardArray(f).join(', ') || f['BOARD BASIS'] || f['BOARD'] || '';
   if(Array.isArray(raw)) return raw.filter(Boolean);
   if(typeof raw === 'string' && raw.includes(',')) return raw.split(',').map(s=>s.trim()).filter(Boolean);
   if(raw && raw!=='-' && raw!=='') return [raw];
@@ -525,10 +525,11 @@ function renderRoomingOverview(rooms){
       const jIds=[...(r.fields['JEMAAH']||[]), ...(r.fields['JEMAAH TANPA KATIL']||[])];
       jIds.forEach(jId=>{
         const jRec=allRoomingJemaah.find(j=>j.id===jId);
-        const fb=(jRec?.fields?.['BOARD']||'').toUpperCase();
+        const fbArr=getBoardArray(jRec?.fields||{});
+        const fb=fbArr.join(', ').toUpperCase();
         if(!fb || fb==='-' || fb==='NO BOARD') return;
-        if(locUpper==='MEKAH'){ if(fb.includes('MEKAH')||fb==='BOARD') cnt++; }
-        else if(locUpper==='MADINAH'){ if(fb.includes('MADINAH')||fb==='BOARD') cnt++; }
+        if(locUpper==='MEKAH'){ if(fb.includes('MEKAH')||fb==='FULLBOARD'&&!fb.includes('MADINAH')||fb==='BOARD') cnt++; }
+        else if(locUpper==='MADINAH'){ if(fb.includes('MADINAH')||fb==='FULLBOARD'&&!fb.includes('MEKAH')||fb==='BOARD') cnt++; }
         else cnt++;
       });
     });
@@ -689,8 +690,8 @@ function renderNamelist(){
     const assignedTanpaInLoc=allRoomingRecords.some(rec=> (rec.fields['LOKASI / CITY']||'MEKAH').toUpperCase()===activeLocation.toUpperCase() && ((rec.fields['JEMAAH TANPA KATIL']||[]).includes(r.id)));
     const assignedInLoc = assignedNormalInLoc || assignedTanpaInLoc;
     const assignedGlobal=isJemaahAssignedAny(r.id);
-    // FIX #1: buang pointer-events-none supaya masih boleh edit inline walau dah assigned
-    const rowCls=assignedInLoc?'opacity-60 bg-slate-50':'hover:bg-slate-50';
+    // FIX ghost dropdown: jangan guna opacity-60 sebab child dropdown ikut transparent, guna bg saja
+    const rowCls=assignedInLoc?'bg-slate-100 text-slate-500':'hover:bg-slate-50';
     const drag=assignedInLoc?'':`draggable="true" ondragstart="dragJemaah(event,'${r.id}')" ondragend="dragEnd(event)"`;
     let statusIcon = assignedInLoc? `<button onclick="removeJemaahFromCurrentLoc('${r.id}')" class="w-5 h-5 rounded-full bg-amber-100 text-amber-700 text-[10px]" title="Keluarkan dari ${activeLocation}">✕</button>` : `<button onclick="quickAssign('${r.id}')" class="w-5 h-5 rounded-full border bg-slate-100 hover:bg-slate-200 text-[10px]">+</button>`;
     if(!assignedInLoc && assignedGlobal) statusIcon = `<button onclick="quickAssign('${r.id}')" class="w-5 h-5 rounded-full border bg-amber-100 hover:bg-amber-200 text-[10px]" title="Sudah ada di lokasi lain, boleh tambah di ${activeLocation} juga">+</button>`;
@@ -729,17 +730,17 @@ function renderNamelist(){
       <div class="col-span-1 text-slate-400 text-[10px]">${String(i+1).padStart(2,'0')}</div>
       <div class="col-span-3 font-medium truncate text-[10px] ${assignedInLoc?'text-slate-500 italic':''}" title="${name}">${name}</div>
       <div class="col-span-2 flex items-center gap-0.5 relative">
-        <div class="relative w-full group">
-          <button onclick="document.getElementById('boardDrop-${r.id}').classList.toggle('hidden')" class="text-[8px] border rounded-full px-2 py-1 bg-white font-bold ${fbCls} outline-none w-full truncate text-left flex items-center justify-between" title="BOARD BASIS - klik untuk pilih 2">
+        <div class="relative w-full">
+          <button onclick="event.stopPropagation(); toggleBoardDropdown('${r.id}')" class="text-[8px] border rounded-full px-2 py-1 font-bold ${fbCls} outline-none w-full truncate text-left flex items-center justify-between bg-white opacity-100" style="opacity:1; isolation:isolate;" title="BOARD BASIS - klik untuk pilih 2">
             <span class="truncate">${fbDisplay}</span><span class="ml-1">▼</span>
           </button>
-          <div id="boardDrop-${r.id}" class="hidden absolute left-0 top-full mt-1 w-[180px] bg-white border border-slate-200 rounded-xl shadow-lg z-50 p-1">
+          <div id="boardDrop-${r.id}" class="hidden absolute left-0 top-full mt-1 w-[190px] bg-white border border-slate-200 rounded-xl shadow-xl z-[9999] p-1 opacity-100" style="opacity:1; background:#fff;">
             ${boardCheckboxes}
             <div class="border-t border-slate-100 mt-1 pt-1 flex justify-between">
-              <button onclick="clearBoardMulti('${r.id}'); document.getElementById('boardDrop-${r.id}').classList.add('hidden')" class="text-[8px] px-2 py-0.5 rounded-full bg-slate-100">Clear</button>
-              <button onclick="document.getElementById('boardDrop-${r.id}').classList.add('hidden')" class="text-[8px] px-2 py-0.5 rounded-full bg-[#7A0C2E] text-white">OK</button>
+              <button onclick="clearBoardMulti('${r.id}'); closeBoardDropdown('${r.id}')" class="text-[8px] px-2 py-0.5 rounded-full bg-slate-100">Clear</button>
+              <button onclick="closeBoardDropdown('${r.id}')" class="text-[8px] px-2 py-0.5 rounded-full bg-[#7A0C2E] text-white">OK</button>
             </div>
-            <div class="text-[7px] text-slate-400 px-2 mt-1">Boleh pilih 2: contoh BB (MEKAH) + FB (MADINAH)</div>
+            <div class="text-[7px] text-slate-400 px-2 mt-1">Boleh pilih 2: BB (MEKAH) + FB (MADINAH)</div>
           </div>
         </div>
       </div>
@@ -857,22 +858,26 @@ function renderRoomingGrid(){
     const jSlots=jIds.map(jId=>{ 
       const jRec=allRoomingJemaah.find(j=>j.id===jId); 
       const jName=getJemaahName(jRec?.fields);
-      const fb=(jRec?.fields?.['BOARD']||'').trim();
+      const fbArr=getBoardArray(jRec?.fields||{});
+      const fb=fbArr.join(', ');
       const roomLoc = (f['LOKASI / CITY']||activeLocation||'').toUpperCase();
       let fbBadge='';
-      if(fb && fb!=='-' && fb.toUpperCase()!=='NO FULLBOARD' && fb!==''){
-        const up=fb.toUpperCase();
-        const raw=fb;
-        if(roomLoc==='MEKAH'){
-          if(up.includes('MEKAH')) fbBadge=`<span class="ml-1 px-1.5 py-0.5 bg-amber-200 text-amber-900 border border-amber-300 rounded-full text-[8px] font-bold">${raw}</span>`;
-          else if(up==='FULLBOARD') fbBadge=`<span class="ml-1 px-1.5 py-0.5 bg-emerald-200 text-emerald-900 border border-emerald-300 rounded-full text-[8px] font-bold">FULLBOARD</span>`;
-        } else if(roomLoc==='MADINAH'){
-          if(up.includes('MADINAH')) fbBadge=`<span class="ml-1 px-1.5 py-0.5 bg-blue-200 text-blue-900 border border-blue-300 rounded-full text-[8px] font-bold">${raw}</span>`;
-          else if(up==='FULLBOARD') fbBadge=`<span class="ml-1 px-1.5 py-0.5 bg-emerald-200 text-emerald-900 border border-emerald-300 rounded-full text-[8px] font-bold">FULLBOARD</span>`;
-        } else {
-          if(up.includes('MEKAH') || up.includes('MADINAH') || up==='FULLBOARD') fbBadge=`<span class="ml-1 px-1.5 py-0.5 bg-emerald-200 text-emerald-900 border border-emerald-300 rounded-full text-[8px] font-bold">${raw}</span>`;
-          else if(up.startsWith('BB')) fbBadge=`<span class="ml-1 px-1.5 py-0.5 bg-orange-100 text-orange-800 border border-orange-200 rounded-full text-[8px] font-bold">${raw}</span>`;
-        }
+      if(fbArr.length>0){
+        fbArr.forEach(raw=>{
+          const up=raw.toUpperCase();
+          let badge='';
+          if(roomLoc==='MEKAH'){
+            if(up.includes('MEKAH')) badge=`<span class="ml-1 px-1.5 py-0.5 bg-amber-200 text-amber-900 border border-amber-300 rounded-full text-[8px] font-bold">${raw}</span>`;
+            else if(up==='FULLBOARD') badge=`<span class="ml-1 px-1.5 py-0.5 bg-emerald-200 text-emerald-900 border border-emerald-300 rounded-full text-[8px] font-bold">FULLBOARD</span>`;
+          } else if(roomLoc==='MADINAH'){
+            if(up.includes('MADINAH')) badge=`<span class="ml-1 px-1.5 py-0.5 bg-blue-200 text-blue-900 border border-blue-300 rounded-full text-[8px] font-bold">${raw}</span>`;
+            else if(up==='FULLBOARD') badge=`<span class="ml-1 px-1.5 py-0.5 bg-emerald-200 text-emerald-900 border border-emerald-300 rounded-full text-[8px] font-bold">FULLBOARD</span>`;
+          } else {
+            if(up.includes('MEKAH') || up.includes('MADINAH') || up==='FULLBOARD') badge=`<span class="ml-1 px-1.5 py-0.5 bg-emerald-200 text-emerald-900 border border-emerald-300 rounded-full text-[8px] font-bold">${raw}</span>`;
+            else if(up.startsWith('BB')) badge=`<span class="ml-1 px-1.5 py-0.5 bg-orange-100 text-orange-800 border border-orange-200 rounded-full text-[8px] font-bold">${raw}</span>`;
+          }
+          fbBadge+=badge;
+        });
       }
       return `<div class="flex items-center justify-between px-2.5 py-2 bg-slate-100 text-slate-800 border border-slate-200 rounded-xl text-[11px]"><span class="truncate font-medium flex items-center">${jName}${fbBadge}</span><button onclick="removeJemaahFromRoom('${rec.id}','${jId}')" class="ml-2 w-4 h-4 rounded-full bg-white hover:bg-slate-200 text-[10px]">✕</button></div>`; 
     }).join('');
@@ -1076,6 +1081,12 @@ function toggleBoardMulti(jemaahId, option){
   // If selects FULLBOARD generic, remove specific ones? Keep simple allow combo
   updateJemaahBoardMulti(jemaahId, arr);
 }
+function toggleBoardDropdown(jemaahId){ const el=document.getElementById('boardDrop-'+jemaahId); if(!el) return; // close others
+  document.querySelectorAll('[id^="boardDrop-"]').forEach(d=>{ if(d.id!=='boardDrop-'+jemaahId) d.classList.add('hidden'); });
+  el.classList.toggle('hidden'); }
+function closeBoardDropdown(jemaahId){ const el=document.getElementById('boardDrop-'+jemaahId); if(el) el.classList.add('hidden'); }
+// Close on outside click
+if(!window._boardDropListener){ window._boardDropListener=true; document.addEventListener('click', (e)=>{ if(!e.target.closest('[id^="boardDrop-"]') && !e.target.closest('button[onclick*="toggleBoardDropdown"]')){ document.querySelectorAll('[id^="boardDrop-"]').forEach(d=>d.classList.add('hidden')); } }); }
 function clearBoardMulti(jemaahId){
   updateJemaahBoardMulti(jemaahId, []);
 }
@@ -1361,7 +1372,8 @@ function generateRoomingPrint(orientation){ orientation = orientation || 'landsc
     let namelistRows = allRoomingJemaah.map((r,i)=>{
       const f=r.fields;
       const name=getJemaahName(f);
-      const fbRaw=getFullboardVal(f)||'';
+      const fbArr=getBoardArray(f);
+      const fbRaw=fbArr.join(', ')||'';
       const fbUpper=fbRaw.toUpperCase();
       let fbBadge = '-';
       if(fbRaw){
@@ -1415,32 +1427,25 @@ function generateRoomingPrint(orientation){ orientation = orientation || 'landsc
         return up.includes('FULLBOARD')||up==='FULLBOARD'||up==='BOARD';
       }
       let fbListForLoc = [];
+      function jHasBoardForLoc(r, locUp){
+        const arr=getBoardArray(r.fields).map(x=>x.toUpperCase());
+        if(arr.length===0) return false;
+        if(locUp==='MEKAH'){
+          return arr.some(x=> x==='FULLBOARD' || x==='FULLBOARD (MEKAH)' || x==='BB (MEKAH)' || (x.includes('MEKAH') && (x.includes('FULLBOARD')||x.includes('BB'))));
+        } else if(locUp==='MADINAH'){
+          return arr.some(x=> x==='FULLBOARD' || x==='FULLBOARD (MADINAH)' || x==='BB (MADINAH)' || (x.includes('MADINAH') && (x.includes('FULLBOARD')||x.includes('BB'))));
+        } else {
+          return arr.some(x=> x==='FULLBOARD');
+        }
+      }
       if(loc==='MEKAH'){
-        fbListForLoc = allRoomingJemaah.filter(r=>{
-          const fb=(getFullboardVal(r.fields)||'').toUpperCase();
-          return fb.includes('FULLBOARD') || fb.includes('BB') && fb.includes('MEKAH') || fb==='FULLBOARD' || fb==='FULLBOARD (MEKAH)' || fb==='BB (MEKAH)';
-        });
-        // Also include exact: FULLBOARD, FULLBOARD (MEKAH), BB (MEKAH)
-        fbListForLoc = allRoomingJemaah.filter(r=>{
-          const fb=(getFullboardVal(r.fields)||'').toUpperCase().trim();
-          return fb==='FULLBOARD' || fb==='FULLBOARD (MEKAH)' || fb==='BB (MEKAH)' || (fb.includes('MEKAH') && (fb.includes('FULLBOARD') || fb.includes('BB')));
-        });
+        fbListForLoc = allRoomingJemaah.filter(r=> jHasBoardForLoc(r,'MEKAH'));
       } else if(loc==='MADINAH'){
-        fbListForLoc = allRoomingJemaah.filter(r=>{
-          const fb=(getFullboardVal(r.fields)||'').toUpperCase().trim();
-          return fb==='FULLBOARD' || fb==='FULLBOARD (MADINAH)' || fb==='BB (MADINAH)' || (fb.includes('MADINAH') && (fb.includes('FULLBOARD') || fb.includes('BB')));
-        });
+        fbListForLoc = allRoomingJemaah.filter(r=> jHasBoardForLoc(r,'MADINAH'));
       } else if(loc==='TAIF'){
-        fbListForLoc = allRoomingJemaah.filter(r=>{
-          const fb=(getFullboardVal(r.fields)||'').toUpperCase().trim();
-          return fb==='FULLBOARD';
-        });
+        fbListForLoc = allRoomingJemaah.filter(r=> jHasBoardForLoc(r,'TAIF'));
       } else {
-        // Other locations: count FULLBOARD only
-        fbListForLoc = allRoomingJemaah.filter(r=>{
-          const fb=(getFullboardVal(r.fields)||'').toUpperCase().trim();
-          return fb==='FULLBOARD';
-        });
+        fbListForLoc = allRoomingJemaah.filter(r=> jHasBoardForLoc(r,loc));
       }
       // Add STAFF with FULLBOARD in this location
       const staffFB = staffList.filter(s=> isStaffBoardMatch(s, loc.toUpperCase()) && s.roomIds && s.roomIds.some(rid=> rooms.some(r=>r.id===rid)));
@@ -1463,17 +1468,25 @@ function generateRoomingPrint(orientation){ orientation = orientation || 'landsc
       
       // For overview BOARD column: show breakdown
       let boardSummary = '';
+      function hasBoard(r, target){
+        const arr=getBoardArray(r.fields).map(x=>x.toUpperCase());
+        return arr.includes(target);
+      }
+      function hasBoardIncludes(r, inc){
+        const arr=getBoardArray(r.fields).map(x=>x.toUpperCase());
+        return arr.some(x=>x.includes(inc));
+      }
       if(loc==='MEKAH'){
-        const countFB = allRoomingJemaah.filter(r=> (getFullboardVal(r.fields)||'').toUpperCase()==='FULLBOARD').length;
-        const countFBMekah = allRoomingJemaah.filter(r=> (getFullboardVal(r.fields)||'').toUpperCase()==='FULLBOARD (MEKAH)').length;
-        const countBBMekah = allRoomingJemaah.filter(r=> (getFullboardVal(r.fields)||'').toUpperCase()==='BB (MEKAH)').length;
+        const countFB = allRoomingJemaah.filter(r=> hasBoard(r,'FULLBOARD')).length;
+        const countFBMekah = allRoomingJemaah.filter(r=> hasBoard(r,'FULLBOARD (MEKAH)')).length;
+        const countBBMekah = allRoomingJemaah.filter(r=> hasBoard(r,'BB (MEKAH)')).length;
         boardSummary = `FULLBOARD: ${countFB}, FULLBOARD MEKAH: ${countFBMekah}, BB MEKAH: ${countBBMekah}`;
         if(fbListForLoc.length>0) boardSummary = `${fbListForLoc.length} orang (FULLBOARD: ${countFB} + FULLBOARD (MEKAH): ${countFBMekah} + BB (MEKAH): ${countBBMekah})`;
         else boardSummary = '-';
       } else if(loc==='MADINAH'){
-        const countFB = allRoomingJemaah.filter(r=> (getFullboardVal(r.fields)||'').toUpperCase()==='FULLBOARD').length;
-        const countFBMad = allRoomingJemaah.filter(r=> (getFullboardVal(r.fields)||'').toUpperCase()==='FULLBOARD (MADINAH)').length;
-        const countBBMad = allRoomingJemaah.filter(r=> (getFullboardVal(r.fields)||'').toUpperCase()==='BB (MADINAH)').length;
+        const countFB = allRoomingJemaah.filter(r=> hasBoard(r,'FULLBOARD')).length;
+        const countFBMad = allRoomingJemaah.filter(r=> hasBoard(r,'FULLBOARD (MADINAH)')).length;
+        const countBBMad = allRoomingJemaah.filter(r=> hasBoard(r,'BB (MADINAH)')).length;
         if(fbListForLoc.length>0) boardSummary = `${fbListForLoc.length} orang (FULLBOARD: ${countFB} + FULLBOARD (MADINAH): ${countFBMad} + BB (MADINAH): ${countBBMad})`;
         else boardSummary = '-';
       } else if(loc==='TAIF'){
