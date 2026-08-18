@@ -266,10 +266,11 @@ function cleanTripNameForRooming(name){
 function getJemaahName(f){ if(!f) return '-'; return f['NAMA'] || f['NAME'] || f['NAMA JEMAAH'] || f['NAMA PENUH'] || f['Name'] || '-'; }
 function generateRoomIdFromCap(cap){ return `B${parseInt(cap)||4}`; }
 function getBoardArray(f){
-  const raw = getBoardArray(f).join(', ') || f['BOARD BASIS'] || f['BOARD'] || '';
-  if(Array.isArray(raw)) return raw.filter(Boolean);
+  if(!f) return [];
+  const raw = f['BOARD BASIS'] || f['BOARD'] || '';
+  if(Array.isArray(raw)) return raw.filter(Boolean).map(s=>String(s).trim()).filter(Boolean);
   if(typeof raw === 'string' && raw.includes(',')) return raw.split(',').map(s=>s.trim()).filter(Boolean);
-  if(raw && raw!=='-' && raw!=='') return [raw];
+  if(raw && raw!=='-' && raw!=='' && raw!=='NO BOARD' && raw!=='NO FULLBOARD') return [String(raw).trim()];
   return [];
 }
 function getFullboardVal(f){ 
