@@ -265,7 +265,22 @@ function cleanTripNameForRooming(name){
 }
 function getJemaahName(f){ if(!f) return '-'; return f['NAMA'] || f['NAME'] || f['NAMA JEMAAH'] || f['NAMA PENUH'] || f['Name'] || '-'; }
 function generateRoomIdFromCap(cap){ return `B${parseInt(cap)||4}`; }
-function getFullboardVal(f){ return f['BOARD BASIS'] || f['BOARD'] || ''; }
+function getBoardArray(f){
+  const raw = f['BOARD BASIS'] || f['BOARD'] || '';
+  if(Array.isArray(raw)) return raw.filter(Boolean);
+  if(typeof raw === 'string' && raw.includes(',')) return raw.split(',').map(s=>s.trim()).filter(Boolean);
+  if(raw && raw!=='-' && raw!=='') return [raw];
+  return [];
+}
+function getFullboardVal(f){ 
+  const arr=getBoardArray(f);
+  return arr[0]||'';
+}
+function getFullboardDisplay(f){
+  const arr=getBoardArray(f);
+  if(arr.length===0) return '-';
+  return arr.join(', ');
+}
 function getPakejVal(f){ return f['PAKEJ'] || ''; }
 function getInsuranVal(f){
   const v=f['INSURAN'];
@@ -679,16 +694,24 @@ function renderNamelist(){
     const drag=assignedInLoc?'':`draggable="true" ondragstart="dragJemaah(event,'${r.id}')" ondragend="dragEnd(event)"`;
     let statusIcon = assignedInLoc? `<button onclick="removeJemaahFromCurrentLoc('${r.id}')" class="w-5 h-5 rounded-full bg-amber-100 text-amber-700 text-[10px]" title="Keluarkan dari ${activeLocation}">✕</button>` : `<button onclick="quickAssign('${r.id}')" class="w-5 h-5 rounded-full border bg-slate-100 hover:bg-slate-200 text-[10px]">+</button>`;
     if(!assignedInLoc && assignedGlobal) statusIcon = `<button onclick="quickAssign('${r.id}')" class="w-5 h-5 rounded-full border bg-amber-100 hover:bg-amber-200 text-[10px]" title="Sudah ada di lokasi lain, boleh tambah di ${activeLocation} juga">+</button>`;
-    const fb = getFullboardVal(r.fields) || '-';
+    const fbArr = getBoardArray(r.fields);
+    const fb = fbArr[0] || '-';
+    const fbDisplay = fbArr.length ? fbArr.join(', ') : '-';
     const pk = getPakejVal(r.fields) || '-';
     const trChecked = isTrainChecked(r.fields);
     const insArr = getInsuranArray(r.fields);
     let fbCls = 'bg-white border-slate-200';
-    if(fb==='FULLBOARD (MEKAH)' || fb==='BB (MEKAH)') fbCls='bg-orange-100 border-orange-200 text-orange-800';
-    else if(fb==='FULLBOARD (MADINAH)' || fb==='BB (MADINAH)') fbCls='bg-blue-100 border-blue-200 text-blue-800';
-    else if(fb==='FULLBOARD') fbCls='bg-emerald-100 border-emerald-200 text-emerald-800';
-    else if(fb==='NO FULLBOARD' || fb==='' ) fbCls='bg-white border-dashed border-slate-300 text-slate-400';
-    else if(fb==='-' || fb==='' ) fbCls='bg-white border-dashed border-slate-300 text-slate-400';
+    // Determine class based on first or combined
+    if(fbArr.some(x=>x.includes('MEKAH'))) fbCls='bg-orange-100 border-orange-200 text-orange-800';
+    else if(fbArr.some(x=>x.includes('MADINAH'))) fbCls='bg-blue-100 border-blue-200 text-blue-800';
+    else if(fbArr.includes('FULLBOARD')) fbCls='bg-emerald-100 border-emerald-200 text-emerald-800';
+    else if(fbArr.length===0) fbCls='bg-white border-dashed border-slate-300 text-slate-400';
+    const boardOptions = ['FULLBOARD','FULLBOARD (MEKAH)','BB (MEKAH)','FULLBOARD (MADINAH)','BB (MADINAH)'];
+    const boardCheckboxes = boardOptions.map(opt=>{
+      const checked = fbArr.includes(opt);
+      return `<label class="flex items-center gap-1.5 px-2 py-1 hover:bg-slate-50 rounded text-[10px] cursor-pointer"><input type="checkbox" ${checked?'checked':''} onchange="toggleBoardMulti('${r.id}','${opt}')" class="w-3 h-3 accent-[#7A0C2E]"> ${opt}</label>`;
+    }).join('');
+    
 
     const insToggle = ['TAKAFUL','ETIQA','AL-KHAIRI'].map(opt=>{
       const active = insArr.includes(opt);
@@ -705,15 +728,20 @@ function renderNamelist(){
     return `<div ${drag} class="grid grid-cols-12 items-center px-1.5 py-1.5 text-[11px] border-b border-slate-50 ${rowCls}">
       <div class="col-span-1 text-slate-400 text-[10px]">${String(i+1).padStart(2,'0')}</div>
       <div class="col-span-3 font-medium truncate text-[10px] ${assignedInLoc?'text-slate-500 italic':''}" title="${name}">${name}</div>
-      <div class="col-span-2 flex items-center gap-0.5">
-        <select onchange="updateJemaahField('${r.id}','BOARD BASIS',this.value)" class="text-[8px] border rounded-full px-1 py-0.5 bg-white font-bold ${fbCls} outline-none w-full truncate" title="BOARD BASIS">
-          <option value="" ${!fb || fb==='-' || fb==='NO FULLBOARD'?'selected':''}>- BOARD</option>
-          <option value="FULLBOARD" ${fb==='FULLBOARD'?'selected':''}>FULLBOARD</option>
-          <option value="FULLBOARD (MEKAH)" ${fb==='FULLBOARD (MEKAH)'?'selected':''}>FULLBOARD (MEKAH)</option>
-          <option value="FULLBOARD (MADINAH)" ${fb==='FULLBOARD (MADINAH)'?'selected':''}>FULLBOARD (MADINAH)</option>
-          <option value="BB (MEKAH)" ${fb==='BB (MEKAH)'?'selected':''}>BB (MEKAH)</option>
-          <option value="BB (MADINAH)" ${fb==='BB (MADINAH)'?'selected':''}>BB (MADINAH)</option>
-        </select>
+      <div class="col-span-2 flex items-center gap-0.5 relative">
+        <div class="relative w-full group">
+          <button onclick="document.getElementById('boardDrop-${r.id}').classList.toggle('hidden')" class="text-[8px] border rounded-full px-2 py-1 bg-white font-bold ${fbCls} outline-none w-full truncate text-left flex items-center justify-between" title="BOARD BASIS - klik untuk pilih 2">
+            <span class="truncate">${fbDisplay}</span><span class="ml-1">▼</span>
+          </button>
+          <div id="boardDrop-${r.id}" class="hidden absolute left-0 top-full mt-1 w-[180px] bg-white border border-slate-200 rounded-xl shadow-lg z-50 p-1">
+            ${boardCheckboxes}
+            <div class="border-t border-slate-100 mt-1 pt-1 flex justify-between">
+              <button onclick="clearBoardMulti('${r.id}'); document.getElementById('boardDrop-${r.id}').classList.add('hidden')" class="text-[8px] px-2 py-0.5 rounded-full bg-slate-100">Clear</button>
+              <button onclick="document.getElementById('boardDrop-${r.id}').classList.add('hidden')" class="text-[8px] px-2 py-0.5 rounded-full bg-[#7A0C2E] text-white">OK</button>
+            </div>
+            <div class="text-[7px] text-slate-400 px-2 mt-1">Boleh pilih 2: contoh BB (MEKAH) + FB (MADINAH)</div>
+          </div>
+        </div>
       </div>
       <div class="col-span-1 text-center">
         <input type="checkbox" ${trChecked?'checked':''} onchange="updateJemaahCheckbox('${r.id}','TRAIN',this.checked)" class="w-3.5 h-3.5 accent-[#7A0C2E] rounded" title="TRAIN">
@@ -1016,6 +1044,42 @@ async function updateJemaahField(jemaahId, field, value){
     if(!data.id && data.error) throw new Error(data.error.message);
   }catch(e){ console.error(e); alert('Gagal update jemaah '+field+': '+e.message); fetchRoomingData(); }
 }
+async function updateJemaahBoardMulti(jemaahId, selectedArr){
+  const base=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base')||localStorage.getItem('effah_base_id'); const pat=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
+  if(!base||!pat) return alert('Airtable config missing');
+  const rec=allRoomingJemaah.find(r=>r.id===jemaahId); if(!rec) return;
+  rec.fields['BOARD BASIS']=selectedArr;
+  rec.fields['BOARD']=selectedArr.join(', ');
+  renderNamelist();
+  try{
+    // Try save as array (for multiple select field)
+    let res=await fetch(`https://api.airtable.com/v0/${base}/DATA%20JEMAAH%20UMRAH/${jemaahId}`,{method:'PATCH',headers:{Authorization:`Bearer ${pat}`,'Content-Type':'application/json'},body:JSON.stringify({fields: {'BOARD BASIS': selectedArr.length?selectedArr:null}})});
+    let data=await res.json();
+    if(data.error){
+      console.warn('BOARD BASIS array save failed, trying string', data.error);
+      // Fallback save as string in BOARD field
+      res=await fetch(`https://api.airtable.com/v0/${base}/DATA%20JEMAAH%20UMRAH/${jemaahId}`,{method:'PATCH',headers:{Authorization:`Bearer ${pat}`,'Content-Type':'application/json'},body:JSON.stringify({fields: {'BOARD': selectedArr.join(', ')}})});
+      data=await res.json();
+      if(data.error) throw new Error(data.error.message);
+    }
+  }catch(e){ console.error(e); alert('Gagal update BOARD: '+e.message+'\n\nPastikan field BOARD BASIS di Airtable sudah tukar ke Multiple Select, bukan Single Select.'); fetchRoomingData(); }
+}
+function toggleBoardMulti(jemaahId, option){
+  const rec=allRoomingJemaah.find(r=>r.id===jemaahId); if(!rec) return;
+  let arr=getBoardArray(rec.fields);
+  if(arr.includes(option)){
+    arr=arr.filter(x=>x!==option);
+  } else {
+    // Allow max 2, but allow more
+    arr.push(option);
+  }
+  // If selects FULLBOARD generic, remove specific ones? Keep simple allow combo
+  updateJemaahBoardMulti(jemaahId, arr);
+}
+function clearBoardMulti(jemaahId){
+  updateJemaahBoardMulti(jemaahId, []);
+}
+
 async function updateJemaahCheckbox(jemaahId, field, checked){
   const base=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base')||localStorage.getItem('effah_base_id'); const pat=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
   if(!base||!pat) return alert('Airtable config missing');
