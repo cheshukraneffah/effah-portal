@@ -1,3 +1,5 @@
+// ROOMING V75 - MULTI STAFF BOARD + MULTI INSURAN + OUTSIDE CLICK CLOSE + FIX STACK - 2026-08-19
+console.log('ROOMING V75 loaded - staff multi, insuran multi, outside click close');
 // ROOMING V72 - FIX STACK OVERFLOW + GHOST + MULTI-BOARD + LOADING 410 - 2026-08-19
 // Version: V72
 console.log('ROOMING V72 loaded - getBoardArray fixed, no recursion');
@@ -229,474 +231,46 @@ async function deleteStaff(staffId){
   saveStaffList(); renderStaffList();
 }
 
+
 function renderStaffList(){
-  const cont=document.getElementById('staffListContainer'); const badge=document.getElementById('staffTotalBadge'); if(!cont) return; if(badge) badge.textContent=staffList.length+' Staff';
-  if(staffList.length===0){ cont.innerHTML='<div class="p-2.5 text-center text-[11px] text-slate-400">Tiada staff / extra</div>'; return; }
-  cont.innerHTML=staffList.map((s,idx)=>{
-    const assignedInLoc=isStaffAssignedInLocation(s.id, activeLocation); 
-    const cls=assignedInLoc?'opacity-50 bg-slate-50':'bg-white hover:bg-slate-50 cursor-grab'; const drag=assignedInLoc?'':`draggable="true" ondragstart="dragStaff(event,'${s.id}')" ondragend="dragStaffEnd(event)"`;
-    const boardVal=s.boardBasis||'';
-    let boardCls='bg-white border-slate-200';
-    if(boardVal==='FULLBOARD (MEKAH)' || boardVal==='BB (MEKAH)') boardCls='bg-orange-100 border-orange-200 text-orange-800';
-    else if(boardVal==='FULLBOARD (MADINAH)' || boardVal==='BB (MADINAH)') boardCls='bg-blue-100 border-blue-200 text-blue-800';
-    else if(boardVal==='FULLBOARD') boardCls='bg-emerald-100 border-emerald-200 text-emerald-800';
-    return `<div ${drag} class="flex flex-col gap-1 px-2.5 py-2 rounded-xl border text-[11px] ${cls}">
-      <div class="flex items-center justify-between">
-        <div class="flex gap-2 items-center"><span class="text-slate-400 text-[10px]">${String(idx+1).padStart(2,'0')}</span><span class="font-medium truncate max-w-[120px]">${s.name}</span>${assignedInLoc?'<span class="ml-1 px-1 py-0.5 bg-slate-200 rounded text-[8px]">ASSIGNED di '+activeLocation+'</span>':''}</div>
-        <div class="flex gap-1"><button onclick="quickAssignStaff('${s.id}')" class="w-5 h-5 rounded-full border ${assignedInLoc?'opacity-30':'hover:bg-[#7A0C2E] hover:text-white'} text-[10px]">+</button><button onclick="deleteStaff('${s.id}')" class="w-5 h-5 rounded-full border hover:bg-red-50 text-[10px]"><i class="fa-solid fa-trash text-[9px]"></i></button></div>
-      </div>
-      <div class="flex items-center gap-1">
-        <select onchange="updateStaffField('${s.id}','boardBasis',this.value)" class="text-[8px] border rounded-full px-1.5 py-0.5 font-bold ${boardCls} outline-none flex-1">
-          <option value="" ${!boardVal?'selected':''}>- BOARD</option>
-          <option value="FULLBOARD" ${boardVal==='FULLBOARD'?'selected':''}>FULLBOARD</option>
-          <option value="FULLBOARD (MEKAH)" ${boardVal==='FULLBOARD (MEKAH)'?'selected':''}>FULLBOARD (MEKAH)</option>
-          <option value="FULLBOARD (MADINAH)" ${boardVal==='FULLBOARD (MADINAH)'?'selected':''}>FULLBOARD (MADINAH)</option>
-          <option value="BB (MEKAH)" ${boardVal==='BB (MEKAH)'?'selected':''}>BB (MEKAH)</option>
-          <option value="BB (MADINAH)" ${boardVal==='BB (MADINAH)'?'selected':''}>BB (MADINAH)</option>
-        </select>
-        <label class="flex items-center gap-1 text-[8px] border rounded-full px-1.5 py-0.5 bg-white cursor-pointer"><input type="checkbox" ${s.train?'checked':''} onchange="updateStaffTrain('${s.id}',this.checked)" class="w-3 h-3"> TRAIN</label>
-      </div>
-    </div>`;
-  }).join('');
-}
-
-
-function cleanTripNameForRooming(name){
-  if(!name) return '';
-  if(typeof cleanTripName==='function') return cleanTripName(name);
-  return name.replace(/^\s*\d+\/\d+\s*\|\s*/i, '').replace(/^\s*\d+\/\d+\s*/i,'').trim();
-}
-function getJemaahName(f){ if(!f) return '-'; return f['NAMA'] || f['NAME'] || f['NAMA JEMAAH'] || f['NAMA PENUH'] || f['Name'] || '-'; }
-function generateRoomIdFromCap(cap){ return `B${parseInt(cap)||4}`; }
-function getBoardArray(f){
-  if(!f) return [];
-  const raw = f['BOARD BASIS'] || f['BOARD'] || '';
-  if(Array.isArray(raw)) return raw.filter(Boolean).map(s=>String(s).trim()).filter(Boolean);
-  if(typeof raw === 'string' && raw.includes(',')) return raw.split(',').map(s=>s.trim()).filter(Boolean);
-  if(raw && raw!=='-' && raw!=='' && raw!=='NO BOARD' && raw!=='NO FULLBOARD') return [String(raw).trim()];
-  return [];
-}
-function getFullboardVal(f){ 
-  const arr=getBoardArray(f);
-  return arr[0]||'';
-}
-function getFullboardDisplay(f){
-  const arr=getBoardArray(f);
-  if(arr.length===0) return '-';
-  return arr.join(', ');
-}
-function getPakejVal(f){ return f['PAKEJ'] || ''; }
-function getInsuranVal(f){
-  const v=f['INSURAN'];
-  if(!v) return '';
-  if(Array.isArray(v)) return v.join(', ');
-  return v;
-}
-function getInsuranArray(f){
-  const v=f['INSURAN'];
-  if(!v) return [];
-  if(Array.isArray(v)) return v;
-  return [v];
-}
-function isTrainChecked(f){ return !!f['TRAIN']; }
-function formatCheckbox(v){ return v ? '✓' : '-'; }
-
-document.addEventListener('DOMContentLoaded', () => {
-  if(document.getElementById('modul-rooming')) renderRoomingHTML();
-  setTimeout(()=>populateRoomingTripDropdown(), 600);
-});
-
-function showRoomingLoading(){
-  const g=document.getElementById('roomingGrid'); const l=document.getElementById('namelistContainer');
-  const spinner = `<div class="flex flex-col items-center justify-center gap-3 py-10"><div class="w-8 h-8 border-[3px] border-slate-200 border-t-[#7A0C2E] rounded-full animate-spin"></div><div class="text-[11px] text-slate-600 font-medium">Memuatkan jemaah...</div></div>`;
-  const spinnerBilik = `<div class="col-span-2 flex flex-col items-center justify-center gap-3 py-16"><div class="w-8 h-8 border-[3px] border-slate-200 border-t-[#7A0C2E] rounded-full animate-spin"></div><div class="text-[11px] text-slate-600 font-medium">Memuatkan bilik...</div></div>`;
-  const skeletonRooms = Array.from({length:4}).map(()=>`<div class="bg-white rounded-2xl border border-slate-200 p-3 animate-pulse"><div class="h-4 bg-slate-100 rounded-full w-1/3 mb-3"></div><div class="h-3 bg-slate-100 rounded-full w-2/3 mb-4"></div><div class="space-y-2"><div class="h-9 bg-slate-50 rounded-xl"></div><div class="h-9 bg-slate-50 rounded-xl"></div><div class="h-9 bg-slate-100 rounded-xl border border-dashed"></div></div></div>`).join('');
-  const skeletonList = Array.from({length:6}).map(()=>`<div class="px-2.5 py-3 flex gap-2 animate-pulse"><div class="w-6 h-3 bg-slate-100 rounded"></div><div class="flex-1 h-3 bg-slate-100 rounded-full"></div><div class="w-16 h-5 bg-slate-50 rounded-full"></div></div>`).join('');
-  if(g) g.innerHTML=`${spinnerBilik}<div class="grid grid-cols-1 gap-2.5 mt-2">${skeletonRooms}</div>`;
-  if(l) l.innerHTML=`${spinner}<div class="divide-y divide-slate-50 border-t mt-2">${skeletonList}</div>`;
-  const overview=document.getElementById('roomingOverview');
-  if(overview) overview.innerHTML=`<div class="flex items-center gap-2 text-[11px]"><div class="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> Memuatkan ${activeLocation}...</div>`;
-}
-
-function renderRoomingHTML(){
-  const c=document.getElementById('modul-rooming'); if(!c) return;
-  c.innerHTML=`
-  <div class="flex flex-col gap-2.5 p-2">
-    <div class="bg-white rounded-2xl border border-slate-200 p-2.5 flex flex-wrap items-center justify-between gap-2">
-      <div class="flex items-center gap-2.5 flex-wrap">
-        <span class="font-bold tracking-widest text-slate-800 text-[11px]">ROOMING LIST</span>
-        <select id="roomingTripSelect" onchange="onRoomingTripChange(this.value)" class="px-2.5 py-1 border border-slate-300 rounded-full bg-white text-[11px] font-bold min-w-[240px] max-w-[320px] truncate">
-          <option value="">Pilih Trip...</option>
-        </select>
-      </div>
-      <div class="flex items-center gap-1.5 text-[11px]">
-        <span id="belumAssignTop" class="px-2 py-0.5 bg-amber-100 rounded-full font-bold text-[10px]">0 Unassigned</span>
-        <span id="assignedTop" class="px-2 py-0.5 bg-emerald-50 rounded-full font-bold text-[10px]">0 Assigned</span>
-        <button onclick="fetchRoomingData()" class="w-6 h-6 rounded-full border bg-white hover:bg-slate-50 text-[10px]"><i class="fa-solid fa-rotate"></i></button>
-      </div>
-    </div>
-
-    <div class="flex flex-col lg:flex-row gap-2.5 items-start">
-      <div class="w-full lg:w-[52%] bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col overflow-hidden">
-        <div class="p-2.5 border-b border-slate-200">
-          <div class="flex items-center justify-between mb-2.5">
-            <h3 class="font-bold text-[11px] tracking-widest text-slate-700">NAMELIST JEMAAH</h3>
-            <div class="flex gap-1">
-              <span id="belumAssignBadge" class="px-2 py-0.5 bg-amber-100 text-amber-800 rounded-full text-[10px] font-bold">0 Unassigned</span>
-              <span id="totalJemaahBadge" class="px-2 py-0.5 bg-slate-100 border border-slate-200 text-slate-700 rounded-full text-[10px] font-bold">0 Total</span>
-            </div>
-          </div>
-          <div class="flex gap-1.5">
-            <div class="relative flex-1">
-              <i class="fa-solid fa-magnifying-glass absolute left-2.5 top-2.5 text-slate-400 text-[10px]"></i>
-              <input id="searchRoomingJemaah" onkeyup="filterRoomingNamelist()" placeholder="Cari nama jemaah..." class="w-full text-[11px] pl-7 pr-2.5 py-2 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:outline-none">
-            </div>
-            <select id="filterPakejRooming" onchange="filterRoomingNamelist()" class="text-[11px] border border-slate-200 rounded-xl px-2.5 py-2 bg-white font-medium"><option value="">Semua Pakej</option><option>JIMAT</option><option>EKONOMI</option><option>STANDARD</option><option>PREMIUM</option></select>
-          </div>
-        </div>
-        <div class="px-2.5 py-1.5 bg-slate-50/70 border-b border-slate-200 grid grid-cols-12 text-[9px] font-bold text-slate-500 tracking-wider">
-          <div class="col-span-1">NO</div>
-          <div class="col-span-3 flex items-center gap-1 cursor-pointer hover:text-[#7A0C2E] select-none" onclick="toggleSortNama()" title="Klik untuk sort A-Z / Z-A">
-            <span id="headerNamaJemaah" class="bg-[#7A0C2E] text-white px-1.5 py-0.5 rounded text-[9px]">NAMA JEMAAH</span>
-            <span id="sortIcon" class="text-[10px]">${roomingSortActive ? (roomingSortDir==='asc'?'↑':'↓') : '↕'}</span>
-          </div>
-          <div class="col-span-2 text-center">BOARD BASIS</div><div class="col-span-1 text-center">TRAIN</div><div class="col-span-3 text-center">INSURAN (TAKAFUL/ETIQA/KHAIRI)</div><div class="col-span-1 text-center">PAKEJ</div><div class="col-span-1 text-center">+</div>
-        </div>
-        <div id="namelistContainer" class="flex-1 overflow-y-auto max-h-[58vh] divide-y divide-slate-100 bg-white min-h-[180px] relative"></div>
-        <div class="border-t-2 border-slate-200 bg-white relative">
-          <div class="p-2.5 flex items-center justify-between">
-            <h4 class="font-bold text-[11px] tracking-widest text-slate-700">STAFF / EXTRA LIST</h4>
-            <span id="staffTotalBadge" class="px-2 py-0.5 bg-slate-100 border border-slate-200 text-slate-700 rounded-full text-[10px] font-bold">0 Staff</span>
-          </div>
-          <div class="px-2.5 pb-2.5 flex gap-1.5">
-            <input id="newStaffInput" placeholder="Taip nama staff" class="flex-1 text-[11px] px-2.5 py-2 border border-slate-200 rounded-xl bg-white focus:outline-none" onkeydown="if(event.key==='Enter'){ addNewStaff(); }">
-            <button onclick="addNewStaff()" class="px-3 py-2 bg-slate-100 border border-slate-200 text-slate-700 rounded-xl text-[11px] font-bold hover:bg-slate-200">+ Add</button>
-          </div>
-          <div id="staffListContainer" class="px-2 pb-2.5 max-h-[34vh] overflow-y-auto space-y-1 bg-white min-h-[70px] relative"></div>
-        </div>
-      </div>
-
-      <div class="w-full lg:w-[48%] flex flex-col gap-2.5">
-        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-2.5">
-          <div class="flex items-center justify-between gap-2 flex-wrap">
-            <div>
-              <h3 class="font-bold text-[11px] tracking-widest">ROOMING LIST</h3>
-              <div class="flex items-center gap-1.5 mt-1 text-[10px]">
-                <span id="roomingBiliks" class="px-2 py-0.5 bg-slate-100 border border-slate-200 text-slate-700 rounded-full font-bold">0 Bilik</span>
-                <span id="roomingOccupancy" class="text-slate-500">0 Jemaah + 0 Staff • ${activeLocation}</span>
-              </div>
-              <div class="hidden" id="roomingBadgesHidden"></div>
-            </div>
-            <div class="flex items-center gap-1 flex-wrap">
-              <div class="flex gap-1"><button onclick="generateRoomingPrint('landscape')" class="px-2.5 py-1 bg-white border border-slate-200 rounded-full text-[10px] font-bold hover:bg-slate-50">Print Landscape</button><button onclick="generateRoomingPrint('portrait')" class="px-2.5 py-1 bg-white border border-slate-200 rounded-full text-[10px] font-bold hover:bg-slate-50">Print Portrait</button></div>
-              <button onclick="openCopyRoomsModal()" class="px-2.5 py-1 bg-white border border-slate-200 rounded-full text-[10px] font-bold hover:bg-slate-50">Copy Bilik</button>
-              <button onclick="autoAssignRooming()" class="px-2.5 py-1 bg-slate-100 border border-slate-200 text-slate-700 rounded-full text-[10px] font-bold hover:bg-slate-200">Auto Assign</button>
-              <button onclick="openNewRoomModal()" class="px-2.5 py-1 bg-[#7A0C2E] text-white rounded-full text-[10px] font-bold hover:bg-[#5a0922]">+ Bilik Baru</button>
-            </div>
-          </div>
-          <div id="roomingOverview" class="mt-2.5 p-2.5 bg-[#7A0C2E] text-white rounded-xl text-[11px]"></div>
-          <div id="locationTabs" class="flex flex-wrap gap-1 mt-2.5"></div>
-        </div>
-        <div id="roomingGrid" class="grid grid-cols-1 lg:grid-cols-2 gap-2.5 content-start min-h-[280px]"></div>
-      </div>
-    </div>
-  </div>
-
-  <div id="newRoomModal" class="fixed inset-0 bg-black/50 z-50 hidden flex items-center justify-center p-4">
-    <div class="bg-white rounded-2xl p-4 max-w-sm w-full shadow-2xl">
-      <h3 class="font-bold mb-3 text-[11px]">Tambah Bilik Baru</h3>
-      <div class="space-y-2.5 text-[11px]">
-        <div>
-          <label class="text-[9px] font-bold text-slate-500">ROOM ID (Auto)</label>
-          <input id="newRoomId" readonly class="w-full p-2 border border-slate-200 rounded-xl bg-slate-100 font-bold text-slate-700 text-[11px]" value="B4">
-          <p class="text-[9px] text-slate-400 mt-0.5">Dijana automatik: B + Kapasiti</p>
-        </div>
-        <select id="newRoomLokasi" class="w-full p-2 border border-slate-200 rounded-xl bg-white text-[11px]"><option value="MEKAH">MEKAH</option><option value="MADINAH">MADINAH</option><option value="TAIF">TAIF</option><option value="JEDDAH">JEDDAH</option></select>
-        <select id="newRoomPakej" class="w-full p-2 border border-slate-200 rounded-xl bg-white text-[11px]"><option>JIMAT</option><option>EKONOMI</option><option>STANDARD</option><option>PREMIUM</option></select>
-        <input id="newRoomHotel" placeholder="Nama Hotel" class="w-full p-2 border border-slate-200 rounded-xl bg-white text-[11px]">
-        <div class="flex gap-2 items-center">
-          <input id="newRoomCap" type="number" value="4" min="1" max="8" oninput="updateNewRoomIdFromCap()" class="flex-1 p-2 border border-slate-200 rounded-xl font-bold bg-white text-[11px]">
-          <span class="py-2 text-slate-500 font-bold text-[10px]">Kapasiti</span>
-          <button type="button" onclick="changeNewRoomCap(-1)" class="w-7 h-7 rounded-full bg-slate-100 border text-[11px]">−</button>
-          <button type="button" onclick="changeNewRoomCap(1)" class="w-7 h-7 rounded-full bg-slate-100 border text-[11px]">+</button>
-        </div>
-        <textarea id="newRoomNote" placeholder="Catatan bilik..." class="w-full p-2 border border-slate-200 rounded-xl h-14 bg-white text-[11px]"></textarea>
-        <div class="flex gap-2 pt-1">
-          <button onclick="closeNewRoomModal()" class="flex-1 py-2 bg-slate-100 border border-slate-200 rounded-xl font-bold text-[11px]">Batal</button>
-          <button onclick="submitNewRoom()" id="btnCiptaBilik" class="flex-1 py-2 bg-[#7A0C2E] text-white rounded-xl font-bold text-[11px]">Cipta Bilik</button>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <div id="copyRoomsModal" class="fixed inset-0 bg-black/50 z-50 hidden flex items-center justify-center p-4">
-    <div class="bg-white rounded-2xl p-4 max-w-md w-full shadow-2xl">
-      <h3 class="font-bold mb-2 text-[11px]">Salin Bilik Dari Lokasi Lain</h3>
-      <p class="text-[10px] text-slate-500 mb-2.5">Salin bilik ke <b id="copyTargetLoc">${activeLocation}</b></p>
-      <div class="mb-2.5 p-2.5 bg-slate-50 rounded-xl border">
-        <div class="text-[9px] font-bold text-slate-600 mb-1.5">Pilihan Salinan:</div>
-        <label class="flex items-start gap-2 p-1.5 rounded-lg hover:bg-white border border-transparent hover:border-slate-200 cursor-pointer">
-          <input type="radio" name="copyMode" value="structure" checked class="mt-0.5">
-          <div><div class="text-[11px] font-bold">Struktur bilik sahaja</div><div class="text-[9px] text-slate-500">Hanya kapasiti, pakej & hotel.</div></div>
-        </label>
-        <label class="flex items-start gap-2 p-1.5 rounded-lg hover:bg-white border border-transparent hover:border-slate-200 cursor-pointer mt-1.5">
-          <input type="radio" name="copyMode" value="withJemaah" class="mt-0.5">
-          <div><div class="text-[11px] font-bold">Struktur + Jemaah & Staff</div><div class="text-[9px] text-slate-500">Bilik beserta penghuni akan disalin.</div></div>
-        </label>
-      </div>
-      <div id="copySourceList" class="space-y-1.5 mb-3 max-h-[30vh] overflow-y-auto"></div>
-      <div class="flex gap-2"><button onclick="closeCopyRoomsModal()" class="flex-1 py-2 bg-slate-100 border rounded-xl font-bold text-[11px]">Batal</button><button onclick="executeCopyRooms()" class="flex-1 py-2 bg-[#7A0C2E] text-white rounded-xl font-bold text-[11px]">Salin Sekarang</button></div>
-    </div>
-  </div>
-  `;
-  populateRoomingTripDropdown();
-  renderLocationTabs();
-  fetchRoomingData();
-}
-
-function getRoomOrderKey(){ const tripId=window.selectedTripRecord?.id||localStorage.getItem('effah_active_trip_id')||'default'; return `effah_room_order_${tripId}_${activeLocation}`; }
-function getRoomOrderedList(rooms){
-  const key=getRoomOrderKey(); const localOrder=JSON.parse(localStorage.getItem(key)||'[]');
-  if(localOrder.length>0){ const map={}; rooms.forEach(r=>map[r.id]=r); const ordered=[]; localOrder.forEach(id=>{ if(map[id]){ ordered.push(map[id]); delete map[id]; } }); Object.values(map).forEach(r=>ordered.push(r)); return ordered; }
-  return [...rooms].sort((a,b)=>(a.fields['SORT ORDER']||9999)-(b.fields['SORT ORDER']||9999));
-}
-function saveRoomOrder(ids){ localStorage.setItem(getRoomOrderKey(), JSON.stringify(ids)); }
-
-var draggedRoomId = window.draggedRoomId || null;
-function handleRoomDragStart(e, roomId){ draggedRoomId=roomId; e.dataTransfer.effectAllowed='move'; e.target.closest('[data-room-id]')?.classList.add('opacity-50'); }
-function handleRoomDragEnd(e){ e.target.closest('[data-room-id]')?.classList.remove('opacity-50'); draggedRoomId=null; }
-function allowDropRoom(e){ e.preventDefault(); e.currentTarget.classList.add('ring-2','ring-[#7A0C2E]/30'); }
-function handleRoomDragLeave(e){ e.currentTarget.classList.remove('ring-2','ring-[#7A0C2E]/30'); }
-async function dropRoomReorder(e, targetRoomId){
-  e.preventDefault(); e.currentTarget.classList.remove('ring-2','ring-[#7A0C2E]/30');
-  if(!draggedRoomId || draggedRoomId===targetRoomId) return;
-  const rooms=[...allRoomingRecords].filter(r=>(r.fields['LOKASI / CITY']||'MEKAH').toUpperCase()===activeLocation.toUpperCase());
-  const ordered=getRoomOrderedList(rooms);
-  const draggedIdx=ordered.findIndex(r=>r.id===draggedRoomId);
-  const targetIdx=ordered.findIndex(r=>r.id===targetRoomId);
-  if(draggedIdx===-1 || targetIdx===-1) return;
-  const moved=ordered.splice(draggedIdx,1)[0];
-  ordered.splice(targetIdx,0,moved);
-  // Update local sort order and save to localStorage
-  ordered.forEach((r,i)=>{ r.fields['SORT ORDER']=i+1; });
-  saveRoomOrder(ordered.map(r=>r.id));
-  // Re-render immediately without refresh
-  renderRoomingGrid();
-  // Auto update Airtable in background
-  for(let i=0;i<ordered.length;i++){
-    const rec=ordered[i];
-    try{
-      const base=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base')||localStorage.getItem('effah_base_id'); const pat=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
-      await fetch(`https://api.airtable.com/v0/${base}/ROOMING%20LIST/${rec.id}`,{
-        method:'PATCH',
-        headers:{'Authorization':`Bearer ${pat}`,'Content-Type':'application/json'},
-        body: JSON.stringify({fields:{'SORT ORDER': i+1}})
-      });
-    }catch(err){ console.error('Sort update failed', rec.id, err); }
-  }
-}
-async function updateRoomCatatan(roomId, value){
-  const rec=allRoomingRecords.find(r=>r.id===roomId);
-  if(!rec) return;
-  rec.fields['CATATAN BILIK']=value;
-  rec.fields['CATATAN']=value;
-  try{
-    const base=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base')||localStorage.getItem('effah_base_id'); const pat=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
-  await fetch(`https://api.airtable.com/v0/${base}/ROOMING%20LIST/${roomId}`,{
-      method:'PATCH',
-      headers:{'Authorization':`Bearer ${pat}`,'Content-Type':'application/json'},
-      body: JSON.stringify({fields:{'CATATAN BILIK': value, 'CATATAN': value}})
-    });
-  }catch(e){ console.error('Catatan update failed', e); }
-}
-
-document.addEventListener('dragover',e=>{ const g=document.getElementById('roomingGrid'); if(!g) return; const r=g.getBoundingClientRect(); if(e.clientY>r.bottom-100) g.scrollTop+=14; if(e.clientY<r.top+100) g.scrollTop-=14; });
-
-function renderRoomingOverview(rooms){
-  const el=document.getElementById('roomingOverview'); if(!el) return;
-  if(rooms.length===0){ el.innerHTML='<div class="flex items-center gap-2 text-[11px] opacity-70"><span class="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span> Tiada bilik untuk '+activeLocation+'</div>'; return; }
-  const byHotel = {};
-  rooms.forEach(r=>{
-    const hotel = (r.fields['HOTEL NAME']||'TANPA HOTEL').trim().toUpperCase() || 'TANPA HOTEL';
-    if(!byHotel[hotel]) byHotel[hotel]={};
-    const cap=r.fields['KAPASITI']||4;
-    byHotel[hotel][cap]=(byHotel[hotel][cap]||0)+1;
-  });
-  // count FB per hotel
-  function countFBForHotel(hotelRooms, locUpper){
-    let cnt=0;
-    hotelRooms.forEach(r=>{
-      const jIds=[...(r.fields['JEMAAH']||[]), ...(r.fields['JEMAAH TANPA KATIL']||[])];
-      jIds.forEach(jId=>{
-        const jRec=allRoomingJemaah.find(j=>j.id===jId);
-        const fbArr=getBoardArray(jRec?.fields||{});
-        const fb=fbArr.join(', ').toUpperCase();
-        if(!fb || fb==='-' || fb==='NO BOARD') return;
-        if(locUpper==='MEKAH'){ if(fb.includes('MEKAH')||fb==='FULLBOARD'&&!fb.includes('MADINAH')||fb==='BOARD') cnt++; }
-        else if(locUpper==='MADINAH'){ if(fb.includes('MADINAH')||fb==='FULLBOARD'&&!fb.includes('MEKAH')||fb==='BOARD') cnt++; }
-        else cnt++;
-      });
-    });
-    return cnt;
-  }
-  let fbCount=0; const loc=activeLocation.toUpperCase();
-  allRoomingJemaah.forEach(j=>{
-    const fb=(j.fields['BOARD']||'').toUpperCase(); if(!fb || fb==='-' || fb==='NO BOARD') return;
-    const assigned = rooms.some(r=> (r.fields['JEMAAH']||[]).includes(j.id) || (r.fields['JEMAAH TANPA KATIL']||[]).includes(j.id));
-    if(!assigned) return;
-    if(loc==='MEKAH'){ if(fb.includes('MEKAH')||fb==='BOARD') fbCount++; }
-    else if(loc==='MADINAH'){ if(fb.includes('MADINAH')||fb==='BOARD') fbCount++; }
-    else fbCount++;
-  });
-  const totalBilik=rooms.length;
-  const totalJ=rooms.reduce((s,r)=>s+(r.fields['JEMAAH']?.length||0),0);
-  const totalBaby=rooms.reduce((s,r)=>s+(r.fields['JEMAAH TANPA KATIL']?.length||0),0);
-  const totalStaff=rooms.reduce((s,r)=>s+(r.fields['STAFF / EXTRA']||'').split(',').filter(Boolean).length,0);
-  const totalJemaahFull = totalJ + totalBaby; // infant masuk dalam jemaah count
-
-  let hotelBlocks = Object.keys(byHotel).sort().map(hotel=>{
-    const caps=byHotel[hotel];
-    const hotelRooms = allRoomingRecords.filter(r=> (r.fields['HOTEL NAME']||'TANPA HOTEL').toUpperCase()===hotel && (r.fields['LOKASI / CITY']||'MEKAH').toUpperCase()===loc);
-    const fbHotel = countFBForHotel(hotelRooms, loc);
-    const capsList = Object.keys(caps).sort((a,b)=>b-a).map(cap=>{
-      const cnt=caps[cap];
-      return `<span class="inline-flex items-center gap-1 bg-white/15 px-2 py-0.5 rounded-full text-[10px] mr-1 mb-1"><span>Bilik ber-${cap}</span><span class="font-bold">(${cnt})</span></span>`;
+  const cont=document.getElementById('staffListContainer'); if(!cont) return;
+  const q=(document.getElementById('searchStaff')?.value||'').toLowerCase();
+  let filtered=[...staffList];
+  if(q) filtered=filtered.filter(s=>(s.name||'').toLowerCase().includes(q));
+  const boardOptions = ['FULLBOARD','FULLBOARD (MEKAH)','BB (MEKAH)','FULLBOARD (MADINAH)','BB (MADINAH)'];
+  cont.innerHTML=filtered.map((s, idx)=>{
+    const staffId=s.id||s.airtableId||'staff-'+idx;
+    const fbArr=getStaffBoardArray(s);
+    const fbDisplay=fbArr.length?fbArr.join(', '):'- BOARD';
+    let fbCls='bg-white border-slate-200 text-slate-400';
+    if(fbArr.some(x=>x.includes('MEKAH'))) fbCls='bg-orange-100 border-orange-200 text-orange-800';
+    else if(fbArr.some(x=>x.includes('MADINAH'))) fbCls='bg-blue-100 border-blue-200 text-blue-800';
+    else if(fbArr.includes('FULLBOARD')) fbCls='bg-emerald-100 border-emerald-200 text-emerald-800';
+    const boardCheckboxes=boardOptions.map(opt=>{
+      const checked=fbArr.includes(opt);
+      return `<label class="flex items-center gap-1.5 px-2 py-1 hover:bg-slate-50 rounded text-[10px] cursor-pointer"><input type="checkbox" ${checked?'checked':''} onchange="toggleStaffBoardMulti('${staffId}','${opt}')" class="w-3 h-3 accent-[#7A0C2E]"> ${opt}</label>`;
     }).join('');
-    return `<div class="flex flex-col gap-1 py-2 border-b border-white/10 last:border-0"><div class="flex items-center justify-between"><span class="font-bold text-[11px] truncate">${hotel}</span>${fbHotel?`<span class="text-[9px] bg-white/20 px-1.5 py-0.5 rounded-full">${fbHotel} Board Basis</span>`:''}</div><div class="flex flex-wrap">${capsList}</div></div>`;
-  }).join('');
-
-  let html=`<div class="space-y-2">
-    <div class="flex items-center justify-between">
-      <div class="font-bold text-[13px] tracking-widest">${activeLocation} • ${totalBilik} Bilik</div>
-      <div class="flex items-center gap-1.5">
-        <span class="text-[10px] bg-white/20 px-2.5 py-1 rounded-full font-bold">${totalJemaahFull} Jemaah + ${totalStaff} Staff</span>
-        ${fbCount?`<span class="text-[10px] bg-emerald-400/90 text-emerald-900 px-2 py-0.5 rounded-full font-bold">${fbCount} Board Basis</span>`:''}
+    const assigned=isStaffAssignedInLocation(staffId, activeLocation);
+    const rowCls=assigned?'bg-slate-50 text-slate-500':'bg-white hover:bg-slate-50';
+    return `<div class="flex items-center gap-2 p-2 border-b border-slate-100 text-[11px] ${rowCls}">
+      <span class="w-6 text-[9px] text-slate-400">${String(idx+1).padStart(2,'0')}</span>
+      <span class="flex-1 truncate font-medium">${s.name||'-'}</span>
+      <span class="text-[7px] px-1 rounded ${assigned?'bg-slate-200':''}">${assigned?'ASSIGNED di '+activeLocation:''}</span>
+      <div class="relative w-[150px]">
+        <button onclick="event.stopPropagation(); toggleStaffDropdown('${staffId}')" class="text-[8px] border rounded-full px-2 py-1 font-bold ${fbCls} w-full text-left flex justify-between items-center bg-white" style="opacity:1;"><span class="truncate">${fbDisplay}</span><span>▼</span></button>
+        <div id="staffBoardDrop-${staffId}" class="hidden absolute right-0 top-full mt-1 w-[190px] bg-white border border-slate-200 rounded-xl shadow-xl z-[9999] p-1">
+          ${boardCheckboxes}
+          <div class="border-t border-slate-100 mt-1 pt-1 flex justify-between"><button onclick="clearStaffBoardMulti('${staffId}'); closeStaffDropdown('${staffId}')" class="text-[8px] px-2 py-0.5 rounded-full bg-slate-100">Clear</button><button onclick="closeStaffDropdown('${staffId}')" class="text-[8px] px-2 py-0.5 rounded-full bg-[#7A0C2E] text-white">OK</button></div>
+          <div class="text-[7px] text-slate-400 px-2 mt-1">Boleh pilih 2: BB (MEKAH) + FB (MADINAH)</div>
+        </div>
       </div>
-    </div>
-    <div class="bg-white/10 rounded-xl p-2.5 max-h-[26vh] overflow-y-auto">
-      ${hotelBlocks||'<div class="opacity-70 text-[11px]">Tiada data hotel</div>'}
-    </div>
-  </div>`;
-  el.innerHTML=html;
+      <button onclick="quickAssignStaff('${staffId}')" class="w-5 h-5 rounded-full bg-slate-100 text-[10px]">+</button>
+      <button onclick="removeStaff('${staffId}')" class="w-5 h-5 rounded-full bg-red-50 text-red-400 text-[10px]">🗑</button>
+    </div>`;
+  }).join('') || '<div class="p-4 text-center text-[11px] text-slate-400">Tiada staff</div>';
 }
 
-function renderLocationTabs(){
-  const container=document.getElementById('locationTabs'); if(!container) return;
-  const base=['MEKAH','MADINAH','TAIF']; 
-  const all=[...base,...customLocations.filter(l=>!base.includes(l))];
-  // collect all distinct locations from records
-  const allLocFromRecords = new Set();
-  allRoomingRecords.forEach(r=>{ const l=(r.fields['LOKASI / CITY']||'').trim().toUpperCase(); if(l) allLocFromRecords.add(l); });
-  allLocFromRecords.forEach(l=>{ if(!all.includes(l)) all.push(l); });
-  const counts={}; all.forEach(l=>counts[l]=0); 
-  allRoomingRecords.forEach(r=>{ 
-    let l=(r.fields['LOKASI / CITY']||'').trim().toUpperCase(); 
-    if(!l) l='MEKAH'; // default
-    if(counts[l]!==undefined) counts[l]++; 
-    else { counts[l]=1; if(!all.includes(l)) all.push(l); } 
-  });
-  let html=all.map(loc=>{
-    const label=loc; // V24.6 no emoji
-    const c=counts[loc]||0; const active=loc===activeLocation; const isCustom=!['MEKAH','MADINAH','TAIF'].includes(loc);
-    const delBtn=isCustom?`<button onclick="event.stopPropagation(); deleteCustomLocation('${loc}')" class="ml-1 w-4 h-4 rounded-full bg-white/20 hover:bg-red-500 hover:text-white flex items-center justify-center text-[9px]">✕</button>`:'';
-    const wrapCls=active?'bg-[#7A0C2E] rounded-full':'bg-white rounded-full border border-slate-200';
-    return `<div class="inline-flex items-center ${wrapCls}"><button onclick="setActiveLocation('${loc}')" class="px-2.5 py-1 rounded-full text-[11px] font-bold ${active?'text-white':'text-slate-700'}">${label} (${c})</button>${delBtn}</div>`;
-  }).join('');
-  html+=`<button onclick="openAddLocationModal()" class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-slate-100 border border-slate-200 text-slate-600 hover:bg-slate-200">+ Lokasi</button>`;
-  container.innerHTML=html;
-}
-async function fetchRoomingData(){
-  try{
-    showRoomingLoading(); 
-    populateRoomingTripDropdown();
-    let tripId=window.selectedTripRecord?.id||localStorage.getItem('effah_active_trip_id')||localStorage.getItem('effah_last_selected_trip')||localStorage.getItem('selectedTripId')||'';
-    // Fallback: try to get from dropdown if localStorage blocked by Tracking Prevention
-    if(!tripId){
-      const sel=document.getElementById('roomingTripSelect');
-      if(sel && sel.value) tripId=sel.value;
-    }
-    if(!tripId){ 
-      document.getElementById('namelistContainer').innerHTML='<div class="p-6 text-center text-[11px] text-slate-400">Sila pilih trip di atas (16-25 OGOS 2026).<br>Jika tracking prevention block storage, pilih manual.</div>'; 
-      if(typeof hideRoomingLoading==='function') hideRoomingLoading();
-      return; 
-    }
-    const base=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base')||localStorage.getItem('effah_base_id'); 
-    const pat=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
-    if(!base||!pat){ 
-      document.getElementById('namelistContainer').innerHTML='<div class="p-6 text-center text-[11px] text-red-400">Airtable config missing</div>';
-      if(typeof hideRoomingLoading==='function') hideRoomingLoading();
-      return;
-    }
-    let allRooms=[],allJems=[],offset='';
-    // Fetch ROOMING LIST with retry
-    try{
-      do{ 
-        const res=await fetch(`https://api.airtable.com/v0/${base}/ROOMING%20LIST?pageSize=100${offset?`&offset=${offset}`:''}`,{headers:{Authorization:`Bearer ${pat}`}}); 
-        if(!res.ok){ console.warn('ROOMING LIST fetch failed', res.status); break; }
-        const data=await res.json(); 
-        if(data.records) allRooms=allRooms.concat(data.records); 
-        offset=data.offset||''; 
-      }while(offset);
-    }catch(e){ console.error('ROOMING LIST error', e); }
-    offset='';
-    // Fetch JEMAAH with retry - ignore 410 attachment errors (they are not API errors, but data contains expired urls)
-    try{
-      do{ 
-        const res=await fetch(`https://api.airtable.com/v0/${base}/DATA%20JEMAAH%20UMRAH?pageSize=100${offset?`&offset=${offset}`:''}`,{headers:{Authorization:`Bearer ${pat}`}}); 
-        if(!res.ok){ 
-          const txt=await res.text();
-          console.warn('JEMAAH fetch failed', res.status, txt);
-          if(res.status===429){ await new Promise(r=>setTimeout(r, 2000)); continue; }
-          break; 
-        }
-        const data=await res.json(); 
-        if(data.records) allJems=allJems.concat(data.records); 
-        offset=data.offset||''; 
-      }while(offset);
-    }catch(e){ console.error('JEMAAH error', e); }
-    console.log('fetchRoomingData done: rooms', allRooms.length, 'jemaah', allJems.length);
-    allRoomingRecords=allRooms.filter(r=>{ const tf=r.fields['TRIP']||[]; return Array.isArray(tf)?tf.includes(tripId):String(tf).includes(tripId); });
-    allRoomingJemaah=allJems.filter(r=>{ const tf=r.fields['TRIP']||[]; return Array.isArray(tf)?tf.includes(tripId):String(tf).includes(tripId); });
-    console.log('filtered for trip', tripId, 'rooms', allRoomingRecords.length, 'jemaah', allRoomingJemaah.length);
-    try{ await loadStaffList(); }catch(e){ console.warn('staff list fail', e); }
-    renderNamelist(); 
-    renderRoomingGrid(); 
-    renderLocationTabs();
-    if(typeof hideRoomingLoading==='function') hideRoomingLoading();
-  }catch(e){ 
-    console.error('fetchRoomingData fatal', e); 
-    const cont=document.getElementById('namelistContainer');
-    if(cont) cont.innerHTML='<div class="p-6 text-center text-[11px] text-red-400">Ralat memuatkan jemaah: '+e.message+'<br><button onclick="fetchRoomingData()" class="mt-2 px-3 py-1 bg-[#7A0C2E] text-white rounded-full text-[10px]">Retry</button></div>';
-    if(typeof hideRoomingLoading==='function') hideRoomingLoading();
-  }
-}
-function hideRoomingLoading(){
-  const el=document.querySelector('.rooming-loading, #roomingLoading');
-  if(el) el.style.display='none';
-  const cont=document.getElementById('namelistContainer');
-  // If still shows loading spinner, replace
-  if(cont && cont.innerHTML.includes('Memuatkan jemaah')){
-    // Will be overwritten by renderNamelist, but if no data, show empty
-    if(allRoomingJemaah.length===0){
-      cont.innerHTML='<div class="p-6 text-center text-[11px] text-slate-400">Tiada jemaah untuk trip ini</div>';
-    }
-  }
-}
 
-function populateRoomingTripDropdown(){
-  const sel=document.getElementById('roomingTripSelect'); if(!sel) return;
-  let trips=[...(window.allTripUmrahRecords||window.allTripRecords||window.allTrips||[])];
-  const currentId=window.selectedTripRecord?.id||localStorage.getItem('effah_active_trip_id')||localStorage.getItem('effah_last_selected_trip')||localStorage.getItem('selectedTripId')||'';
-  if(trips.length===0){
-    sel.innerHTML='<option value="">Memuatkan senarai trip...</option>';
-    let retries=parseInt(sel.dataset.retries||'0'); if(retries<10){ sel.dataset.retries=retries+1; setTimeout(()=>{ if(typeof fetchTripUmrahData==='function') fetchTripUmrahData(); populateRoomingTripDropdown(); }, 900); }
-    return;
-  }
-  trips.sort((a,b)=>(a.fields?.['Mula Pakej']||'').localeCompare(b.fields?.['Mula Pakej']||''));
-  sel.innerHTML='<option value="">Pilih Trip...</option>'+trips.map(t=>{ const raw=t.fields?.Trip||t.fields?.['TRIP NAME']||t.id; const clean=cleanTripNameForRooming(raw); return `<option value="${t.id}" ${t.id===currentId?'selected':''}>${clean}</option>`; }).join('');
-  if(currentId) sel.value=currentId; else if(trips.length>0){ sel.value=trips[0].id; onRoomingTripChange(trips[0].id); }
-}
-function onRoomingTripChange(tripId){ if(!tripId) return; const trips=window.allTripUmrahRecords||window.allTripRecords||[]; const found=trips.find(t=>t.id===tripId); if(found) window.selectedTripRecord=found; localStorage.setItem('effah_active_trip_id',tripId); localStorage.setItem('selectedTripId',tripId); localStorage.setItem('effah_last_selected_trip',tripId); fetchRoomingData(); }
 function isJemaahAssignedInLocation(jId, location){
   const loc = (location||activeLocation).toUpperCase();
   return allRoomingRecords.some(r=> (r.fields['LOKASI / CITY']||'MEKAH').toUpperCase()===loc && (r.fields['JEMAAH']||[]).includes(jId));
@@ -778,6 +352,15 @@ function renderNamelist(){
     const boardCheckboxes = boardOptions.map(opt=>{
       const checked = fbArr.includes(opt);
       return `<label class="flex items-center gap-1.5 px-2 py-1 hover:bg-slate-50 rounded text-[10px] cursor-pointer"><input type="checkbox" ${checked?'checked':''} onchange="toggleBoardMulti('${r.id}','${opt}')" class="w-3 h-3 accent-[#7A0C2E]"> ${opt}</label>`;
+    const insArr = getInsuranArray(r.fields);
+    const insDisplay = insArr.length ? insArr.join(', ') : '- INSURAN';
+    const insuranOptions = ['TAKAFUL','ETIQA','KHAIRI','AL-KHAIRI','TRAIN'];
+    const insCheckboxes = insuranOptions.map(opt=>{
+      const checked = insArr.includes(opt);
+      const color = opt==='TAKAFUL'?'bg-emerald-100':opt==='ETIQA'?'bg-amber-100':opt.includes('KHAIRI')?'bg-blue-100':'bg-slate-100';
+      return `<label class="flex items-center gap-1.5 px-2 py-1 hover:bg-slate-50 rounded text-[10px] cursor-pointer"><input type="checkbox" ${checked?'checked':''} onchange="toggleInsuranMulti('${r.id}','${opt}')" class="w-3 h-3 accent-[#7A0C2E]"> <span class="px-1.5 py-0.5 rounded-full text-[8px] ${color}">${opt}</span></label>`;
+    }).join('');
+
     }).join('');
     
 
@@ -815,7 +398,15 @@ function renderNamelist(){
         <input type="checkbox" ${trChecked?'checked':''} onchange="updateJemaahCheckbox('${r.id}','TRAIN',this.checked)" class="w-3.5 h-3.5 accent-[#7A0C2E] rounded" title="TRAIN">
       </div>
       <div class="col-span-3 flex items-center gap-0.5 flex-wrap justify-center">
-        ${insToggle}
+        <div class="relative w-full">
+          <button onclick="event.stopPropagation(); toggleInsuranDropdown('${r.id}')" class="text-[8px] border rounded-full px-2 py-1 bg-white font-bold w-full text-left flex justify-between items-center ${insArr.length? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-white border-slate-200 text-slate-400'}" style="opacity:1;">
+            <span class="truncate">${insDisplay}</span><span>▼</span>
+          </button>
+          <div id="insuranDrop-${r.id}" class="hidden absolute left-0 top-full mt-1 w-[170px] bg-white border border-slate-200 rounded-xl shadow-xl z-[9999] p-1">
+            ${insCheckboxes}
+            <div class="border-t border-slate-100 mt-1 pt-1 flex justify-between"><button onclick="clearInsuranMulti('${r.id}'); closeInsuranDropdown('${r.id}')" class="text-[8px] px-2 py-0.5 rounded-full bg-slate-100">Clear</button><button onclick="closeInsuranDropdown('${r.id}')" class="text-[8px] px-2 py-0.5 rounded-full bg-[#7A0C2E] text-white">OK</button></div>
+          </div>
+        </div>
       </div>
       <div class="col-span-1 flex items-center gap-0.5">
         <select onchange="updateJemaahField('${r.id}','PAKEJ',this.value)" class="text-[7px] border rounded-full px-1 py-0.5 bg-white font-bold outline-none w-full ${pk==='-'?'border-dashed text-slate-400':'bg-slate-50'}" title="PAKEJ">
@@ -1148,15 +739,7 @@ function toggleBoardMulti(jemaahId, option){
   // If selects FULLBOARD generic, remove specific ones? Keep simple allow combo
   updateJemaahBoardMulti(jemaahId, arr);
 }
-function toggleBoardDropdown(jemaahId){ const el=document.getElementById('boardDrop-'+jemaahId); if(!el) return; // close others
-  document.querySelectorAll('[id^="boardDrop-"]').forEach(d=>{ if(d.id!=='boardDrop-'+jemaahId) d.classList.add('hidden'); });
-  el.classList.toggle('hidden'); }
-function closeBoardDropdown(jemaahId){ const el=document.getElementById('boardDrop-'+jemaahId); if(el) el.classList.add('hidden'); }
-// Close on outside click
-if(!window._boardDropListener){ window._boardDropListener=true; document.addEventListener('click', (e)=>{ if(!e.target.closest('[id^="boardDrop-"]') && !e.target.closest('button[onclick*="toggleBoardDropdown"]')){ document.querySelectorAll('[id^="boardDrop-"]').forEach(d=>d.classList.add('hidden')); } }); }
-function clearBoardMulti(jemaahId){
-  updateJemaahBoardMulti(jemaahId, []);
-}
+
 
 async function updateJemaahCheckbox(jemaahId, field, checked){
   const base=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base')||localStorage.getItem('effah_base_id'); const pat=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
@@ -1168,40 +751,6 @@ async function updateJemaahCheckbox(jemaahId, field, checked){
     const data=await res.json();
     if(!data.id && data.error) throw new Error(data.error.message);
   }catch(e){ console.error(e); alert('Gagal update checkbox '+field+': '+e.message); fetchRoomingData(); }
-}
-async function updateJemaahInsuran(jemaahId, value){
-  const base=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base')||localStorage.getItem('effah_base_id'); const pat=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
-  if(!base||!pat) return alert('Airtable config missing');
-  const rec=allRoomingJemaah.find(r=>r.id===jemaahId); 
-  if(rec){
-    rec.fields['INSURAN'] = value ? [value] : [];
-  }
-  renderNamelist();
-  try{
-    const payload = value ? {[ 'INSURAN']: [value]} : {['INSURAN']: []};
-    const res=await fetch(`https://api.airtable.com/v0/${base}/DATA%20JEMAAH%20UMRAH/${jemaahId}`,{method:'PATCH',headers:{Authorization:`Bearer ${pat}`,'Content-Type':'application/json'},body:JSON.stringify({fields: payload})});
-    const data=await res.json();
-    if(!data.id && data.error) throw new Error(data.error.message);
-  }catch(e){ console.error(e); alert('Gagal update INSURAN: '+e.message); fetchRoomingData(); }
-}
-async function toggleInsuran(jemaahId, opt){
-  const base=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base')||localStorage.getItem('effah_base_id'); const pat=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
-  if(!base||!pat) return alert('Airtable config missing');
-  const rec=allRoomingJemaah.find(r=>r.id===jemaahId);
-  if(!rec) return;
-  let curr = getInsuranArray(rec.fields);
-  if(curr.includes(opt)){
-    curr = curr.filter(x=>x!==opt);
-  } else {
-    curr.push(opt);
-  }
-  rec.fields['INSURAN'] = curr;
-  renderNamelist();
-  try{
-    const res=await fetch(`https://api.airtable.com/v0/${base}/DATA%20JEMAAH%20UMRAH/${jemaahId}`,{method:'PATCH',headers:{Authorization:`Bearer ${pat}`,'Content-Type':'application/json'},body:JSON.stringify({fields: {'INSURAN': curr}})});
-    const data=await res.json();
-    if(!data.id && data.error) throw new Error(data.error.message);
-  }catch(e){ console.error(e); alert('Gagal update INSURAN multi: '+e.message); fetchRoomingData(); }
 }
 function updateHotelInline(roomId, newName){
   const name = (newName||'').trim().toUpperCase();
