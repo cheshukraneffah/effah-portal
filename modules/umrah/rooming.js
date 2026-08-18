@@ -1079,22 +1079,21 @@ function openTanpaKatilModal(roomId){
   try{
     const targetRec = allRoomingRecords.find(r=>r.id===roomId);
     const currentTripId = window.selectedTripRecord?.id || localStorage.getItem('effah_active_trip_id') || '';
-    console.log('openTanpaKatil TAIF fix', currentTripId, activeLocation, 'total', allRoomingJemaah.length);
-    // For TAIF case where all assigned but user still wants to add infant beyond capacity,
-    // allow ANY jemaah in current trip who is not already Tanpa Katil anywhere and not already in target room
-    // This includes those already assigned as normal in activeLocation, so TAIF full can still add infant as extra
+    console.log('openTanpaKatil TAIF fix - allow multi-loc infant', currentTripId, activeLocation, 'total', allRoomingJemaah.length);
     const available = allRoomingJemaah.filter(j=>{
       const nameUpper = (getJemaahName(j.fields)||'').toUpperCase();
       if(nameUpper.includes('MUTAWIF') || nameUpper.includes('EFFAH')) return false;
-      if(isJemaahAssignedTanpaKatil(j.id)) return false;
+      // FIX: only exclude if already Tanpa Katil in THIS location (activeLocation), not in other locations like MEKAH
+      const alreadyTanpaInLoc = allRoomingRecords.some(r=> (r.fields['LOKASI / CITY']||'MEKAH').toUpperCase()===activeLocation.toUpperCase() && ((r.fields['JEMAAH TANPA KATIL']||r.fields['INFANT']||[]).includes(j.id)));
+      if(alreadyTanpaInLoc) return false;
       if(targetRec && (targetRec.fields['JEMAAH TANPA KATIL']||[]).includes(j.id)) return false;
       if(targetRec && (targetRec.fields['JEMAAH']||[]).includes(j.id)) return false;
-      // Do NOT check isJemaahAssignedInLocation - allow even if assigned in TAIF, so TAIF full can still add infant as extra sharing
       return true;
     });
-    console.log('available tanpa katil (allow assigned) for', activeLocation, available.length);
+    console.log('available tanpa katil list:', available.map(j=>getJemaahName(j.fields)));
+    console.log('available tanpa katil (allow multi-loc) for', activeLocation, available.length);
     if(available.length===0){
-      alert('Tiada Baki Jemaah\n\nSemua jemaah telah ada sebagai Tanpa Katil atau sudah ada di bilik ini.');
+      alert('Tiada Baki Jemaah\n\nSemua jemaah telah ada sebagai Tanpa Katil di ' + activeLocation + ' atau sudah ada di bilik ini.');
       return;
     }
     let existingModal = document.getElementById('tanpaKatilSelectorModal');
@@ -1105,7 +1104,7 @@ function openTanpaKatilModal(roomId){
           <span style="font-weight:bold;font-size:12px">Pilih Infant / Tanpa Katil - ${activeLocation} (${available.length} calon)</span>
           <button onclick="document.getElementById('tanpaKatilSelectorModal').remove()" style="w-6 h-6 rounded-full bg-slate-100">X</button>
         </div>
-        <div style="padding:6px 8px;background:#fffbe6;border-bottom:1px solid #fde68a;font-size:9px;color:#92400e">Infant tidak kira kapasiti bilik. Boleh tambah walaupun bilik penuh 4/4. Pilih jemaah yang akan share katil.</div>
+        <div style="padding:6px 8px;background:#fffbe6;border-bottom:1px solid #fde68a;font-size:9px;color:#92400e">Infant tidak kira kapasiti. Boleh share walaupun bilik penuh. Kalau dah jadi Tanpa Katil di MEKAH, boleh tambah juga di TAIF.</div>
         <div style="padding:8px;max-height:50vh;overflow-y:auto" id="tanpaKatilList">
           <input type="text" id="tanpaKatilSearch" placeholder="Cari nama..." style="width:100%;padding:6px 10px;border:1px solid #ddd;border-radius:20px;font-size:11px;margin-bottom:8px" oninput="filterTanpaKatilList(this.value)">
           <div id="tanpaKatilOptions">
@@ -1134,8 +1133,8 @@ function filterTanpaKatilList(q){
       return name.includes(low) || raw.includes(low);
     });
   }
-  console.log('filter tanpa katil q=', low, 'available', window._tanpaKatilAvailable.length, 'filtered', filtered.length);
-  list.innerHTML = filtered.map((j, idx)=>`<button onclick="addTanpaKatilToRoom('${roomId}','${j.id}'); document.getElementById('tanpaKatilSelectorModal').remove()" style="width:100%;text-align:left;padding:8px 10px;border:1px solid #eee;border-radius:10px;margin-bottom:4px;font-size:11px;background:#fff" class="hover:bg-amber-50">${idx+1}. ${getJemaahName(j.fields)}</button>`).join('') || '<div style="padding:8px;text-align:center;color:#999;font-size:11px">Tiada carian ditemui ('+low+') - ada '+window._tanpaKatilAvailable.length+' calon</div>';
+  console.log('filter tanpa katil q=', low, 'available', window._tanpaKatilAvailable.length, 'filtered', filtered.length, 'names', filtered.map(j=>getJemaahName(j.fields)));
+  list.innerHTML = filtered.map((j, idx)=>`<button onclick="addTanpaKatilToRoom('${roomId}','${j.id}'); document.getElementById('tanpaKatilSelectorModal').remove()" style="width:100%;text-align:left;padding:8px 10px;border:1px solid #eee;border-radius:10px;margin-bottom:4px;font-size:11px;background:#fff" class="hover:bg-amber-50">${idx+1}. ${getJemaahName(j.fields)}</button>`).join('') || '<div style="padding:8px;text-align:center;color:#999;font-size:11px">Tiada carian ditemui ('+low+') - ada '+window._tanpaKatilAvailable.length+' calon<br>'+window._tanpaKatilAvailable.map(j=>getJemaahName(j.fields)).join(', ')+'</div>';
 }
 
 
