@@ -1,5 +1,5 @@
-// ROOMING V76 - MULTI STAFF BOARD + MULTI INSURAN + OUTSIDE CLICK CLOSE + FIX STACK - 2026-08-19
-console.log('ROOMING V76 loaded - staff multi, insuran multi, outside click, blank fix');
+// ROOMING V77 - MULTI STAFF BOARD + MULTI INSURAN + OUTSIDE CLICK CLOSE + FIX STACK - 2026-08-19
+console.log('ROOMING V77 loaded - staff multi, insuran multi, outside click, blank fix v2');
 // ROOMING V72 - FIX STACK OVERFLOW + GHOST + MULTI-BOARD + LOADING 410 - 2026-08-19
 // Version: V72
 
@@ -1315,32 +1315,70 @@ function generateRoomingPrint(orientation){ orientation = orientation || 'landsc
 
 async function autoAssignRooming(){ if(!confirm('Adakah anda pasti ingin menetapkan semua jemaah yang belum ditetapkan untuk lokasi '+activeLocation+' secara automatik?')) return; let rooms=[...allRoomingRecords].filter(r=>(r.fields['LOKASI / CITY']||'MEKAH').toUpperCase()===activeLocation.toUpperCase()); if(rooms.length===0) rooms=[...allRoomingRecords]; rooms=getRoomOrderedList(rooms); const unassigned=allRoomingJemaah.filter(j=>!isJemaahAssignedInLocation(j.id, activeLocation)); let idx=0; for(let room of rooms){ const cap=room.fields['KAPASITI']||roomingDefaultCap; const staffCount=(room.fields['STAFF / EXTRA']||'').split(',').filter(Boolean).length; let cur=[...(room.fields['JEMAAH']||[])]; while((cur.length+staffCount)<cap && idx<unassigned.length){ cur.push(unassigned[idx].id); idx++; } if(cur.length!==(room.fields['JEMAAH']||[]).length){ await updateRoomField(room.id,'JEMAAH',cur,false); } } setTimeout(fetchRoomingData,800); }
 
-// V76 INIT FIX BLANK
+
+
+// V77 INIT FIX BLANK - robust container detection
+function findRoomingContainers(){
+  const selectors = {
+    namelist: ['#namelistContainer', '#namelist-container', '[data-testid="namelist"]', '.namelist-container', '#jemaahList', '#jemaahListContainer'],
+    grid: ['#roomingGrid', '#roomingGridContainer', '#rooming-grid', '.rooming-grid', '#bilikGrid', '#roomingListGrid']
+  };
+  let namelist=null, grid=null;
+  for(let sel of selectors.namelist){ const el=document.querySelector(sel); if(el){ namelist=el; break; } }
+  for(let sel of selectors.grid){ const el=document.querySelector(sel); if(el){ grid=el; break; } }
+  // Fallback: look for any div containing "NAMELIST JEMAAH" text
+  if(!namelist){
+    const allDivs=document.querySelectorAll('div');
+    for(let d of allDivs){ if(d.textContent && d.textContent.includes('NAMELIST JEMAAH') && d.textContent.length<200){ namelist=d.parentElement; break; } }
+  }
+  return {namelist, grid};
+}
 document.addEventListener('DOMContentLoaded', ()=>{
-  console.log('V76 DOMContentLoaded - checking rooming init');
-  setTimeout(()=>{
-    const cont=document.getElementById('namelistContainer');
-    const grid=document.getElementById('roomingGrid')||document.getElementById('roomingGridContainer');
-    console.log('V76 check containers', !!cont, !!grid, 'trip', window.selectedTripRecord?.id||localStorage.getItem('effah_active_trip_id'));
-    if(cont && cont.innerHTML.trim()===''){
-      console.log('V76 container empty, forcing fetchRoomingData');
+  console.log('V77 DOMContentLoaded - checking rooming init');
+  let attempts=0;
+  const maxAttempts=20;
+  const checkLoop=setInterval(()=>{
+    attempts++;
+    const {namelist, grid}=findRoomingContainers();
+    console.log(`V77 attempt ${attempts}: containers`, !!namelist, !!grid, 'trip', window.selectedTripRecord?.id||localStorage.getItem('effah_active_trip_id'), 'url', window.location.href);
+    if(namelist||grid){
+      clearInterval(checkLoop);
+      console.log('V77 containers found, forcing fetchRoomingData');
       if(typeof fetchRoomingData==='function') fetchRoomingData();
-    }
-    // If still blank, show helper
-    setTimeout(()=>{
-      if(cont && (cont.innerHTML.trim()==='' || cont.innerHTML.includes('Memuatkan'))){
-        cont.innerHTML='<div class="p-6 text-center text-[11px] text-slate-500">Blank dikesan.<br>1. Pastikan trip dipilih di atas.<br>2. Hard reload Ctrl+Shift+R<br>3. Check console untuk V76 loaded<br><button onclick="fetchRoomingData()" class="mt-2 px-3 py-1 bg-[#7A0C2E] text-white rounded-full">Reload Data</button></div>';
+    } else if(attempts>=maxAttempts){
+      clearInterval(checkLoop);
+      console.log('V77 containers NOT found after max attempts, trying to render blank helper in body');
+      // Try to inject into main content area
+      const main=document.querySelector('main')||document.querySelector('#app')||document.body;
+      if(main && !document.getElementById('v77-blank-helper')){
+        const helper=document.createElement('div');
+        helper.id='v77-blank-helper';
+        helper.innerHTML=`<div style="padding:20px; text-align:center; font-size:12px; color:#666; background:#fff; border:1px dashed #ccc; margin:20px; border-radius:12px;">
+          <b>Rooming List containers not found</b><br>
+          Trip: ${window.selectedTripRecord?.id||localStorage.getItem('effah_active_trip_id')||'none'}<br>
+          URL: ${window.location.href}<br>
+          Selectors tried: #namelistContainer, #roomingGrid<br>
+          <button onclick="location.reload()" style="margin-top:8px; padding:6px 12px; background:#7A0C2E; color:#fff; border-radius:20px;">Reload</button>
+          <button onclick="fetchRoomingData()" style="margin-top:8px; margin-left:8px; padding:6px 12px; background:#eee; border-radius:20px;">Try Fetch</button>
+          <div id="v77-debug" style="margin-top:10px; font-size:9px; text-align:left; max-height:200px; overflow:auto; background:#f9f9f9; padding:8px;"></div>
+        </div>`;
+        main.appendChild(helper);
+        // Debug: list all ids in page
+        const allIds=[...document.querySelectorAll('[id]')].map(el=>el.id).slice(0,100);
+        const dbg=document.getElementById('v77-debug');
+        if(dbg) dbg.textContent='All IDs in page: '+allIds.join(', ');
       }
-    }, 3000);
+    }
   }, 1000);
 });
-// Also wrap renderNamelist and renderRoomingGrid in try-catch to prevent blank
-const _origRenderNamelist = renderNamelist;
-renderNamelist = function(){
-  try{ return _origRenderNamelist.apply(this, arguments); }catch(e){ console.error('V76 renderNamelist error', e); const cont=document.getElementById('namelistContainer'); if(cont) cont.innerHTML='<div class="p-4 text-red-500 text-[11px]">Error renderNamelist: '+e.message+'</div>'; }
-};
-const _origRenderRoomingGrid = renderRoomingGrid;
-renderRoomingGrid = function(){
-  try{ return _origRenderRoomingGrid.apply(this, arguments); }catch(e){ console.error('V76 renderRoomingGrid error', e); }
-};
-console.log('ROOMING V76 blank fix applied');
+const _origRenderNamelist2 = typeof renderNamelist!=='undefined'?renderNamelist:null;
+if(_origRenderNamelist2){
+  renderNamelist = function(){
+    try{ 
+      const {namelist}=findRoomingContainers();
+      if(!namelist){ console.warn('V77 renderNamelist: container not found, skipping'); return; }
+      return _origRenderNamelist2.apply(this, arguments); 
+    }catch(e){ console.error('V77 renderNamelist error', e); }
+  };
+}
+console.log('ROOMING V77 blank fix with container polling applied');
