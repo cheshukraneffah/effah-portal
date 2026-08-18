@@ -1,5 +1,5 @@
-// ROOMING V77 - MULTI STAFF BOARD + MULTI INSURAN + OUTSIDE CLICK CLOSE + FIX STACK - 2026-08-19
-console.log('ROOMING V77 loaded - staff multi, insuran multi, outside click, blank fix v2');
+// ROOMING V78 - MULTI STAFF BOARD + MULTI INSURAN + OUTSIDE CLICK CLOSE + FIX STACK - 2026-08-19
+console.log('ROOMING V78 loaded - staff multi, insuran multi, outside click, blank fix v2');
 // ROOMING V72 - FIX STACK OVERFLOW + GHOST + MULTI-BOARD + LOADING 410 - 2026-08-19
 // Version: V72
 
@@ -1317,68 +1317,98 @@ async function autoAssignRooming(){ if(!confirm('Adakah anda pasti ingin menetap
 
 
 
-// V77 INIT FIX BLANK - robust container detection
-function findRoomingContainers(){
-  const selectors = {
-    namelist: ['#namelistContainer', '#namelist-container', '[data-testid="namelist"]', '.namelist-container', '#jemaahList', '#jemaahListContainer'],
-    grid: ['#roomingGrid', '#roomingGridContainer', '#rooming-grid', '.rooming-grid', '#bilikGrid', '#roomingListGrid']
-  };
-  let namelist=null, grid=null;
-  for(let sel of selectors.namelist){ const el=document.querySelector(sel); if(el){ namelist=el; break; } }
-  for(let sel of selectors.grid){ const el=document.querySelector(sel); if(el){ grid=el; break; } }
-  // Fallback: look for any div containing "NAMELIST JEMAAH" text
-  if(!namelist){
-    const allDivs=document.querySelectorAll('div');
-    for(let d of allDivs){ if(d.textContent && d.textContent.includes('NAMELIST JEMAAH') && d.textContent.length<200){ namelist=d.parentElement; break; } }
+
+
+// V78 - Inspect modul-rooming and auto-create missing structure
+function inspectModulRooming(){
+  const modul=document.getElementById('modul-rooming');
+  console.log('V78 inspect modul-rooming exists:', !!modul);
+  if(modul){
+    console.log('V78 modul-rooming innerHTML length:', modul.innerHTML.length);
+    console.log('V78 modul-rooming innerHTML preview:', modul.innerHTML.substring(0,2000));
+    // Check if it has any children
+    console.log('V78 modul-rooming children count:', modul.children.length);
+    // Try to find any existing rooming elements inside
+    const innerIds=[...modul.querySelectorAll('[id]')].map(el=>el.id);
+    console.log('V78 inner IDs inside modul-rooming:', innerIds.slice(0,50));
   }
-  return {namelist, grid};
+  // Check for other possible containers
+  const allModules=['modul-home','modul-pakej-umrah','modul-jemaah-umrah','modul-rooming','modul-trip-luar'];
+  allModules.forEach(mid=>{
+    const el=document.getElementById(mid);
+    if(el) console.log(`V78 module ${mid}: display=${getComputedStyle(el).display}, visible=${!!(el.offsetParent)}, htmlLen=${el.innerHTML.length}`);
+  });
 }
-document.addEventListener('DOMContentLoaded', ()=>{
-  console.log('V77 DOMContentLoaded - checking rooming init');
-  let attempts=0;
-  const maxAttempts=20;
-  const checkLoop=setInterval(()=>{
-    attempts++;
-    const {namelist, grid}=findRoomingContainers();
-    console.log(`V77 attempt ${attempts}: containers`, !!namelist, !!grid, 'trip', window.selectedTripRecord?.id||localStorage.getItem('effah_active_trip_id'), 'url', window.location.href);
-    if(namelist||grid){
-      clearInterval(checkLoop);
-      console.log('V77 containers found, forcing fetchRoomingData');
-      if(typeof fetchRoomingData==='function') fetchRoomingData();
-    } else if(attempts>=maxAttempts){
-      clearInterval(checkLoop);
-      console.log('V77 containers NOT found after max attempts, trying to render blank helper in body');
-      // Try to inject into main content area
-      const main=document.querySelector('main')||document.querySelector('#app')||document.body;
-      if(main && !document.getElementById('v77-blank-helper')){
-        const helper=document.createElement('div');
-        helper.id='v77-blank-helper';
-        helper.innerHTML=`<div style="padding:20px; text-align:center; font-size:12px; color:#666; background:#fff; border:1px dashed #ccc; margin:20px; border-radius:12px;">
-          <b>Rooming List containers not found</b><br>
-          Trip: ${window.selectedTripRecord?.id||localStorage.getItem('effah_active_trip_id')||'none'}<br>
-          URL: ${window.location.href}<br>
-          Selectors tried: #namelistContainer, #roomingGrid<br>
-          <button onclick="location.reload()" style="margin-top:8px; padding:6px 12px; background:#7A0C2E; color:#fff; border-radius:20px;">Reload</button>
-          <button onclick="fetchRoomingData()" style="margin-top:8px; margin-left:8px; padding:6px 12px; background:#eee; border-radius:20px;">Try Fetch</button>
-          <div id="v77-debug" style="margin-top:10px; font-size:9px; text-align:left; max-height:200px; overflow:auto; background:#f9f9f9; padding:8px;"></div>
-        </div>`;
-        main.appendChild(helper);
-        // Debug: list all ids in page
-        const allIds=[...document.querySelectorAll('[id]')].map(el=>el.id).slice(0,100);
-        const dbg=document.getElementById('v77-debug');
-        if(dbg) dbg.textContent='All IDs in page: '+allIds.join(', ');
-      }
-    }
-  }, 1000);
-});
-const _origRenderNamelist2 = typeof renderNamelist!=='undefined'?renderNamelist:null;
-if(_origRenderNamelist2){
-  renderNamelist = function(){
-    try{ 
-      const {namelist}=findRoomingContainers();
-      if(!namelist){ console.warn('V77 renderNamelist: container not found, skipping'); return; }
-      return _origRenderNamelist2.apply(this, arguments); 
-    }catch(e){ console.error('V77 renderNamelist error', e); }
-  };
+
+function createMissingRoomingStructure(){
+  const modul=document.getElementById('modul-rooming');
+  if(!modul) return false;
+  // If modul is empty or doesn't have our expected containers, create them
+  const hasNamelist=modul.querySelector('#namelistContainer');
+  const hasGrid=modul.querySelector('#roomingGrid')||modul.querySelector('#roomingGridContainer');
+  console.log('V78 create check: hasNamelist', !!hasNamelist, 'hasGrid', !!hasGrid, 'innerLen', modul.innerHTML.length);
+  if(!hasNamelist || !hasGrid){
+    console.log('V78 creating missing rooming structure...');
+    // Preserve existing content if any
+    const existingHTML=modul.innerHTML;
+    // Create basic structure that matches what render functions expect
+    modul.innerHTML=`
+      <div id="roomingHeader" class="p-4 border-b">
+        <div class="flex justify-between items-center">
+          <h2 class="text-sm font-bold">Rooming List - V78 Auto-Created</h2>
+          <div class="flex gap-2">
+            <select id="roomingTripSelect" class="text-[11px] border rounded px-2 py-1"></select>
+            <button onclick="fetchRoomingData()" class="text-[11px] bg-[#7A0C2E] text-white px-3 py-1 rounded-full">Reload</button>
+          </div>
+        </div>
+        <div id="locationTabs" class="flex gap-2 mt-3"></div>
+      </div>
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 p-4">
+        <div class="lg:col-span-1">
+          <div class="bg-white rounded-xl border">
+            <div class="p-3 border-b flex justify-between items-center">
+              <span class="text-[11px] font-bold">NAMELIST JEMAAH</span>
+              <span id="topUnassignedBadge" class="text-[9px] bg-amber-100 px-2 py-0.5 rounded-full">0</span>
+            </div>
+            <div class="p-2">
+              <input id="searchNamelist" placeholder="Cari jemaah..." class="w-full text-[11px] border rounded-full px-3 py-1.5 mb-2" oninput="renderNamelist()">
+            </div>
+            <div id="namelistContainer" class="max-h-[60vh] overflow-y-auto">
+              <div class="p-6 text-center text-[11px] text-slate-400">Memuatkan jemaah...</div>
+            </div>
+          </div>
+          <div class="bg-white rounded-xl border mt-4">
+            <div class="p-3 border-b flex justify-between">
+              <span class="text-[11px] font-bold">STAFF / EXTRA</span>
+              <span id="staffTotalBadge" class="text-[9px] bg-slate-100 px-2 py-0.5 rounded-full">0</span>
+            </div>
+            <div class="p-2">
+              <input id="searchStaff" placeholder="Cari staff..." class="w-full text-[11px] border rounded-full px-3 py-1.5 mb-2" oninput="renderStaffList()">
+            </div>
+            <div id="staffListContainer" class="max-h-[30vh] overflow-y-auto"></div>
+          </div>
+        </div>
+        <div class="lg:col-span-2">
+          <div id="roomingGrid" class="grid gap-3"></div>
+          <div id="roomingGridContainer" class="hidden"></div>
+        </div>
+      </div>
+      <div id="v78-existing-preserved" style="display:none;">${existingHTML}</div>
+    `;
+    console.log('V78 structure created, now calling fetchRoomingData');
+    setTimeout(()=>{ if(typeof populateRoomingTripDropdown==='function') populateRoomingTripDropdown(); if(typeof fetchRoomingData==='function') fetchRoomingData(); }, 500);
+    return true;
+  }
+  return false;
 }
-console.log('ROOMING V77 blank fix with container polling applied');
+
+setTimeout(()=>{
+  inspectModulRooming();
+  const created=createMissingRoomingStructure();
+  if(!created){
+    console.log('V78 structure already exists or modul not found, trying fetch');
+    if(typeof fetchRoomingData==='function') fetchRoomingData();
+  }
+}, 2000);
+
+console.log('ROOMING V78 auto-create structure loaded');
