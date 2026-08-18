@@ -1,3 +1,5 @@
+// ROOMING V83 - FIX INSURAN CANNOT PARSE VALUE - SEND ARRAY FOR MULTIPLE SELECT - 2026-08-19
+console.log('ROOMING V83 loaded - fix INSURAN parse error, send array');
 // ROOMING V82 - PRINT BOARD SEPARATE TAGS (BB MEKAH) (FULLBOARD MADINAH) + INSURAN HEADER ONLY - 2026-08-19
 console.log('ROOMING V82 loaded - print board separate tags, no overlap');
 // ROOMING V81 - HEADER INSURAN ONLY + 3 OPTIONS TAKAFUL,ETIQA,AL-KHAIRI - 2026-08-19
@@ -324,7 +326,7 @@ function toggleInsuranMulti(jemaahId, option){
   if(typeof updateJemaahField==='function') updateJemaahField(jemaahId, 'INSURAN', arr.length?arr.join(', '):'');
   if(typeof renderNamelist==='function') renderNamelist();
 }
-function clearInsuranMulti(jemaahId){ const rec=allRoomingJemaah.find(r=>r.id===jemaahId); if(!rec) return; rec.fields['INSURAN']=[]; if(typeof updateJemaahField==='function') updateJemaahField(jemaahId, 'INSURAN', ''); if(typeof renderNamelist==='function') renderNamelist(); }
+function clearInsuranMulti(jemaahId){ const rec=allRoomingJemaah.find(r=>r.id===jemaahId); if(!rec) return; rec.fields['INSURAN']=[]; if(typeof updateJemaahField==='function') updateJemaahField(jemaahId, 'INSURAN', []); if(typeof renderNamelist==='function') renderNamelist(); }
 function toggleBoardDropdown(id){ const el=document.getElementById('boardDrop-'+id); if(!el) return; document.querySelectorAll('[id^="boardDrop-"]').forEach(d=>{ if(d.id!=='boardDrop-'+id) d.classList.add('hidden'); }); document.querySelectorAll('[id^="staffBoardDrop-"]').forEach(d=>d.classList.add('hidden')); document.querySelectorAll('[id^="insuranDrop-"]').forEach(d=>d.classList.add('hidden')); el.classList.toggle('hidden'); }
 function closeBoardDropdown(id){ const el=document.getElementById('boardDrop-'+id); if(el) el.classList.add('hidden'); }
 function toggleStaffDropdown(id){ const el=document.getElementById('staffBoardDrop-'+id); if(!el) return; document.querySelectorAll('[id^="staffBoardDrop-"]').forEach(d=>{ if(d.id!=='staffBoardDrop-'+id) d.classList.add('hidden'); }); document.querySelectorAll('[id^="boardDrop-"]').forEach(d=>d.classList.add('hidden')); document.querySelectorAll('[id^="insuranDrop-"]').forEach(d=>d.classList.add('hidden')); el.classList.toggle('hidden'); }
@@ -1161,18 +1163,48 @@ async function updateRoomField(roomId,field,value,doRender=true){
     if(doRender){ renderRoomingGrid(); renderNamelist(); renderStaffList(); renderLocationTabs(); }
   }catch(e){ console.error(e); alert('Gagal mengemaskini data bilik: '+e.message); }
 }
+
 async function updateJemaahField(jemaahId, field, value){
   const base=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base')||localStorage.getItem('effah_base_id'); const pat=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
   if(!base||!pat) return alert('Airtable config missing');
-  const rec=allRoomingJemaah.find(r=>r.id===jemaahId); if(rec) rec.fields[field]=value||'';
-  renderNamelist();
+  const rec=allRoomingJemaah.find(r=>r.id===jemaahId);
+  if(rec){ rec.fields[field]=value; }
+  // Optimistic UI already updated
   try{
-    const payload = value ? {[field]: value} : {[field]: null};
-    const res=await fetch(`https://api.airtable.com/v0/${base}/DATA%20JEMAAH%20UMRAH/${jemaahId}`,{method:'PATCH',headers:{Authorization:`Bearer ${pat}`,'Content-Type':'application/json'},body:JSON.stringify({fields: payload})});
+    let payloadValue = value;
+    // FIX for Airtable Multiple Select fields: INSURAN, BOARD BASIS, BOARD
+    if(field==='INSURAN'){
+      if(Array.isArray(value)) payloadValue = value.length?value:null;
+      else if(typeof value==='string' && value.trim()!==''){
+        payloadValue = value.split(',').map(s=>s.trim()).filter(Boolean);
+        if(payloadValue.length===0) payloadValue=null;
+      } else payloadValue=null;
+    }
+    if(field==='BOARD BASIS' || field==='BOARD'){
+      if(Array.isArray(value)) payloadValue = value.length?value:null;
+      else if(typeof value==='string' && value.includes(',')){
+        payloadValue = value.split(',').map(s=>s.trim()).filter(Boolean);
+      }
+    }
+    // If null, send empty array for multiple select to clear? Airtable needs null to clear multiple select
+    const fieldsToSend = {};
+    if(payloadValue===null || (Array.isArray(payloadValue) && payloadValue.length===0)){
+      // For multiple select, sending [] or null clears, but Airtable docs: use [] to clear? Use null
+      fieldsToSend[field] = field==='INSURAN' || field==='BOARD BASIS' ? [] : '';
+    } else {
+      fieldsToSend[field] = payloadValue;
+    }
+    console.log('V83 updateJemaahField', jemaahId, field, '->', fieldsToSend[field]);
+    const res=await fetch(`https://api.airtable.com/v0/${base}/DATA%20JEMAAH%20UMRAH/${jemaahId}`,{method:'PATCH',headers:{Authorization:`Bearer ${pat}`,'Content-Type':'application/json'},body:JSON.stringify({fields: fieldsToSend})});
     const data=await res.json();
-    if(!data.id && data.error) throw new Error(data.error.message);
-  }catch(e){ console.error(e); alert('Gagal update jemaah '+field+': '+e.message); fetchRoomingData(); }
+    if(data.error){
+      console.error('Airtable update error', data.error);
+      throw new Error(data.error.message + ' (field: '+field+', type: '+data.error.type+')');
+    }
+  }catch(e){ console.error(e); alert('Gagal update jemaah '+field+': '+e.message+'\n\nPastikan field '+field+' di Airtable adalah Multiple Select (bukan Single Select). Jika Single Select, tukar ke Multiple Select dulu.'); if(typeof fetchRoomingData==='function') fetchRoomingData(); }
 }
+
+
 async function updateJemaahBoardMulti(jemaahId, selectedArr){
   const base=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base')||localStorage.getItem('effah_base_id'); const pat=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
   if(!base||!pat) return alert('Airtable config missing');
