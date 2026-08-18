@@ -603,19 +603,82 @@ function renderLocationTabs(){
 }
 async function fetchRoomingData(){
   try{
-    showRoomingLoading(); populateRoomingTripDropdown();
-    const tripId=window.selectedTripRecord?.id||localStorage.getItem('effah_active_trip_id')||localStorage.getItem('effah_last_selected_trip')||localStorage.getItem('selectedTripId');
-    if(!tripId){ document.getElementById('namelistContainer').innerHTML='<div class="p-6 text-center text-[11px] text-slate-400">Sila pilih trip terlebih dahulu</div>'; return; }
-    const base=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base')||localStorage.getItem('effah_base_id'); const pat=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
-    if(!base||!pat) return;
+    showRoomingLoading(); 
+    populateRoomingTripDropdown();
+    let tripId=window.selectedTripRecord?.id||localStorage.getItem('effah_active_trip_id')||localStorage.getItem('effah_last_selected_trip')||localStorage.getItem('selectedTripId')||'';
+    // Fallback: try to get from dropdown if localStorage blocked by Tracking Prevention
+    if(!tripId){
+      const sel=document.getElementById('roomingTripSelect');
+      if(sel && sel.value) tripId=sel.value;
+    }
+    if(!tripId){ 
+      document.getElementById('namelistContainer').innerHTML='<div class="p-6 text-center text-[11px] text-slate-400">Sila pilih trip di atas (16-25 OGOS 2026).<br>Jika tracking prevention block storage, pilih manual.</div>'; 
+      if(typeof hideRoomingLoading==='function') hideRoomingLoading();
+      return; 
+    }
+    const base=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base')||localStorage.getItem('effah_base_id'); 
+    const pat=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
+    if(!base||!pat){ 
+      document.getElementById('namelistContainer').innerHTML='<div class="p-6 text-center text-[11px] text-red-400">Airtable config missing</div>';
+      if(typeof hideRoomingLoading==='function') hideRoomingLoading();
+      return;
+    }
     let allRooms=[],allJems=[],offset='';
-    do{ const res=await fetch(`https://api.airtable.com/v0/${base}/ROOMING%20LIST?pageSize=100${offset?`&offset=${offset}`:''}`,{headers:{Authorization:`Bearer ${pat}`}}); const data=await res.json(); if(data.records) allRooms=allRooms.concat(data.records); offset=data.offset||''; }while(offset);
-    offset=''; do{ const res=await fetch(`https://api.airtable.com/v0/${base}/DATA%20JEMAAH%20UMRAH?pageSize=100${offset?`&offset=${offset}`:''}`,{headers:{Authorization:`Bearer ${pat}`}}); const data=await res.json(); if(data.records) allJems=allJems.concat(data.records); offset=data.offset||''; }while(offset);
+    // Fetch ROOMING LIST with retry
+    try{
+      do{ 
+        const res=await fetch(`https://api.airtable.com/v0/${base}/ROOMING%20LIST?pageSize=100${offset?`&offset=${offset}`:''}`,{headers:{Authorization:`Bearer ${pat}`}}); 
+        if(!res.ok){ console.warn('ROOMING LIST fetch failed', res.status); break; }
+        const data=await res.json(); 
+        if(data.records) allRooms=allRooms.concat(data.records); 
+        offset=data.offset||''; 
+      }while(offset);
+    }catch(e){ console.error('ROOMING LIST error', e); }
+    offset='';
+    // Fetch JEMAAH with retry - ignore 410 attachment errors (they are not API errors, but data contains expired urls)
+    try{
+      do{ 
+        const res=await fetch(`https://api.airtable.com/v0/${base}/DATA%20JEMAAH%20UMRAH?pageSize=100${offset?`&offset=${offset}`:''}`,{headers:{Authorization:`Bearer ${pat}`}}); 
+        if(!res.ok){ 
+          const txt=await res.text();
+          console.warn('JEMAAH fetch failed', res.status, txt);
+          if(res.status===429){ await new Promise(r=>setTimeout(r, 2000)); continue; }
+          break; 
+        }
+        const data=await res.json(); 
+        if(data.records) allJems=allJems.concat(data.records); 
+        offset=data.offset||''; 
+      }while(offset);
+    }catch(e){ console.error('JEMAAH error', e); }
+    console.log('fetchRoomingData done: rooms', allRooms.length, 'jemaah', allJems.length);
     allRoomingRecords=allRooms.filter(r=>{ const tf=r.fields['TRIP']||[]; return Array.isArray(tf)?tf.includes(tripId):String(tf).includes(tripId); });
     allRoomingJemaah=allJems.filter(r=>{ const tf=r.fields['TRIP']||[]; return Array.isArray(tf)?tf.includes(tripId):String(tf).includes(tripId); });
-    loadStaffList(); renderNamelist(); renderRoomingGrid(); renderLocationTabs();
-  }catch(e){ console.error(e); }
+    console.log('filtered for trip', tripId, 'rooms', allRoomingRecords.length, 'jemaah', allRoomingJemaah.length);
+    try{ await loadStaffList(); }catch(e){ console.warn('staff list fail', e); }
+    renderNamelist(); 
+    renderRoomingGrid(); 
+    renderLocationTabs();
+    if(typeof hideRoomingLoading==='function') hideRoomingLoading();
+  }catch(e){ 
+    console.error('fetchRoomingData fatal', e); 
+    const cont=document.getElementById('namelistContainer');
+    if(cont) cont.innerHTML='<div class="p-6 text-center text-[11px] text-red-400">Ralat memuatkan jemaah: '+e.message+'<br><button onclick="fetchRoomingData()" class="mt-2 px-3 py-1 bg-[#7A0C2E] text-white rounded-full text-[10px]">Retry</button></div>';
+    if(typeof hideRoomingLoading==='function') hideRoomingLoading();
+  }
 }
+function hideRoomingLoading(){
+  const el=document.querySelector('.rooming-loading, #roomingLoading');
+  if(el) el.style.display='none';
+  const cont=document.getElementById('namelistContainer');
+  // If still shows loading spinner, replace
+  if(cont && cont.innerHTML.includes('Memuatkan jemaah')){
+    // Will be overwritten by renderNamelist, but if no data, show empty
+    if(allRoomingJemaah.length===0){
+      cont.innerHTML='<div class="p-6 text-center text-[11px] text-slate-400">Tiada jemaah untuk trip ini</div>';
+    }
+  }
+}
+
 function populateRoomingTripDropdown(){
   const sel=document.getElementById('roomingTripSelect'); if(!sel) return;
   let trips=[...(window.allTripUmrahRecords||window.allTripRecords||window.allTrips||[])];
