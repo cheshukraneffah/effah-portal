@@ -739,19 +739,21 @@ function makeNamelistSticky(){
   try{
     const nl = document.getElementById('namelistContainer');
     if(!nl) return;
-    const leftCard = nl.closest('.w-full.lg\\:w-\\[52\\%\\]') || nl.parentElement;
+    const leftCard = nl.closest('.w-full.lg\:w-\[52\%\]') || nl.parentElement;
     if(leftCard){
       leftCard.style.position='sticky';
       leftCard.style.top='12px';
       leftCard.style.alignSelf='flex-start';
       leftCard.style.zIndex='20';
-      leftCard.style.maxHeight='calc(100vh - 24px)';
       leftCard.style.display='flex';
       leftCard.style.flexDirection='column';
       leftCard.style.backgroundColor='#ffffff';
+      leftCard.style.maxHeight='calc(100vh - 16px)';
+      leftCard.style.overflow='hidden';
     }
     nl.style.flex='1 1 auto';
-    nl.style.maxHeight='52vh';
+    nl.style.maxHeight='48vh';
+    nl.style.minHeight='200px';
     nl.style.overflowY='auto';
     nl.style.overflowX='hidden';
     nl.style.backgroundColor='#ffffff';
@@ -760,16 +762,27 @@ function makeNamelistSticky(){
       staffSec.style.flex='0 0 auto';
       staffSec.style.backgroundColor='#ffffff';
       staffSec.style.borderTop='2px solid #e2e8f0';
+      staffSec.style.display='flex';
+      staffSec.style.flexDirection='column';
+      staffSec.style.maxHeight='38vh';
+      staffSec.style.overflow='hidden';
     }
     const staffCont = document.getElementById('staffListContainer');
     if(staffCont){
-      staffCont.style.maxHeight='32vh';
+      staffCont.style.flex='1';
       staffCont.style.overflowY='auto';
       staffCont.style.overflowX='hidden';
       staffCont.style.backgroundColor='#ffffff';
     }
+    // Ensure rooming grid can scroll via window
+    const rg=document.getElementById('roomingGrid');
+    if(rg){
+      rg.style.overflow='visible';
+      rg.style.maxHeight='none';
+    }
   }catch(e){}
 }
+
 
 function filterRoomingNamelist(){ renderNamelist(); }
 
@@ -838,9 +851,78 @@ function renderRoomingGrid(){
   }).join('');
 }
 function setActiveLocation(loc){ activeLocation=loc.toUpperCase(); localStorage.setItem('effah_active_location',activeLocation); const el=document.getElementById('copyTargetLoc'); if(el) el.textContent=activeLocation; renderLocationTabs(); renderRoomingGrid(); renderNamelist(); renderStaffList(); }
-function allowDrop(e){ e.preventDefault(); }
+let _autoScrollInterval=null;
+function _stopAutoScroll(){ if(_autoScrollInterval){ clearInterval(_autoScrollInterval); _autoScrollInterval=null; } }
+function _startAutoScroll(){
+  if(_autoScrollInterval) return;
+  _autoScrollInterval=setInterval(()=>{
+    const y=window._lastDragY||0;
+    if(y<140){ window.scrollBy(0, -22); document.documentElement.scrollTop-=22; }
+    else if(y>window.innerHeight-140){ window.scrollBy(0, 22); document.documentElement.scrollTop+=22; }
+    // also scroll left panels if near edge
+    const nl=document.getElementById('namelistContainer');
+    const sl=document.getElementById('staffListContainer');
+    const grid=document.getElementById('roomingGrid');
+    if(nl){
+      const rect=nl.getBoundingClientRect();
+      if(y>rect.top && y<rect.bottom){
+        if(y-rect.top<80) nl.scrollBy(0,-12);
+        else if(rect.bottom-y<80) nl.scrollBy(0,12);
+      }
+    }
+    if(grid){
+      const rect=grid.getBoundingClientRect();
+      if(y>rect.top){
+        if(y>window.innerHeight-140) grid.scrollBy ? grid.scrollBy(0,10) : null;
+      }
+    }
+  }, 30);
+}
+function allowDrop(e){ e.preventDefault(); window._lastDragY=e.clientY; _startAutoScroll(); }
+document.addEventListener('dragover', (e)=>{ window._lastDragY=e.clientY; _startAutoScroll(); });
+document.addEventListener('dragend', ()=>{ _stopAutoScroll(); });
+document.addEventListener('drop', ()=>{ _stopAutoScroll(); });
 function dragJemaah(e,jId){ if(isJemaahAssignedInLocation(jId, activeLocation)) return; e.dataTransfer.setData('text/plain',jId); const r=e.currentTarget; if(r) setTimeout(()=>r.style.opacity='0.3',0); }
 function dragEnd(e){ e.currentTarget.style.opacity='1'; }
+
+function dragRoom(e,roomId){
+  e.dataTransfer.setData('text/room-id', roomId);
+  e.dataTransfer.effectAllowed='move';
+  const el=e.currentTarget.closest('[data-room-id]');
+  if(el) setTimeout(()=>el.style.opacity='0.4',0);
+}
+function dragRoomEnd(e){
+  const el=e.currentTarget.closest('[data-room-id]');
+  if(el) el.style.opacity='1';
+  _stopAutoScroll();
+}
+function allowDropRoom(e){ e.preventDefault(); window._lastDragY=e.clientY; _startAutoScroll(); e.currentTarget.classList.add('ring-2','ring-amber-300'); }
+function leaveDropRoom(e){ e.currentTarget.classList.remove('ring-2','ring-amber-300'); }
+async function dropRoom(e,targetRoomId){
+  e.preventDefault();
+  e.currentTarget.classList.remove('ring-2','ring-amber-300');
+  _stopAutoScroll();
+  const srcId=e.dataTransfer.getData('text/room-id');
+  if(!srcId || srcId===targetRoomId) return;
+  // Swap SORT ORDER
+  const srcRec=allRoomingRecords.find(r=>r.id===srcId);
+  const tgtRec=allRoomingRecords.find(r=>r.id===targetRoomId);
+  if(!srcRec||!tgtRec) return;
+  const srcOrder=srcRec.fields['SORT ORDER']||0;
+  const tgtOrder=tgtRec.fields['SORT ORDER']||0;
+  // Optimistic UI
+  srcRec.fields['SORT ORDER']=tgtOrder;
+  tgtRec.fields['SORT ORDER']=srcOrder;
+  renderRoomingGrid();
+  // Save to Airtable
+  const base=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base')||localStorage.getItem('effah_base_id');
+  const pat=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
+  try{
+    await fetch(`https://api.airtable.com/v0/${base}/ROOMING%20LIST/${srcId}`,{method:'PATCH',headers:{Authorization:`Bearer ${pat}`,'Content-Type':'application/json'},body:JSON.stringify({fields:{'SORT ORDER':tgtOrder}})});
+    await fetch(`https://api.airtable.com/v0/${base}/ROOMING%20LIST/${targetRoomId}`,{method:'PATCH',headers:{Authorization:`Bearer ${pat}`,'Content-Type':'application/json'},body:JSON.stringify({fields:{'SORT ORDER':srcOrder}})});
+  }catch(err){ console.error('swap room order failed',err); }
+}
+
 function dropJemaah(e,roomId){
   e.preventDefault(); e.currentTarget.classList.remove('ring-2','ring-[#7A0C2E]/20');
   document.querySelectorAll('[draggable="true"]').forEach(el=>el.style.opacity='1');
@@ -1291,12 +1373,44 @@ function generateRoomingPrint(orientation){ orientation = orientation || 'landsc
       
       Object.keys(hotels).forEach(hotelName=>{
         const hRooms = hotels[hotelName];
-        // Count bilik by capacity
         const capCounts = {};
         hRooms.forEach(r=>{ const c=r.fields['KAPASITI']||4; capCounts[c]=(capCounts[c]||0)+1; });
         const bilikStr = Object.keys(capCounts).map(c=>`Bilik ber-${c} (${capCounts[c]})`).join(', ');
-        const totalInHotel = hRooms.reduce((sum,r)=> sum + (r.fields['JEMAAH']||[]).length + getStaffForRoom(r.id).length, 0);
-        overviewRows += `<tr><td style="border:1px solid #ddd;padding:4px 6px;font-weight:bold">${hotelName}</td><td style="border:1px solid #ddd;padding:4px 6px;text-align:center">${bilikStr}</td><td style="border:1px solid #ddd;padding:4px 6px;text-align:center">${boardSummary}</td><td style="border:1px solid #ddd;padding:4px 6px;text-align:center">${hRooms.length} bilik</td></tr>`;
+        // --- FIX: board basis per hotel, include staff ---
+        const hJemaahIds = [];
+        hRooms.forEach(r=>{ (r.fields['JEMAAH']||[]).forEach(id=>hJemaahIds.push(id)); });
+        const hJemaahRecs = allRoomingJemaah.filter(j=> hJemaahIds.includes(j.id));
+        function countBoardForHotel(fbFilter){
+          let cnt=0;
+          hJemaahRecs.forEach(j=>{ const fb=(getFullboardVal(j.fields)||'').toUpperCase().trim(); if(fbFilter(fb)) cnt++; });
+          // staff in this hotel
+          const staffInHotel = staffList.filter(s=> s.roomIds && s.roomIds.some(rid=> hRooms.some(hr=>hr.id===rid)));
+          staffInHotel.forEach(s=>{
+            const fbRaw=(s.boardBasis||s.fields?.['BOARD']||s.board||'').toString().toUpperCase().trim();
+            if(fbFilter(fbRaw)) cnt++;
+          });
+          return cnt;
+        }
+        let boardSummaryHotel='';
+        if(loc==='MEKAH'){
+          const cFB = countBoardForHotel(fb=>fb==='FULLBOARD');
+          const cFBM = countBoardForHotel(fb=>fb==='FULLBOARD (MEKAH)');
+          const cBBM = countBoardForHotel(fb=>fb==='BB (MEKAH)' || (fb.includes('MEKAH') && fb.includes('BB')));
+          const totalHotelBoard = cFB + cFBM + cBBM;
+          if(totalHotelBoard>0) boardSummaryHotel = `${totalHotelBoard} orang (FULLBOARD: ${cFB} + FULLBOARD (MEKAH): ${cFBM} + BB (MEKAH): ${cBBM})`;
+          else boardSummaryHotel='-';
+        } else if(loc==='MADINAH'){
+          const cFB = countBoardForHotel(fb=>fb==='FULLBOARD');
+          const cFBMad = countBoardForHotel(fb=>fb==='FULLBOARD (MADINAH)');
+          const cBBMad = countBoardForHotel(fb=>fb==='BB (MADINAH)' || (fb.includes('MADINAH') && fb.includes('BB')));
+          const totalHotelBoard = cFB + cFBMad + cBBMad;
+          if(totalHotelBoard>0) boardSummaryHotel = `${totalHotelBoard} orang (FULLBOARD: ${cFB} + FULLBOARD (MADINAH): ${cFBMad} + BB (MADINAH): ${cBBMad})`;
+          else boardSummaryHotel='-';
+        } else {
+          const cFB = countBoardForHotel(fb=>fb==='FULLBOARD');
+          boardSummaryHotel = cFB>0 ? `${cFB} FULLBOARD` : '-';
+        }
+        overviewRows += `<tr><td style="border:1px solid #ddd;padding:4px 6px;font-weight:bold">${hotelName}</td><td style="border:1px solid #ddd;padding:4px 6px;text-align:center">${bilikStr}</td><td style="border:1px solid #ddd;padding:4px 6px;text-align:center">${boardSummaryHotel}</td><td style="border:1px solid #ddd;padding:4px 6px;text-align:center">${hRooms.length} bilik</td></tr>`;
       });
       
       let overviewProfessionalHTML = `<table style="width:100%;border-collapse:collapse;font-size:9px"><tr style="background:#f8f8f8;font-weight:bold"><th style="border:1px solid #ddd;padding:4px 6px;text-align:left">HOTEL</th><th style="border:1px solid #ddd;padding:4px 6px;text-align:center">BILIK</th><th style="border:1px solid #ddd;padding:4px 6px;text-align:center">BOARD BASIS</th><th style="border:1px solid #ddd;padding:4px 6px;text-align:center">JUMLAH</th></tr>${overviewRows}</table>`;
@@ -1329,7 +1443,7 @@ function generateRoomingPrint(orientation){ orientation = orientation || 'landsc
         let babyHtml = babyIds.length ? babyIds.map((jid, jIdx)=>{
           const jRec = allRoomingJemaah.find(r=>r.id===jid);
           const name = jRec ? getJemaahName(jRec.fields) : jid;
-          return `<div style="font-size:${isPortrait ? '6.5px' : '7.5px'};padding:1px 0;color:#92400E;background:#FEF3C7">NA. ${name} (Tanpa Katil)</div>`;
+          return `<div style="font-size:${isPortrait ? '7.5px' : '8.5px'};padding:${isPortrait ? '1px 0' : '2px 0'};border-bottom:1px dotted #92400E;color:#92400E;background:#FEF3C7;font-weight:600">NA. ${name} (Tanpa Katil)</div>`;
         }).join('') : '';
         
         let staffHtml = staffForRoom.length ? staffForRoom.map((s, sIdx)=>{
@@ -1338,8 +1452,8 @@ function generateRoomingPrint(orientation){ orientation = orientation || 'landsc
         
         const catatanBilik = (f['CATATAN BILIK'] || f['CATATAN'] || '').trim();
         const catatanPrint = catatanBilik ? ` (${catatanBilik})` : '';
-        return `<div style="border:1px solid #000;margin-bottom:${isPortrait ? '4px' : '6px'};background:#fff;break-inside:avoid">
-          <div style="background:#fff;border-bottom:1px solid #000;padding:${isPortrait ? '2px 4px' : '3px 6px'};display:flex;justify-content:space-between;align-items:center">
+        return `<div style="border:1px solid #000;margin-bottom:${isPortrait ? '4px' : '6px'};background:#fff;break-inside:avoid" data-room-card="${rec.id}" ondragover="allowDropRoom(event)" ondragleave="leaveDropRoom(event)" ondrop="dropRoom(event,'${rec.id}')">
+          <div draggable="true" ondragstart="dragRoom(event,'${rec.id}')" ondragend="dragRoomEnd(event)" style="background:#fff;border-bottom:1px solid #000;padding:${isPortrait ? '2px 4px' : '3px 6px'};display:flex;justify-content:space-between;align-items:center;cursor:grab" title="Drag untuk susun bilik">
             <span style="font-weight:bold;font-size:${isPortrait ? '8px' : '9px'}">${idx+1}. ${roomName} ${pakej ? '('+pakej+')' : ''} ${hotel ? '- '+hotel : ''}${catatanPrint}</span>
             <span style="font-size:${isPortrait ? '7px' : '8px'};font-weight:bold">${jIds.length + staffForRoom.length}/${cap}</span>
           </div>
@@ -1439,7 +1553,16 @@ function generateRoomingPrint(orientation){ orientation = orientation || 'landsc
     });
 
     const html=`<html><head><title>Rooming ${tripName} - ${orientation}</title><style>body{font-family:Arial,Helvetica,sans-serif;font-size:10px;margin:12px;color:#000}table{border-collapse:collapse;width:100%}th,td{border:1px solid #000;padding:4px 6px;font-size:9px}th{background:#7A0C2E;color:#fff;font-weight:bold;text-transform:uppercase}.header{display:flex;justify-content:space-between;font-weight:bold;font-size:12px;border-bottom:2px solid #000;padding-bottom:6px;margin-bottom:8px}.page-break{page-break-before:always}.namelist-page{max-width:900px;margin:0 auto}.location-page{max-width:100%}@media print{@page{size:A4 ${orientation};margin:${orientation==='portrait' ? '8mm' : '10mm'}}body{-webkit-print-color-adjust:exact;print-color-adjust:exact}.page-break{page-break-before:always}}</style></head><body>
-      <div class="namelist-page"><div class="header"><span>NAMELIST ${tripName}</span><span>Total: ${allRoomingJemaah.length} Jemaah + ${combinedStaff.length} Staff</span></div><div style="font-size:9px;margin-bottom:8px"><b>Trip:</b> ${tripName} | <b>Tarikh Cetak:</b> ${new Date().toLocaleDateString('ms-MY')} | <b>Orientasi:</b> ${orientation.toUpperCase()}</div><table><tr><th style="width:30px">NO</th><th>NAMA JEMAAH</th><th style="width:130px">BOARD</th><th style="width:60px">TRAIN</th><th style="width:70px">PAKEJ</th><th style="width:190px">INSURAN</th></tr>${namelistRows}</table></div>
+      // --- NAMELIST OVERVIEW: Speedtrain & Insuran unique ---
+      const trainCount = allRoomingJemaah.filter(j=> isTrainChecked(j.fields)).length + combinedStaff.filter(s=> s.train||s.fields?.TRAIN).length;
+      // Insuran unique: count jemaah/staff that have at least 1 insuran
+      const insuranUnique = allRoomingJemaah.filter(j=> getInsuranArray(j.fields).length>0).length;
+      const staffInsuranUnique = combinedStaff.filter(s=>{ const arr = typeof getInsuranArray==='function' ? (s.insuranArray||[]) : []; const f = s.fields?.['INSURAN']||s.insuran||''; if(arr.length>0) return true; if(f && f.toString().trim()!=='-' && f.toString().trim()!=='') return true; return false; }).length;
+      // Also count from allRoomingJemaah insuran array already includes multi-insuran as 1
+      const totalInsuranUnique = insuranUnique + staffInsuranUnique;
+      const namelistOverviewHTML = '<div style="margin-top:12px;border:1px solid #000;padding:8px 10px;background:#f9fafb"><div style="font-weight:bold;font-size:10px;margin-bottom:6px">RINGKASAN NAMELIST</div><div style="display:flex;gap:20px;font-size:9px"><div><b>Bilangan Speedtrain:</b> ' + trainCount + ' orang</div><div><b>Bilangan Insuran:</b> ' + totalInsuranUnique + ' orang <span style="color:#666;font-size:8px">(kira unik, 2-3 insuran tetap 1)</span></div><div><b>Total Jemaah:</b> ' + allRoomingJemaah.length + '</div><div><b>Total Staff:</b> ' + combinedStaff.length + '</div></div></div>';
+
+      <div class="namelist-page"><div class="header"><span>NAMELIST ${tripName}</span><span>Total: ${allRoomingJemaah.length} Jemaah + ${combinedStaff.length} Staff</span></div><div style="font-size:9px;margin-bottom:8px"><b>Trip:</b> ${tripName} | <b>Tarikh Cetak:</b> ${new Date().toLocaleDateString('ms-MY')} | <b>Orientasi:</b> ${orientation.toUpperCase()}</div><table style="table-layout:fixed"><colgroup><col style="width:32px"><col style="width:44%"><col style="width:110px"><col style="width:52px"><col style="width:62px"><col style="width:90px"></colgroup><tr><th>NO</th><th style="text-align:left">NAMA JEMAAH</th><th>BOARD</th><th>TRAIN</th><th>PAKEJ</th><th>INSURAN</th></tr>${namelistRows}</table>${namelistOverviewHTML}</div>
       ${locationPages||'<div style="page-break-before:always"><div style="border:1px dashed #000;padding:20px;text-align:center">Tiada bilik untuk trip ini</div></div>'}
       <script>window.onload=function(){setTimeout(()=>window.print(),600)}; window.onafterprint=function(){window.close();}; setTimeout(()=>{try{window.close();}catch(e){}},3500);<\/script>
     </body></html>`;
