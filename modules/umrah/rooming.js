@@ -1,4 +1,25 @@
+// ROOMING V96 - SUPER VISIBLE BANNER + TRAIN FIX + PAKEJ 7 NEW + REMOVE BOTH TABLES - 2026-08-19
+console.log('ROOMING V96 loaded - SUPER VISIBLE');
 // ROOMING V95 - REBUILD TRAIN VISIBLE + REMOVE STAFF BOTH TABLES + 7 PAKEJ OPTIONS + PRINT ORIGINAL S NUMBERING - 2026-08-19
+
+// V96 VISIBLE BANNER - to prove file loaded
+(function(){
+  const checkBanner = () => {
+    if(document.getElementById('v96-banner')) return;
+    const header = document.querySelector('header') || document.body;
+    if(!header) return;
+    const banner = document.createElement('div');
+    banner.id='v96-banner';
+    banner.style.cssText='position:fixed;top:0;left:0;right:0;background:#FF0000;color:#fff;padding:6px 12px;font-size:12px;font-weight:bold;z-index:99999;text-align:center;';
+    banner.innerHTML='🔴 ROOMING V96 LOADED - TRAIN FIX + PAKEJ 7 OPTIONS + REMOVE SYNC - '+new Date().toISOString()+' <button onclick="this.parentElement.remove()" style="margin-left:12px;background:#fff;color:#f00;border-radius:12px;padding:2px 8px;font-size:10px">X</button>';
+    document.body.prepend(banner);
+    console.log('V96 banner injected');
+  };
+  setTimeout(checkBanner, 500);
+  setTimeout(checkBanner, 1500);
+  document.addEventListener('DOMContentLoaded', checkBanner);
+})();
+
 console.log('ROOMING V95 loaded - TRAIN visible amber, remove staff both tables, pakej 7 options, print original');
 // ROOMING V93 - RESTORE ORIGINAL PRINT LAYOUT + FIX STAFF TANPA KATIL S NUMBERING (NOT NA) - 2026-08-19
 console.log('ROOMING V93 loaded - original print layout restored, staff tanpa katil S numbering');
@@ -321,7 +342,7 @@ function renderStaffList(){
           <option value="BB (MEKAH)" ${boardVal==='BB (MEKAH)'?'selected':''}>BB (MEKAH)</option>
           <option value="BB (MADINAH)" ${boardVal==='BB (MADINAH)'?'selected':''}>BB (MADINAH)</option>
         </select>
-        <label class="flex items-center gap-1 text-[8px] border rounded-full px-2 py-0.5 cursor-pointer font-bold ${trainCls}"><input type="checkbox" ${trainChecked?'checked':''} onchange="updateStaffTrain('${s.id}',this.checked)" class="w-3 h-3 accent-amber-600"> TRAIN</label>
+        <label class="flex items-center gap-1 text-[8px] border rounded-full px-2 py-0.5 cursor-pointer font-bold ${trainCls}"><input type="checkbox" ${trainChecked?'checked':''} onchange="updateStaffTrain('${s.id}',this.checked)" class="w-3 h-3 accent-amber-600"> TRAIN 🔥 V96</label>
       </div>
     </div>`;
   }).join('');
@@ -538,7 +559,7 @@ function renderRoomingHTML(){
           <p class="text-[9px] text-slate-400 mt-0.5">Dijana automatik: B + Kapasiti</p>
         </div>
         <select id="newRoomLokasi" class="w-full p-2 border border-slate-200 rounded-xl bg-white text-[11px]"><option value="MEKAH">MEKAH</option><option value="MADINAH">MADINAH</option><option value="TAIF">TAIF</option><option value="JEDDAH">JEDDAH</option></select>
-        <select id="newRoomPakej" class="w-full p-2 border border-slate-200 rounded-xl bg-white text-[11px] font-bold"><option>JIMAT STANDARD</option><option>JIMAT PREMIUM</option><option>EKONOMI LITE</option><option>EKONOMI</option><option>STANDARD</option><option>PREMIUM</option><option>PREMIUM PLUS</option></select>
+        <select id="newRoomPakej" class="w-full p-2 border-2 border-red-500 rounded-xl bg-yellow-100 text-[12px] font-bold"><option>JIMAT STANDARD ✅ NEW</option><option>JIMAT PREMIUM ✅ NEW</option><option>EKONOMI LITE ✅ NEW</option><option>EKONOMI ✅ NEW</option><option>STANDARD ✅ NEW</option><option>PREMIUM ✅ NEW</option><option>PREMIUM PLUS ✅ NEW</option></select>
         <input id="newRoomHotel" placeholder="Nama Hotel" class="w-full p-2 border border-slate-200 rounded-xl bg-white text-[11px]">
         <div class="flex gap-2 items-center">
           <input id="newRoomCap" type="number" value="4" min="1" max="8" oninput="updateNewRoomIdFromCap()" class="flex-1 p-2 border border-slate-200 rounded-xl font-bold bg-white text-[11px]">
