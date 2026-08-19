@@ -1,3 +1,9 @@
+// ROOMING V99c - INSURAN MULTI DROPDOWN + BOARD STAFF MULTI + REMOVE FIX + TRAIN + PAKEJ 7 - 2026-08-19
+console.log('ROOMING V99c loaded - insuran multi dropdown');
+// ROOMING V99b - BOARD STAFF MULTI DROPDOWN + REMOVE FIX + TRAIN + PAKEJ 7 - 2026-08-19
+console.log('ROOMING V99b loaded - board staff multi');
+// ROOMING V99a - FIX REMOVE BUTTON ONLY (event) + TRAIN VISIBLE - 2026-08-19
+console.log('ROOMING V99a loaded - remove button fixed');
 // ROOMING V98 - FIX TRAIN CHECKBOX VISIBLE + PAKEJ 7 OPTIONS ALL SELECTS + REMOVE SINGLE STAFF ONLY - 2026-08-19
 console.log('ROOMING V98 loaded - train visible, pakej 7 options all selects, remove single');
 // ROOMING V97 - NO RED BANNER + TRAIN CHECKBOX FIXED + REMOVE STAFF BOTH TABLES + PAKEJ SINGLE SELECT 7 OPTIONS - 2026-08-19
@@ -219,7 +225,7 @@ async function assignStaffToRoom(staffId,roomId){
   }catch(e){ console.error('assignStaffToRoom link failed', e); }
 
 }
-function removeStaff(roomId,staffName){
+function removeStaff(roomId,staffName, evt){ if(evt){ evt.stopPropagation(); evt.preventDefault(); }
   const s=staffList.find(x=>x.id===staffName||x.airtableId===staffName||x.name===staffName);
   if(s){ removeStaffFromRoom(roomId, s.id); return; }
   const rec=allRoomingRecords.find(r=>r.id===roomId); if(!rec) return;
@@ -273,6 +279,34 @@ function getStaffBoardArray(s){
   if(raw && raw!=='-' && raw!=='' && raw!=='NO BOARD') return [String(raw).trim()];
   return [];
 }
+function renderInsuranCell(jId, insArr){
+  var opts=['TAKAFUL','ETIQA','AL-KHAIRI'];
+  var display=insArr.length? insArr.join(', ') : '-';
+  var cls=insArr.length? 'bg-emerald-100 border-emerald-200 text-emerald-800' : 'bg-white border-slate-200';
+  var html='<div class="relative"><button onclick="toggleInsuranDropdown(\''+jId+'\')" class="w-full text-[8px] border rounded-full px-2 py-1 font-bold '+cls+' text-left flex items-center justify-between"><span class="truncate">'+display+'</span><span>▼</span></button><div id="insuranDrop-'+jId+'" class="hidden absolute z-20 mt-1 w-44 bg-white border border-slate-200 rounded-xl shadow-lg p-1">';
+  for(var i=0;i<opts.length;i++){
+    var o=opts[i];
+    var checked=insArr.includes(o)?'checked':'';
+    html+='<label class="flex items-center gap-2 px-2 py-1 hover:bg-slate-50 cursor-pointer text-[10px]"><input type="checkbox" '+checked+' onchange="toggleInsuranMulti(\''+jId+'\',\''+o+'\')" class="w-3 h-3"> '+o+'</label>';
+  }
+  html+='<div class="flex justify-between gap-1 mt-1 pt-1 border-t"><button onclick="clearInsuranMulti(\''+jId+'\'); closeInsuranDropdown(\''+jId+'\')" class="text-[8px] px-2 py-1 rounded-full bg-slate-100">Clear</button><button onclick="closeInsuranDropdown(\''+jId+'\')" class="text-[8px] px-2 py-1 rounded-full bg-[#7A0C2E] text-white">OK</button></div></div></div>';
+  return html;
+}
+function toggleInsuranMulti(jId, opt){
+  var rec=allRoomingJemaah.find(function(r){return r.id===jId;});
+  if(!rec) return;
+  var arr=getInsuranArray(rec.fields);
+  if(arr.includes(opt)) arr=arr.filter(function(x){return x!==opt;}); else arr.push(opt);
+  rec.fields['INSURAN']=arr;
+  if(typeof updateJemaahField==='function') updateJemaahField(jId, 'INSURAN', arr);
+}
+function clearInsuranMulti(jId){
+  var rec=allRoomingJemaah.find(function(r){return r.id===jId;});
+  if(!rec) return;
+  rec.fields['INSURAN']=[];
+  if(typeof updateJemaahField==='function') updateJemaahField(jId, 'INSURAN', []);
+}
+
 function getInsuranArrayV2(f){
   if(!f) return [];
   const raw = f['INSURAN'] || f['INSURANCE'] || '';
@@ -1033,7 +1067,7 @@ function renderRoomingGrid(){
       }
       return `<div class="flex items-center justify-between px-2.5 py-2 bg-slate-100 text-slate-800 border border-slate-200 rounded-xl text-[11px]"><span class="truncate font-medium flex items-center">${jName}${fbBadge}</span><button onclick="removeJemaahFromRoom('${rec.id}','${jId}')" class="ml-2 w-4 h-4 rounded-full bg-white hover:bg-slate-200 text-[10px]">✕</button></div>`; 
     }).join('');
-    const sSlots=staffArr.map(s=>`<div class="flex items-center justify-between px-2.5 py-2 bg-[#FADBD8] text-[#7A0C2E] border border-[#F5B7B1] rounded-xl text-[11px]"><span class="truncate">👤 ${s}</span><button onclick="removeStaff('${rec.id}','${s.replace(/'/g,"\\'")}')" class="ml-2 w-4 h-4 rounded-full bg-white/70 text-[10px]">✕</button></div>`).join('');
+    const sSlots=staffArr.map(s=>`<div class="flex items-center justify-between px-2.5 py-2 bg-[#FADBD8] text-[#7A0C2E] border border-[#F5B7B1] rounded-xl text-[11px]"><span class="truncate">👤 ${s}</span><button onclick="removeStaff('${rec.id}','${s.replace(/'/g,"\\'")}', event)" class="ml-2 w-4 h-4 rounded-full bg-white/70 text-[10px]">✕</button></div>`).join('');
     const jTanpaRaw = f['JEMAAH TANPA KATIL']||f['INFANT']||[];
     const staffTanpaLocal = (typeof getStaffTanpaKatilForRoom==='function'? getStaffTanpaKatilForRoom(rec.id) : (f['_STAFF_TANPA_KATIL']||[]));
     const combinedTanpa = [...new Set([...jTanpaRaw, ...staffTanpaLocal])];
@@ -1076,38 +1110,42 @@ const emptyCount=Math.max(0,cap-count); const emptySlots=Array.from({length:empt
   }).join('');
 }
 
+
 function renderStaffList(){
   const cont=document.getElementById('staffListContainer'); const badge=document.getElementById('staffTotalBadge'); if(!cont) return; if(badge) badge.textContent=staffList.length+' Staff';
   if(staffList.length===0){ cont.innerHTML='<div class="p-2.5 text-center text-[11px] text-slate-400">Tiada staff / extra</div>'; return; }
   cont.innerHTML=staffList.map((s,idx)=>{
-    const assignedInLoc=isStaffAssignedInLocation(s.id, activeLocation); 
-    const cls=assignedInLoc?'opacity-50 bg-slate-50':'bg-white hover:bg-slate-50 cursor-grab'; const drag=assignedInLoc?'':`draggable="true" ondragstart="dragStaff(event,'${s.id}')" ondragend="dragStaffEnd(event)"`;
-    const boardVal=s.boardBasis||'';
-    let boardCls='bg-white border-slate-200';
-    if(boardVal==='FULLBOARD (MEKAH)' || boardVal==='BB (MEKAH)') boardCls='bg-orange-100 border-orange-200 text-orange-800';
-    else if(boardVal==='FULLBOARD (MADINAH)' || boardVal==='BB (MADINAH)') boardCls='bg-blue-100 border-blue-200 text-blue-800';
-    else if(boardVal==='FULLBOARD') boardCls='bg-emerald-100 border-emerald-200 text-emerald-800';
+    const assignedInLoc=isStaffAssignedInLocation(s.id, activeLocation);
+    const cls=assignedInLoc?'opacity-50 bg-slate-50':'bg-white hover:bg-slate-50 cursor-grab';
+    const drag=assignedInLoc?'':`draggable="true" ondragstart="dragStaff(event,'${s.id}')" ondragend="dragStaffEnd(event)"`;
+    const boardArr=(typeof getStaffBoardArray==='function'? getStaffBoardArray(s) : []);
+    const boardDisplay = boardArr.length? boardArr.join(', ') : '- BOARD';
+    const boardCls = boardArr.length? 'bg-emerald-100 border-emerald-200 text-emerald-800' : 'bg-white border-slate-200';
     const trainChecked = !!(s.train||s.fields?.TRAIN);
-    const trainCls = trainChecked ? 'bg-amber-300 border-amber-600 text-amber-900' : 'bg-white border-slate-300 text-slate-600';
+    const trainCls = trainChecked ? 'bg-amber-300 border-amber-600 text-amber-900' : 'bg-white border-slate-300';
     const staffId = s.id||s.airtableId;
+    const boardOptions = ['FULLBOARD','FULLBOARD (MEKAH)','FULLBOARD (MADINAH)','BB (MEKAH)','BB (MADINAH)'];
+    const boardDropHtml = boardOptions.map(opt=>`<label class="flex items-center gap-2 px-2 py-1 hover:bg-slate-50 cursor-pointer text-[10px]"><input type="checkbox" ${boardArr.includes(opt)?'checked':''} onchange="toggleStaffBoardMulti('${staffId}','${opt}')" class="w-3 h-3"> ${opt}</label>`).join('');
     return `<div ${drag} class="flex flex-col gap-1.5 px-2.5 py-2 rounded-xl border text-[11px] ${cls}">
       <div class="flex items-center justify-between">
         <div class="flex gap-2 items-center"><span class="text-slate-400 text-[10px]">${String(idx+1).padStart(2,'0')}</span><span class="font-medium truncate max-w-[120px]">${s.name}</span>${assignedInLoc?'<span class="ml-1 px-1 py-0.5 bg-slate-200 rounded text-[8px]">ASSIGNED di '+activeLocation+'</span>':''}</div>
         <div class="flex gap-1"><button onclick="quickAssignStaff('${staffId}')" class="w-5 h-5 rounded-full border ${assignedInLoc?'opacity-30':'hover:bg-[#7A0C2E] hover:text-white'} text-[10px]">+</button><button onclick="deleteStaff('${staffId}')" class="w-5 h-5 rounded-full border hover:bg-red-50 text-[10px]"><i class="fa-solid fa-trash text-[9px]"></i></button></div>
       </div>
       <div class="flex items-center gap-2">
-        <select onchange="updateStaffField('${staffId}','boardBasis',this.value)" class="text-[8px] border rounded-full px-2 py-1 font-bold ${boardCls} outline-none flex-1">
-          <option value="" ${!boardVal?'selected':''}>- BOARD</option>
-          <option value="FULLBOARD" ${boardVal==='FULLBOARD'?'selected':''}>FULLBOARD</option>
-          <option value="FULLBOARD (MEKAH)" ${boardVal==='FULLBOARD (MEKAH)'?'selected':''}>FULLBOARD (MEKAH)</option>
-          <option value="FULLBOARD (MADINAH)" ${boardVal==='FULLBOARD (MADINAH)'?'selected':''}>FULLBOARD (MADINAH)</option>
-          <option value="BB (MEKAH)" ${boardVal==='BB (MEKAH)'?'selected':''}>BB (MEKAH)</option>
-          <option value="BB (MADINAH)" ${boardVal==='BB (MADINAH)'?'selected':''}>BB (MADINAH)</option>
-        </select>
-        <label class="flex items-center gap-1 text-[8px] border rounded-full px-2 py-1 cursor-pointer font-bold ${trainCls}"><input type="checkbox" ${trainChecked?'checked':''} onchange="updateStaffTrain('${staffId}',this.checked)" class="w-3.5 h-3.5 accent-amber-600"> TRAIN</label>
+        <div class="relative flex-1">
+          <button onclick="toggleStaffDropdown('${staffId}')" class="w-full text-[8px] border rounded-full px-2 py-1 font-bold ${boardCls} text-left flex items-center justify-between"><span class="truncate">${boardDisplay}</span><span class="ml-1">▼</span></button>
+          <div id="staffBoardDrop-${staffId}" class="hidden absolute z-20 mt-1 w-52 bg-white border border-slate-200 rounded-xl shadow-lg p-1 max-h-48 overflow-auto">
+            ${boardDropHtml}
+            <div class="flex justify-between gap-1 mt-1 pt-1 border-t"><button onclick="clearStaffBoardMulti('${staffId}'); closeStaffDropdown('${staffId}')" class="text-[8px] px-2 py-1 rounded-full bg-slate-100">Clear</button><button onclick="closeStaffDropdown('${staffId}')" class="text-[8px] px-2 py-1 rounded-full bg-[#7A0C2E] text-white">OK</button></div>
+          </div>
+        </div>
+        <label class="flex items-center gap-1 text-[8px] border rounded-full px-2 py-1 cursor-pointer font-bold ${trainCls} shrink-0"><input type="checkbox" ${trainChecked?'checked':''} onchange="updateStaffTrain('${staffId}',this.checked)" class="w-3.5 h-3.5 accent-amber-600"> TRAIN</label>
       </div>
     </div>`;
   }).join('');
+}
+
+
 
 async function removeStaffFromRoom(roomId, staffId){
   console.log('V98 removeStaffFromRoom single', roomId, staffId);
@@ -1163,7 +1201,6 @@ async function removeStaffFromRoom(roomId, staffId){
       console.log('V98 ROOMING LIST cleared single', await res2.json());
     }
   }catch(e){ console.error('V98 remove failed', e); }
-}
 }
 
 
