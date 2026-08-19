@@ -1,3 +1,5 @@
+// ROOMING V85 - FIX STAFF COUNT MISMATCH + REMOVE BOARD BASIS TEXTBOX - 2026-08-19
+console.log('ROOMING V85 loaded - fix staff count, remove Board Basis textbox');
 // ROOMING V84 - INSURAN PILL ASING (TAKAFUL) (ETIQA) (AL-KHAIRI) + BOARD SEPARATE - 2026-08-19
 console.log('ROOMING V84 loaded - insuran pills separate, no overlap');
 // ROOMING V83 - FIX INSURAN CANNOT PARSE VALUE - SEND ARRAY FOR MULTIPLE SELECT - 2026-08-19
@@ -612,7 +614,10 @@ function renderRoomingOverview(rooms){
   const totalBilik=rooms.length;
   const totalJ=rooms.reduce((s,r)=>s+(r.fields['JEMAAH']?.length||0),0);
   const totalBaby=rooms.reduce((s,r)=>s+(r.fields['JEMAAH TANPA KATIL']?.length||0),0);
-  const totalStaff=rooms.reduce((s,r)=>s+(r.fields['STAFF / EXTRA']||'').split(',').filter(Boolean).length,0);
+  // FIX: count staff from both text field and linked staffList (same as renderRoomingGrid)
+  const staffFromText = rooms.reduce((s,r)=>s+(r.fields['STAFF / EXTRA']||'').split(',').filter(Boolean).length,0);
+  const staffFromLinked = rooms.reduce((s,r)=>{ try{ return s+getStaffForRoom(r.id).length; }catch(e){ return s; } },0);
+  const totalStaff = staffFromText + staffFromLinked;
   const totalJemaahFull = totalJ + totalBaby; // infant masuk dalam jemaah count
 
   let hotelBlocks = Object.keys(byHotel).sort().map(hotel=>{
@@ -623,7 +628,7 @@ function renderRoomingOverview(rooms){
       const cnt=caps[cap];
       return `<span class="inline-flex items-center gap-1 bg-white/15 px-2 py-0.5 rounded-full text-[10px] mr-1 mb-1"><span>Bilik ber-${cap}</span><span class="font-bold">(${cnt})</span></span>`;
     }).join('');
-    return `<div class="flex flex-col gap-1 py-2 border-b border-white/10 last:border-0"><div class="flex items-center justify-between"><span class="font-bold text-[11px] truncate">${hotel}</span>${fbHotel?`<span class="text-[9px] bg-white/20 px-1.5 py-0.5 rounded-full">${fbHotel} Board Basis</span>`:''}</div><div class="flex flex-wrap">${capsList}</div></div>`;
+    return `<div class="flex flex-col gap-1 py-2 border-b border-white/10 last:border-0"><div class="flex items-center justify-between"><span class="font-bold text-[11px] truncate">${hotel}</span>${fbHotel?``:''}</div><div class="flex flex-wrap">${capsList}</div></div>`;
   }).join('');
 
   let html=`<div class="space-y-2">
@@ -631,7 +636,7 @@ function renderRoomingOverview(rooms){
       <div class="font-bold text-[13px] tracking-widest">${activeLocation} • ${totalBilik} Bilik</div>
       <div class="flex items-center gap-1.5">
         <span class="text-[10px] bg-white/20 px-2.5 py-1 rounded-full font-bold">${totalJemaahFull} Jemaah + ${totalStaff} Staff</span>
-        ${fbCount?`<span class="text-[10px] bg-emerald-400/90 text-emerald-900 px-2 py-0.5 rounded-full font-bold">${fbCount} Board Basis</span>`:''}
+        ${fbCount?``:''}
       </div>
     </div>
     <div class="bg-white/10 rounded-xl p-2.5 max-h-[26vh] overflow-y-auto">
