@@ -1,5 +1,5 @@
-// ROOMING V99c - INSURAN MULTI DROPDOWN + BOARD STAFF MULTI + REMOVE FIX + TRAIN + PAKEJ 7 - 2026-08-19
-console.log('ROOMING V99c loaded - insuran multi dropdown');
+// ROOMING V100 - FIX GHOST BOARD STAFF + INSURAN MULTI DROPDOWN (like BOARD) + REMOVE FIX + TRAIN + PAKEJ 7 - 2026-08-19
+console.log('ROOMING V100 loaded - ghost fix, insuran multi');
 // ROOMING V99b - BOARD STAFF MULTI DROPDOWN + REMOVE FIX + TRAIN + PAKEJ 7 - 2026-08-19
 console.log('ROOMING V99b loaded - board staff multi');
 // ROOMING V99a - FIX REMOVE BUTTON ONLY (event) + TRAIN VISIBLE - 2026-08-19
@@ -283,13 +283,13 @@ function renderInsuranCell(jId, insArr){
   var opts=['TAKAFUL','ETIQA','AL-KHAIRI'];
   var display=insArr.length? insArr.join(', ') : '-';
   var cls=insArr.length? 'bg-emerald-100 border-emerald-200 text-emerald-800' : 'bg-white border-slate-200';
-  var html='<div class="relative"><button onclick="toggleInsuranDropdown(\''+jId+'\')" class="w-full text-[8px] border rounded-full px-2 py-1 font-bold '+cls+' text-left flex items-center justify-between"><span class="truncate">'+display+'</span><span>▼</span></button><div id="insuranDrop-'+jId+'" class="hidden absolute z-20 mt-1 w-44 bg-white border border-slate-200 rounded-xl shadow-lg p-1">';
+  var html='<div class="relative"><button onclick="toggleInsuranDropdown(\''+jId+'\')" class="w-full text-[8px] border rounded-full px-2.5 py-1.5 font-bold '+cls+' text-left flex items-center justify-between opacity-100"><span class="truncate">'+display+'</span><span>▼</span></button><div id="insuranDrop-'+jId+'" class="hidden absolute z-[9999] mt-1 w-48 bg-white border border-slate-300 rounded-xl shadow-2xl p-1 opacity-100" style="background:white; opacity:1;">';
   for(var i=0;i<opts.length;i++){
     var o=opts[i];
     var checked=insArr.includes(o)?'checked':'';
-    html+='<label class="flex items-center gap-2 px-2 py-1 hover:bg-slate-50 cursor-pointer text-[10px]"><input type="checkbox" '+checked+' onchange="toggleInsuranMulti(\''+jId+'\',\''+o+'\')" class="w-3 h-3"> '+o+'</label>';
+    html+='<label class="flex items-center gap-2 px-2.5 py-1.5 hover:bg-slate-50 cursor-pointer text-[11px]"><input type="checkbox" '+checked+' onchange="toggleInsuranMulti(\''+jId+'\',\''+o+'\')" class="w-3.5 h-3.5 accent-[#7A0C2E]"> '+o+'</label>';
   }
-  html+='<div class="flex justify-between gap-1 mt-1 pt-1 border-t"><button onclick="clearInsuranMulti(\''+jId+'\'); closeInsuranDropdown(\''+jId+'\')" class="text-[8px] px-2 py-1 rounded-full bg-slate-100">Clear</button><button onclick="closeInsuranDropdown(\''+jId+'\')" class="text-[8px] px-2 py-1 rounded-full bg-[#7A0C2E] text-white">OK</button></div></div></div>';
+  html+='<div class="flex justify-between gap-1 mt-1 pt-1 border-t bg-white"><button onclick="clearInsuranMulti(\''+jId+'\'); closeInsuranDropdown(\''+jId+'\')" class="text-[9px] px-3 py-1 rounded-full bg-slate-100">Clear</button><button onclick="closeInsuranDropdown(\''+jId+'\')" class="text-[9px] px-3 py-1 rounded-full bg-[#7A0C2E] text-white">OK</button></div></div></div>';
   return html;
 }
 function toggleInsuranMulti(jId, opt){
@@ -1111,12 +1111,13 @@ const emptyCount=Math.max(0,cap-count); const emptySlots=Array.from({length:empt
 }
 
 
+
 function renderStaffList(){
   const cont=document.getElementById('staffListContainer'); const badge=document.getElementById('staffTotalBadge'); if(!cont) return; if(badge) badge.textContent=staffList.length+' Staff';
   if(staffList.length===0){ cont.innerHTML='<div class="p-2.5 text-center text-[11px] text-slate-400">Tiada staff / extra</div>'; return; }
   cont.innerHTML=staffList.map((s,idx)=>{
     const assignedInLoc=isStaffAssignedInLocation(s.id, activeLocation);
-    const cls=assignedInLoc?'opacity-50 bg-slate-50':'bg-white hover:bg-slate-50 cursor-grab';
+    const cls=assignedInLoc?'opacity-60 bg-slate-100':'bg-white hover:bg-slate-50 cursor-grab';
     const drag=assignedInLoc?'':`draggable="true" ondragstart="dragStaff(event,'${s.id}')" ondragend="dragStaffEnd(event)"`;
     const boardArr=(typeof getStaffBoardArray==='function'? getStaffBoardArray(s) : []);
     const boardDisplay = boardArr.length? boardArr.join(', ') : '- BOARD';
@@ -1125,26 +1126,25 @@ function renderStaffList(){
     const trainCls = trainChecked ? 'bg-amber-300 border-amber-600 text-amber-900' : 'bg-white border-slate-300';
     const staffId = s.id||s.airtableId;
     const boardOptions = ['FULLBOARD','FULLBOARD (MEKAH)','FULLBOARD (MADINAH)','BB (MEKAH)','BB (MADINAH)'];
-    const boardDropHtml = boardOptions.map(opt=>`<label class="flex items-center gap-2 px-2 py-1 hover:bg-slate-50 cursor-pointer text-[10px]"><input type="checkbox" ${boardArr.includes(opt)?'checked':''} onchange="toggleStaffBoardMulti('${staffId}','${opt}')" class="w-3 h-3"> ${opt}</label>`).join('');
-    return `<div ${drag} class="flex flex-col gap-1.5 px-2.5 py-2 rounded-xl border text-[11px] ${cls}">
+    const boardDropHtml = boardOptions.map(opt=>`<label class="flex items-center gap-2 px-2.5 py-1.5 hover:bg-slate-50 cursor-pointer text-[11px]"><input type="checkbox" ${boardArr.includes(opt)?'checked':''} onchange="toggleStaffBoardMulti('${staffId}','${opt}')" class="w-3.5 h-3.5 accent-[#7A0C2E]"> ${opt}</label>`).join('');
+    return `<div ${drag} class="flex flex-col gap-1.5 px-2.5 py-2 rounded-xl border text-[11px] ${cls} relative">
       <div class="flex items-center justify-between">
         <div class="flex gap-2 items-center"><span class="text-slate-400 text-[10px]">${String(idx+1).padStart(2,'0')}</span><span class="font-medium truncate max-w-[120px]">${s.name}</span>${assignedInLoc?'<span class="ml-1 px-1 py-0.5 bg-slate-200 rounded text-[8px]">ASSIGNED di '+activeLocation+'</span>':''}</div>
-        <div class="flex gap-1"><button onclick="quickAssignStaff('${staffId}')" class="w-5 h-5 rounded-full border ${assignedInLoc?'opacity-30':'hover:bg-[#7A0C2E] hover:text-white'} text-[10px]">+</button><button onclick="deleteStaff('${staffId}')" class="w-5 h-5 rounded-full border hover:bg-red-50 text-[10px]"><i class="fa-solid fa-trash text-[9px]"></i></button></div>
+        <div class="flex gap-1"><button onclick="quickAssignStaff('${staffId}')" class="w-5 h-5 rounded-full border ${assignedInLoc?'opacity-30 pointer-events-none':'hover:bg-[#7A0C2E] hover:text-white'} text-[10px]">+</button><button onclick="deleteStaff('${staffId}')" class="w-5 h-5 rounded-full border hover:bg-red-50 text-[10px]"><i class="fa-solid fa-trash text-[9px]"></i></button></div>
       </div>
       <div class="flex items-center gap-2">
         <div class="relative flex-1">
-          <button onclick="toggleStaffDropdown('${staffId}')" class="w-full text-[8px] border rounded-full px-2 py-1 font-bold ${boardCls} text-left flex items-center justify-between"><span class="truncate">${boardDisplay}</span><span class="ml-1">▼</span></button>
-          <div id="staffBoardDrop-${staffId}" class="hidden absolute z-20 mt-1 w-52 bg-white border border-slate-200 rounded-xl shadow-lg p-1 max-h-48 overflow-auto">
+          <button onclick="toggleStaffDropdown('${staffId}')" class="w-full text-[8px] border rounded-full px-2.5 py-1.5 font-bold ${boardCls} text-left flex items-center justify-between opacity-100"><span class="truncate">${boardDisplay}</span><span class="ml-1">▼</span></button>
+          <div id="staffBoardDrop-${staffId}" class="hidden absolute z-[9999] mt-1 w-56 bg-white border border-slate-300 rounded-xl shadow-2xl p-1 max-h-52 overflow-auto opacity-100" style="background:white; opacity:1;">
             ${boardDropHtml}
-            <div class="flex justify-between gap-1 mt-1 pt-1 border-t"><button onclick="clearStaffBoardMulti('${staffId}'); closeStaffDropdown('${staffId}')" class="text-[8px] px-2 py-1 rounded-full bg-slate-100">Clear</button><button onclick="closeStaffDropdown('${staffId}')" class="text-[8px] px-2 py-1 rounded-full bg-[#7A0C2E] text-white">OK</button></div>
+            <div class="flex justify-between gap-1 mt-1 pt-1 border-t bg-white"><button onclick="clearStaffBoardMulti('${staffId}'); closeStaffDropdown('${staffId}')" class="text-[9px] px-3 py-1 rounded-full bg-slate-100 hover:bg-slate-200">Clear</button><button onclick="closeStaffDropdown('${staffId}')" class="text-[9px] px-3 py-1 rounded-full bg-[#7A0C2E] text-white hover:bg-[#9d174d]">OK</button></div>
           </div>
         </div>
-        <label class="flex items-center gap-1 text-[8px] border rounded-full px-2 py-1 cursor-pointer font-bold ${trainCls} shrink-0"><input type="checkbox" ${trainChecked?'checked':''} onchange="updateStaffTrain('${staffId}',this.checked)" class="w-3.5 h-3.5 accent-amber-600"> TRAIN</label>
+        <label class="flex items-center gap-1 text-[8px] border rounded-full px-2.5 py-1.5 cursor-pointer font-bold ${trainCls} shrink-0 opacity-100"><input type="checkbox" ${trainChecked?'checked':''} onchange="updateStaffTrain('${staffId}',this.checked)" class="w-3.5 h-3.5 accent-amber-600"> TRAIN</label>
       </div>
     </div>`;
   }).join('');
 }
-
 
 
 async function removeStaffFromRoom(roomId, staffId){
