@@ -1,55 +1,58 @@
+// ROOMING V102 FIX TAB CLICK - FIX async STRAY + _origDropJemaahToRoom DUPLICATE + _autoScrollInterval
+console.log('ROOMING V102 FIX TAB CLICK loaded - all tabs should work now');
 // ROOMING V101 - FIX PRINT fbRaw toUpperCase ARRAY + _autoScrollInterval REFERENCEERROR + 422 HANDLING - 2026-08-19
-console.log('ROOMING V101 loaded - print fix, autoScroll fix');
-var _autoScrollInterval=null;
+// CLEANED LOG: console.log('ROOMING V101 loaded - print fix, autoScroll fix');
+var _autoScrollInterval = window._autoScrollInterval || null; // V102 FIX SINGLE
+window._autoScrollInterval = _autoScrollInterval;
 // ROOMING V100 - FIX GHOST BOARD STAFF + INSURAN MULTI DROPDOWN (like BOARD) + REMOVE FIX + TRAIN + PAKEJ 7 - 2026-08-19
-console.log('ROOMING V100 loaded - ghost fix, insuran multi');
-var _autoScrollInterval=null;
+// CLEANED LOG: console.log('ROOMING V100 loaded - ghost fix, insuran multi');
+// REMOVED DUPLICATE _autoScrollInterval - var _autoScrollInterval=null;
 // ROOMING V99b - BOARD STAFF MULTI DROPDOWN + REMOVE FIX + TRAIN + PAKEJ 7 - 2026-08-19
-console.log('ROOMING V99b loaded - board staff multi');
+// CLEANED LOG: console.log('ROOMING V99b loaded - board staff multi');
 // ROOMING V99a - FIX REMOVE BUTTON ONLY (event) + TRAIN VISIBLE - 2026-08-19
-console.log('ROOMING V99a loaded - remove button fixed');
+// CLEANED LOG: console.log('ROOMING V99a loaded - remove button fixed');
 // ROOMING V98 - FIX TRAIN CHECKBOX VISIBLE + PAKEJ 7 OPTIONS ALL SELECTS + REMOVE SINGLE STAFF ONLY - 2026-08-19
-console.log('ROOMING V98 loaded - train visible, pakej 7 options all selects, remove single');
+// CLEANED LOG: console.log('ROOMING V98 loaded - train visible, pakej 7 options all selects, remove single');
 // ROOMING V97 - NO RED BANNER + TRAIN CHECKBOX FIXED + REMOVE STAFF BOTH TABLES + PAKEJ SINGLE SELECT 7 OPTIONS - 2026-08-19
-console.log('ROOMING V97 loaded - train visible, no banner, pakej single select');
+// CLEANED LOG: console.log('ROOMING V97 loaded - train visible, no banner, pakej single select');
 // ROOMING V97 - NO RED BANNER + TRAIN CHECKBOX FOR STAFF FIXED + REMOVE STAFF BOTH TABLES + PAKEJ SINGLE SELECT 7 OPTIONS - 2026-08-19
-console.log('ROOMING V97 loaded - no banner, train checkbox visible, pakej single select 7 options');
+// CLEANED LOG: console.log('ROOMING V97 loaded - no banner, train checkbox visible, pakej single select 7 options');
 // ROOMING V96 - SUPER VISIBLE BANNER + TRAIN FIX + PAKEJ 7 NEW + REMOVE BOTH TABLES - 2026-08-19
-console.log('ROOMING V96 loaded - SUPER VISIBLE');
+// CLEANED LOG: console.log('ROOMING V96 loaded - SUPER VISIBLE');
 // ROOMING V95 - REBUILD TRAIN VISIBLE + REMOVE STAFF BOTH TABLES + 7 PAKEJ OPTIONS + PRINT ORIGINAL S NUMBERING - 2026-08-19
 
 
 
-console.log('ROOMING V95 loaded - TRAIN visible amber, remove staff both tables, pakej 7 options, print original');
+// CLEANED LOG: console.log('ROOMING V95 loaded - TRAIN visible amber, remove staff both tables, pakej 7 options, print original');
 // ROOMING V93 - RESTORE ORIGINAL PRINT LAYOUT + FIX STAFF TANPA KATIL S NUMBERING (NOT NA) - 2026-08-19
-console.log('ROOMING V93 loaded - original print layout restored, staff tanpa katil S numbering');
+// CLEANED LOG: console.log('ROOMING V93 loaded - original print layout restored, staff tanpa katil S numbering');
 // ROOMING V91 - FIX PRINT 6 ROWS + REMOVE TANPA KATIL NOT MOVE TO REGULAR + MANY STAFF PER ROOM - 2026-08-19
-console.log('ROOMING V91 loaded - print tanpa katil fix, remove tanpa katil becomes unassigned');
+// CLEANED LOG: console.log('ROOMING V91 loaded - print tanpa katil fix, remove tanpa katil becomes unassigned');
 // ROOMING V90 - FIX MANY STAFF PER ROOM + MOVE STAFF TO TANPA KATIL (NO BLOCK) - 2026-08-19
-console.log('ROOMING V90 loaded - many staff per room allowed, move to tanpa katil');
+// CLEANED LOG: console.log('ROOMING V90 loaded - many staff per room allowed, move to tanpa katil');
 // ROOMING V89 - FIX MULTIPLE STAFF PER ROOM + INFANT UNKNOWN (STAFF TANPA KATIL RENDER) + CATATAN SAVE - 2026-08-19
-console.log('ROOMING V89 loaded - fix multi staff per room, staff tanpa katil no Unknown');
+// CLEANED LOG: console.log('ROOMING V89 loaded - fix multi staff per room, staff tanpa katil no Unknown');
 // ROOMING V88 - STAFF IN TANPA KATIL MODAL + CATATAN SAVE + DRAG FIX - 2026-08-19
-console.log('ROOMING V88 loaded - staff in tanpa katil modal, catatan save, drag fix');
+// CLEANED LOG: console.log('ROOMING V88 loaded - staff in tanpa katil modal, catatan save, drag fix');
 // ROOMING V87 - FIX CATATAN BILIK SAVE + STAFF AS TANPA KATIL DROP + GRIP FIX - 2026-08-19
-console.log('ROOMING V87 loaded - catatan save fix + staff tanpa katil');
+// CLEANED LOG: console.log('ROOMING V87 loaded - catatan save fix + staff tanpa katil');
 // ROOMING V86 - STAFF DRAG & DROP + FIX COUNT 23 vs 25 (INCLUDE TANPA KATIL) + STAFF AS TANPA KATIL - 2026-08-19
-console.log('ROOMING V86 loaded - staff draggable, count includes tanpa katil, staff as tanpa katil allowed');
+// CLEANED LOG: console.log('ROOMING V86 loaded - staff draggable, count includes tanpa katil, staff as tanpa katil allowed');
 // ROOMING V85 - FIX STAFF COUNT MISMATCH + REMOVE BOARD BASIS TEXTBOX - 2026-08-19
-console.log('ROOMING V85 loaded - fix staff count, remove Board Basis textbox');
+// CLEANED LOG: console.log('ROOMING V85 loaded - fix staff count, remove Board Basis textbox');
 // ROOMING V84 - INSURAN PILL ASING (TAKAFUL) (ETIQA) (AL-KHAIRI) + BOARD SEPARATE - 2026-08-19
-console.log('ROOMING V84 loaded - insuran pills separate, no overlap');
+// CLEANED LOG: console.log('ROOMING V84 loaded - insuran pills separate, no overlap');
 // ROOMING V83 - FIX INSURAN CANNOT PARSE VALUE - SEND ARRAY FOR MULTIPLE SELECT - 2026-08-19
-console.log('ROOMING V83 loaded - fix INSURAN parse error, send array');
+// CLEANED LOG: console.log('ROOMING V83 loaded - fix INSURAN parse error, send array');
 // ROOMING V82 - PRINT BOARD SEPARATE TAGS (BB MEKAH) (FULLBOARD MADINAH) + INSURAN HEADER ONLY - 2026-08-19
-console.log('ROOMING V82 loaded - print board separate tags, no overlap');
+// CLEANED LOG: console.log('ROOMING V82 loaded - print board separate tags, no overlap');
 // ROOMING V81 - HEADER INSURAN ONLY + 3 OPTIONS TAKAFUL,ETIQA,AL-KHAIRI - 2026-08-19
-console.log('ROOMING V81 loaded - INSURAN header only, 3 options');
+// CLEANED LOG: console.log('ROOMING V81 loaded - INSURAN header only, 3 options');
 // ROOMING V80 - FULL 1767 LINES BASE PRESERVED + MULTI STAFF + MULTI INSURAN + OUTSIDE CLICK + BLANK AUTO-CREATE - 2026-08-19
-console.log('ROOMING V80 loaded - FULL BASE 1767 preserved + staff multi + insuran multi + blank fix');
+// CLEANED LOG: console.log('ROOMING V80 loaded - FULL BASE 1767 preserved + staff multi + insuran multi + blank fix');
 // ROOMING V72 - FIX STACK OVERFLOW + GHOST + MULTI-BOARD + LOADING 410 - 2026-08-19
 // Version: V72
-console.log('ROOMING V72 loaded - getBoardArray fixed, no recursion');
+// CLEANED LOG: console.log('ROOMING V72 loaded - getBoardArray fixed, no recursion');
 // ROOMING V24 - Fix grayed still editable + print highlight (TAKAFUL hijau, ETIQA kuning, KHAIRI biru, TRAIN kuning)
 // Base: V23 exact layout, only 2 patches
 var allRoomingRecords = window.allRoomingRecords || [];
@@ -168,7 +171,6 @@ async function updateStaffField(staffId, field, value){
   }catch(e){ console.error('updateStaffField failed', e); }
 }
 
-async 
 async function assignStaffToRoom(staffId,roomId){
   const staff=staffList.find(s=>s.id===staffId||s.airtableId===staffId); if(!staff) return;
   const rec=allRoomingRecords.find(r=>r.id===roomId); if(!rec) return;
@@ -1206,7 +1208,7 @@ async function removeStaffFromRoom(roomId, staffId){
 
 
 function setActiveLocation(loc){ activeLocation=loc.toUpperCase(); localStorage.setItem('effah_active_location',activeLocation); const el=document.getElementById('copyTargetLoc'); if(el) el.textContent=activeLocation; renderLocationTabs(); renderRoomingGrid(); renderNamelist(); renderStaffList(); }
-var _autoScrollInterval=null;
+// REMOVED DUPLICATE _autoScrollInterval - var _autoScrollInterval=null;
 function _stopAutoScroll(){ if(_autoScrollInterval){ clearInterval(_autoScrollInterval); _autoScrollInterval=null; } }
 function _startAutoScroll(){
   if(_autoScrollInterval) return;
@@ -1410,7 +1412,7 @@ function quickAssignStaffToRoom(staffId, roomId){
   }
 }
 // Override drop handlers to accept staff
-const _origDropJemaahToRoom = typeof dropJemaahToRoom==='function'? dropJemaahToRoom : null;
+var _origDropJemaahToRoom = window._origDropJemaahToRoom || (typeof dropJemaahToRoom==='function'? dropJemaahToRoom : null);
 function dropJemaahToRoom(e, roomId, isTanpaKatil){
   const staffId = e.dataTransfer.getData('application/x-staff-id') || window._draggedStaffId;
   if(staffId){
@@ -2443,7 +2445,7 @@ setTimeout(()=>{
   console.log('V80 containers found:', !!namelist, !!grid);
   if(!namelist||!grid){ createMissingRoomingStructure(); } else { if(typeof fetchRoomingData==='function') fetchRoomingData(); }
 }, 1500);
-console.log('ROOMING V80 full (1767 base preserved + staff multi + insuran multi + blank auto-create) loaded');
+// CLEANED LOG: console.log('ROOMING V80 full (1767 base preserved + staff multi + insuran multi + blank auto-create) loaded');
 
 function updateStaffTrain(staffId, checked){
   const s=staffList.find(x=>x.id===staffId||x.airtableId===staffId);
