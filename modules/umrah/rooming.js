@@ -1,3 +1,5 @@
+// ROOMING V94 - FIX STAFF TRAIN RESTORED + REMOVE STAFF AIRTABLE SYNC BOTH SIDES + NEW PAKEJ 7 OPTIONS + RESTORE PRINT ORIGINAL S NUMBERING - 2026-08-19
+console.log('ROOMING V94 loaded - train restored, remove sync fix, pakej 7 options');
 // ROOMING V93 - RESTORE ORIGINAL PRINT LAYOUT + FIX STAFF TANPA KATIL S NUMBERING (NOT NA) - 2026-08-19
 console.log('ROOMING V93 loaded - original print layout restored, staff tanpa katil S numbering');
 // ROOMING V91 - FIX PRINT 6 ROWS + REMOVE TANPA KATIL NOT MOVE TO REGULAR + MANY STAFF PER ROOM - 2026-08-19
@@ -436,7 +438,7 @@ function renderRoomingHTML(){
               <i class="fa-solid fa-magnifying-glass absolute left-2.5 top-2.5 text-slate-400 text-[10px]"></i>
               <input id="searchRoomingJemaah" onkeyup="filterRoomingNamelist()" placeholder="Cari nama jemaah..." class="w-full text-[11px] pl-7 pr-2.5 py-2 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:outline-none">
             </div>
-            <select id="filterPakejRooming" onchange="filterRoomingNamelist()" class="text-[11px] border border-slate-200 rounded-xl px-2.5 py-2 bg-white font-medium"><option value="">Semua Pakej</option><option>JIMAT</option><option>EKONOMI</option><option>STANDARD</option><option>PREMIUM</option></select>
+            <select id="filterPakejRooming" onchange="filterRoomingNamelist()" class="text-[11px] border border-slate-200 rounded-xl px-2.5 py-2 bg-white font-medium"><option value="">Semua Pakej</option><option>JIMAT STANDARD</option><option>JIMAT PREMIUM</option><option>EKONOMI LITE</option><option>EKONOMI</option><option>STANDARD</option><option>PREMIUM</option><option>PREMIUM PLUS</option></select>
           </div>
         </div>
         <div class="px-2.5 py-1.5 bg-slate-50/70 border-b border-slate-200 grid grid-cols-12 text-[9px] font-bold text-slate-500 tracking-wider">
@@ -497,7 +499,7 @@ function renderRoomingHTML(){
           <p class="text-[9px] text-slate-400 mt-0.5">Dijana automatik: B + Kapasiti</p>
         </div>
         <select id="newRoomLokasi" class="w-full p-2 border border-slate-200 rounded-xl bg-white text-[11px]"><option value="MEKAH">MEKAH</option><option value="MADINAH">MADINAH</option><option value="TAIF">TAIF</option><option value="JEDDAH">JEDDAH</option></select>
-        <select id="newRoomPakej" class="w-full p-2 border border-slate-200 rounded-xl bg-white text-[11px]"><option>JIMAT</option><option>EKONOMI</option><option>STANDARD</option><option>PREMIUM</option></select>
+        <select id="newRoomPakej" class="w-full p-2 border border-slate-200 rounded-xl bg-white text-[11px]"><option>JIMAT STANDARD</option><option>JIMAT PREMIUM</option><option>EKONOMI LITE</option><option>EKONOMI</option><option>STANDARD</option><option>PREMIUM</option><option>PREMIUM PLUS</option></select>
         <input id="newRoomHotel" placeholder="Nama Hotel" class="w-full p-2 border border-slate-200 rounded-xl bg-white text-[11px]">
         <div class="flex gap-2 items-center">
           <input id="newRoomCap" type="number" value="4" min="1" max="8" oninput="updateNewRoomIdFromCap()" class="flex-1 p-2 border border-slate-200 rounded-xl font-bold bg-white text-[11px]">
