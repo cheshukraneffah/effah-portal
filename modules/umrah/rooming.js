@@ -1,3 +1,7 @@
+// ROOMING V91 - FIX PRINT 6 ROWS + REMOVE TANPA KATIL NOT MOVE TO REGULAR + MANY STAFF PER ROOM - 2026-08-19
+console.log('ROOMING V91 loaded - print tanpa katil fix, remove tanpa katil becomes unassigned');
+// ROOMING V90 - FIX MANY STAFF PER ROOM + MOVE STAFF TO TANPA KATIL (NO BLOCK) - 2026-08-19
+console.log('ROOMING V90 loaded - many staff per room allowed, move to tanpa katil');
 // ROOMING V89 - FIX MULTIPLE STAFF PER ROOM + INFANT UNKNOWN (STAFF TANPA KATIL RENDER) + CATATAN SAVE - 2026-08-19
 console.log('ROOMING V89 loaded - fix multi staff per room, staff tanpa katil no Unknown');
 // ROOMING V88 - STAFF IN TANPA KATIL MODAL + CATATAN SAVE + DRAG FIX - 2026-08-19
@@ -296,6 +300,14 @@ function getBoardArray(f){
   if(raw && raw!=='-' && raw!=='' && raw!=='NO BOARD' && raw!=='NO FULLBOARD') return [String(raw).trim()];
   return [];
 }
+function getNameForAnyId(id){
+  const jRec=allRoomingJemaah.find(j=>j.id===id);
+  if(jRec) return getJemaahName(jRec.fields);
+  const sRec=staffList.find(s=>s.id===id||s.airtableId===id);
+  if(sRec) return sRec.name+' (STAFF TANPA KATIL)';
+  return id.substring(0,8)+'... (Unknown)';
+}
+
 function getStaffBoardArray(s){
   if(!s) return [];
   const raw = s.boardBasis || s.fields?.['BOARD'] || s.fields?.['BOARD BASIS'] || s.board || '';
@@ -818,7 +830,18 @@ function isStaffAssignedInLocation(staffId, location){
   return allRoomingRecords.some(r=> (r.fields['LOKASI / CITY']||'MEKAH').toUpperCase()===loc && s.roomIds.includes(r.id));
 }
 function getStaffForRoom(roomId){
-  return staffList.filter(s=> s.roomIds && s.roomIds.includes(roomId));
+  const tanpaLocal = (typeof getStaffTanpaKatilForRoom==='function'? getStaffTanpaKatilForRoom(roomId) : []);
+  const room = allRoomingRecords.find(r=>r.id===roomId);
+  const tanpaFromField = room ? (room.fields['JEMAAH TANPA KATIL']||[]) : [];
+  return staffList.filter(s=>{
+    if(!s.roomIds || !s.roomIds.includes(roomId)) return false;
+    const id = s.id||s.airtableId;
+    // If staff is in tanpa katil list (local or field), don't count as regular staff
+    if(tanpaLocal.includes(id) || tanpaFromField.includes(id)) return false;
+    // Also check _STAFF_TANPA_KATIL
+    if(room && room.fields['_STAFF_TANPA_KATIL'] && room.fields['_STAFF_TANPA_KATIL'].includes(id)) return false;
+    return true;
+  });
 }
 function isJemaahAssigned(jId){ return allRoomingRecords.some(r=>(r.fields['JEMAAH']||[]).includes(jId)); }
 
@@ -1174,44 +1197,66 @@ function dropStaffToRoom(e, roomId, isTanpaKatil){
 function assignStaffAsTanpaKatil(staffId, roomId){
   const room = allRoomingRecords.find(r=>r.id===roomId);
   if(!room) return;
-  // Check if staff already assigned anywhere in this room (as staff or tanpa katil)
   const existingJTanpa = room.fields['JEMAAH TANPA KATIL']||[];
   const existingStaff = room.fields['STAFF LIST (ROOMING)']||[];
-  if(existingJTanpa.includes(staffId)) return alert('Staff ini sudah ada sebagai tanpa katil di bilik ini');
-  if(existingStaff.includes(staffId)) return alert('Staff ini sudah ada di bilik ini (bukan tanpa katil)');
+  const existingStaffText = room.fields['STAFF / EXTRA']||'';
   
-  // For staff, we will store in a separate local mapping AND try to save to JEMAAH TANPA KATIL if Airtable allows
-  // Also store in STAFF TANPA KATIL localStorage mapping
+  if(existingJTanpa.includes(staffId)){
+    console.log('Staff already tanpa katil in this room', staffId);
+    return; // already there
+  }
+  // FIX V90: If staff already exists as regular staff in same room, move him to tanpa katil (allow many staff per room)
+  if(existingStaff.includes(staffId)){
+    console.log('Staff already regular in this room, moving to tanpa katil', staffId);
+    // Remove from regular staff list
+    room.fields['STAFF LIST (ROOMING)'] = existingStaff.filter(id=>id!==staffId);
+    // Also update staffList roomIds
+    const s=getStaffById(staffId);
+    if(s && s.roomIds) s.roomIds = s.roomIds.filter(rid=>rid!==roomId);
+    // Continue to add as tanpa katil (don't block)
+  }
+  // Also check if staff name exists in STAFF / EXTRA text field
+  if(existingStaffText.includes(staffId)){
+    // try to remove from text field
+    room.fields['STAFF / EXTRA'] = existingStaffText.split(',').filter(x=>x.trim()!==staffId).join(',');
+  }
+  
+  // Store in local mapping for tanpa katil staff (allows many staff per room)
   const key='effah_staff_tanpa_'+roomId;
   let staffTanpaList=[];
   try{ staffTanpaList=JSON.parse(localStorage.getItem(key)||'[]'); }catch(e){ staffTanpaList=[]; }
   if(!staffTanpaList.includes(staffId)) staffTanpaList.push(staffId);
   try{ localStorage.setItem(key, JSON.stringify(staffTanpaList)); }catch(e){}
   
-  // Optimistic UI: add to room's custom field for rendering
   if(!room.fields['_STAFF_TANPA_KATIL']) room.fields['_STAFF_TANPA_KATIL']=[];
   if(!room.fields['_STAFF_TANPA_KATIL'].includes(staffId)) room.fields['_STAFF_TANPA_KATIL'].push(staffId);
   
-  // Try to save to Airtable JEMAAH TANPA KATIL (might fail if staff ID not from jemaah table, but try)
-  const newList = [...existingJTanpa, staffId];
+  const newList = [...existingJTanpa.filter(id=>id!==staffId), staffId];
   room.fields['JEMAAH TANPA KATIL']=newList;
   renderRoomingGrid();
   
   const base=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base')||localStorage.getItem('effah_base_id'); const pat=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
   if(base&&pat){
-    // Try JEMAAH TANPA KATIL field first, if fails try STAFF TANPA KATIL custom field
-    fetch(`https://api.airtable.com/v0/${base}/ROOMING%20LIST/${roomId}`,{method:'PATCH',headers:{Authorization:`Bearer ${pat}`,'Content-Type':'application/json'},body:JSON.stringify({fields:{'JEMAAH TANPA KATIL': newList}})}).then(r=>r.json()).then(data=>{
-      console.log('staff tanpa katil assigned to JEMAAH TANPA KATIL', data);
+    // Save both regular staff removal and tanpa katil addition
+    const payload={};
+    payload['STAFF LIST (ROOMING)']=room.fields['STAFF LIST (ROOMING)']||[];
+    // Try JEMAAH TANPA KATIL first
+    payload['JEMAAH TANPA KATIL']=newList;
+    fetch(`https://api.airtable.com/v0/${base}/ROOMING%20LIST/${roomId}`,{method:'PATCH',headers:{Authorization:`Bearer ${pat}`,'Content-Type':'application/json'},body:JSON.stringify({fields: payload})}).then(r=>r.json()).then(data=>{
+      console.log('V90 staff moved to tanpa katil', data);
       if(data.error){
-        console.warn('JEMAAH TANPA KATIL field cannot accept staff ID, trying STAFF TANPA KATIL field');
-        // Try alternative field STAFF TANPA KATIL or keep local only
-        return fetch(`https://api.airtable.com/v0/${base}/ROOMING%20LIST/${roomId}`,{method:'PATCH',headers:{Authorization:`Bearer ${pat}`,'Content-Type':'application/json'},body:JSON.stringify({fields:{'STAFF TANPA KATIL': staffTanpaList}})}).then(r=>r.json()).then(d2=>{ console.log('staff tanpa katil saved to STAFF TANPA KATIL', d2); });
+        console.warn('JEMAAH TANPA KATIL cannot accept staff ID, saving to STAFF TANPA KATIL field');
+        // Save to custom field STAFF TANPA KATIL
+        fetch(`https://api.airtable.com/v0/${base}/ROOMING%20LIST/${roomId}`,{method:'PATCH',headers:{Authorization:`Bearer ${pat}`,'Content-Type':'application/json'},body:JSON.stringify({fields:{'STAFF TANPA KATIL': staffTanpaList, 'STAFF LIST (ROOMING)': room.fields['STAFF LIST (ROOMING)']||[]}})}).then(r=>r.json()).then(d2=>{ console.log('saved to STAFF TANPA KATIL', d2); });
       }
     }).catch(err=>{ console.error(err); });
   }
   const s=getStaffById(staffId);
-  if(s){ s.roomIds = [...(s.roomIds||[]), roomId]; }
-  console.log('Staff assigned as tanpa katil', staffId, 'to', roomId);
+  if(s){ 
+    if(!s.roomIds) s.roomIds=[];
+    if(!s.roomIds.includes(roomId)) s.roomIds.push(roomId);
+  }
+  console.log('V90 Staff assigned as tanpa katil (many staff per room allowed)', staffId, 'to', roomId);
 }
 function getStaffTanpaKatilForRoom(roomId){
   try{
@@ -1228,12 +1273,19 @@ function removeStaffTanpaKatilFromRoom(roomId, staffId){
     list=list.filter(id=>id!==staffId);
     try{ localStorage.setItem(key, JSON.stringify(list)); }catch(e){}
     if(room.fields['_STAFF_TANPA_KATIL']) room.fields['_STAFF_TANPA_KATIL']=room.fields['_STAFF_TANPA_KATIL'].filter(id=>id!==staffId);
-    // Also remove from JEMAAH TANPA KATIL if exists there
     if(room.fields['JEMAAH TANPA KATIL']) room.fields['JEMAAH TANPA KATIL']=room.fields['JEMAAH TANPA KATIL'].filter(id=>id!==staffId);
+    // FIX V91: Also remove from staffList roomIds so staff becomes unassigned, not move to regular
+    const sRec = (typeof getStaffById==='function'? getStaffById(staffId) : staffList.find(s=>s.id===staffId||s.airtableId===staffId));
+    if(sRec && sRec.roomIds){
+      sRec.roomIds = sRec.roomIds.filter(rid=>rid!==roomId);
+      // Also remove from ROOMING LIST STAFF LIST field if exists
+      if(room.fields['STAFF LIST (ROOMING)']) room.fields['STAFF LIST (ROOMING)']=room.fields['STAFF LIST (ROOMING)'].filter(id=>id!==staffId);
+    }
     renderRoomingGrid();
+    renderStaffList();
     const base=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base')||localStorage.getItem('effah_base_id'); const pat=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
     if(base&&pat){
-      fetch(`https://api.airtable.com/v0/${base}/ROOMING%20LIST/${roomId}`,{method:'PATCH',headers:{Authorization:`Bearer ${pat}`,'Content-Type':'application/json'},body:JSON.stringify({fields:{'JEMAAH TANPA KATIL': room.fields['JEMAAH TANPA KATIL']||[]}})}).catch(()=>{});
+      fetch(`https://api.airtable.com/v0/${base}/ROOMING%20LIST/${roomId}`,{method:'PATCH',headers:{Authorization:`Bearer ${pat}`,'Content-Type':'application/json'},body:JSON.stringify({fields:{'JEMAAH TANPA KATIL': room.fields['JEMAAH TANPA KATIL']||[], 'STAFF LIST (ROOMING)': room.fields['STAFF LIST (ROOMING)']||[], 'STAFF TANPA KATIL': list}})}).catch(()=>{});
     }
   }
 }
@@ -1260,7 +1312,7 @@ function quickAssignStaffToRoom(staffId, roomId){
   if(!room) return;
   // Add to STAFF / EXTRA or linked staff field
   // Try to use linked staff field if exists
-  const staffField = room.fields['STAFF LIST (ROOMING)'] ? 'STAFF LIST (ROOMING)' : 'STAFF / EXTRA';
+  const staffField = (room.fields['STAFF LIST (ROOMING)']!==undefined) ? 'STAFF LIST (ROOMING)' : 'STAFF / EXTRA';
   if(staffField==='STAFF LIST (ROOMING)'){
     const current = room.fields[staffField]||[];
     if(current.includes(staffId)) { console.log('staff already in this room', staffId); return; }
