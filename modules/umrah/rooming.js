@@ -1,12 +1,3 @@
-
-function sortJemaahAZ_PRINT(list){
-  return [...list].sort((a,b)=>{
-    const na = (a.fields['NAMA JEMAAH']||a.fields['NAMA']||getJemaahName(a.fields)||'').toString().toUpperCase();
-    const nb = (b.fields['NAMA JEMAAH']||b.fields['NAMA']||getJemaahName(b.fields)||'').toString().toUpperCase();
-    return na.localeCompare(nb);
-  });
-}
-
 // ROOMING V102 SUPER CLEAN - All history comments removed - Functional code only
 console.log('ROOMING V102 SUPER CLEAN loaded');
 // ROOMING V102 FIX TAB CLICK - FIX async STRAY + _origDropJemaahToRoom DUPLICATE + _autoScrollInterval
@@ -841,7 +832,6 @@ function renderNamelist(){
   const topUnassignedBadge=document.getElementById('topUnassignedBadge'); if(topUnassignedBadge) topUnassignedBadge.style.display='none';
   const topAssignedBadge=document.getElementById('topAssignedBadge'); if(topAssignedBadge) topAssignedBadge.style.display='none';
   if(total===0){ cont.innerHTML='<div class="p-6 text-center text-[11px] text-slate-400">Tiada jemaah untuk trip ini</div>'; return; }
-  filtered = [...filtered].sort((a,b)=>{ const na=(getJemaahName(a.fields)||'').toUpperCase(); const nb=(getJemaahName(b.fields)||'').toUpperCase(); return na.localeCompare(nb); });
   cont.innerHTML=filtered.map((r,i)=>{
         const name=getJemaahName(r.fields);
     const assignedNormalInLoc=isJemaahAssignedInLocation(r.id, activeLocation);
@@ -1828,7 +1818,9 @@ function generateRoomingPrint(orientation){ orientation = orientation || 'landsc
     
     // NAMELIST ROWS - keep existing logic but ensure board badge shows actual value
     let combinedStaff = [...staffList];
-    let namelistRows = allRoomingJemaah.map((r,i)=>{
+    // FIX SORT A-Z untuk print
+    let sortedJemaahForPrint = [...allRoomingJemaah].sort((a,b)=>{ const na=(a.fields['NAMA JEMAAH']||a.fields['NAMA']||'').toString().toUpperCase(); const nb=(b.fields['NAMA JEMAAH']||b.fields['NAMA']||'').toString().toUpperCase(); return na.localeCompare(nb); });
+    let namelistRows = sortedJemaahForPrint.map((r,i)=>{
       const f=r.fields;
       const name=getJemaahName(f);
       const fbArr=getBoardArray(f);
@@ -2250,8 +2242,7 @@ renderNamelist = function(){
       });
     }
     const boardOptions = ['FULLBOARD','FULLBOARD (MEKAH)','BB (MEKAH)','FULLBOARD (MADINAH)','BB (MADINAH)'];
-    filtered = [...filtered].sort((a,b)=>{ const na=(getJemaahName(a.fields)||'').toUpperCase(); const nb=(getJemaahName(b.fields)||'').toUpperCase(); return na.localeCompare(nb); });
-  cont.innerHTML=filtered.map((r,i)=>{
+    cont.innerHTML=filtered.map((r,i)=>{
       const name=getJemaahName(r.fields);
       const assignedNormalInLoc=isJemaahAssignedInLocation(r.id, activeLocation);
       const assignedTanpaInLoc=allRoomingRecords.some(rec=> (rec.fields['LOKASI / CITY']||'MEKAH').toUpperCase()===activeLocation.toUpperCase() && ((rec.fields['JEMAAH TANPA KATIL']||[]).includes(r.id)));
@@ -2498,26 +2489,47 @@ window.removeStaffFromRoom = removeStaffFromRoom_FIXED;
 
 console.log('V102 RACE FIX loaded - queue per staff');
 
-// Patch print namelist to sort A-Z
-(function(){
-  const origPrint = window.printNamelist;
-  if(!origPrint) return;
-  window.printNamelist = function(){
-    const backup = window.allRoomingJemaah;
-    try{
-      if(backup && Array.isArray(backup)){
-        const jemaahOnly = backup.filter(r=> !(r.fields['IS_STAFF']||r.fields['STAFF']));
-        const staffOnly = backup.filter(r=> (r.fields['IS_STAFF']||r.fields['STAFF']));
-        window.allRoomingJemaah = [...sortJemaahAZ_PRINT(jemaahOnly), ...staffOnly.sort((a,b)=>{
-          const na=(a.fields['NAMA JEMAAH']||'').toUpperCase();
-          const nb=(b.fields['NAMA JEMAAH']||'').toUpperCase();
-          return na.localeCompare(nb);
-        })];
-      }
-      return origPrint.apply(this, arguments);
-    } finally {
-      window.allRoomingJemaah = backup;
-    }
-  };
-})();
-console.log('PRINT SORT A-Z FIXED - syntax error removed');
+
+function toggleStaffBoardMulti_FIXED(staffId, boardVal){
+  const staff = (window.staffList||[]).find(s=>s.id===staffId||s.airtableId===staffId);
+  if(!staff) return;
+  if(!staff.board) staff.board=[];
+  if(!Array.isArray(staff.board)) staff.board = staff.board ? [staff.board] : [];
+  const idx = staff.board.indexOf(boardVal);
+  if(idx>=0) staff.board.splice(idx,1); else staff.board.push(boardVal);
+  const isTrain = staff.board.includes('TRAIN') || !!staff.train;
+  staff.train = isTrain;
+  if(typeof saveStaffList==='function') try{saveStaffList();}catch(e){}
+  if(typeof renderStaffList==='function') renderStaffList();
+  if(typeof renderRoomingGrid==='function') renderRoomingGrid();
+  const base = window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base');
+  const pat = window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
+  if(base&&pat&&staff.airtableId){
+    const boardToSave = staff.board.filter(b=>b!=='TRAIN');
+    fetch('https://api.airtable.com/v0/'+base+'/STAFF%20LIST%20%28ROOMING%29/'+staff.airtableId,{
+      method:'PATCH', headers:{'Authorization':'Bearer '+pat,'Content-Type':'application/json'},
+      body: JSON.stringify({fields:{'BOARD BASIS': boardToSave, 'TRAIN': isTrain}})
+    }).then(r=>r.json()).then(d=>console.log('STAFF BOARD saved')).catch(()=>{});
+  }
+}
+window.toggleStaffBoardMulti = toggleStaffBoardMulti_FIXED;
+
+function updateStaffBoardSingle_FIXED(staffId, value){
+  const staff = (window.staffList||[]).find(s=>s.id===staffId||s.airtableId===staffId);
+  if(!staff) return;
+  const hasTrain = (staff.board||[]).includes('TRAIN') || !!staff.train;
+  if(value==='-'||value==='') staff.board = hasTrain ? ['TRAIN'] : [];
+  else staff.board = hasTrain ? [value,'TRAIN'] : [value];
+  if(typeof saveStaffList==='function') try{saveStaffList();}catch(e){}
+  if(typeof renderStaffList==='function') renderStaffList();
+  const base = window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base');
+  const pat = window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
+  if(base&&pat&&staff.airtableId){
+    const boardToSave = (staff.board||[]).filter(b=>b!=='TRAIN');
+    fetch('https://api.airtable.com/v0/'+base+'/STAFF%20LIST%20%28ROOMING%29/'+staff.airtableId,{
+      method:'PATCH', headers:{'Authorization':'Bearer '+pat,'Content-Type':'application/json'},
+      body: JSON.stringify({fields:{'BOARD BASIS': boardToSave}})
+    }).then(r=>r.json()).then(d=>console.log('STAFF BOARD single saved '+value)).catch(()=>{});
+  }
+}
+window.updateStaffBoardSingle = updateStaffBoardSingle_FIXED;
