@@ -383,7 +383,7 @@ function renderRoomingHTML(){
               <i class="fa-solid fa-magnifying-glass absolute left-2.5 top-2.5 text-slate-400 text-[10px]"></i>
               <input id="searchRoomingJemaah" onkeyup="filterRoomingNamelist()" placeholder="Cari nama jemaah..." class="w-full text-[11px] pl-7 pr-2.5 py-2 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:outline-none">
             </div>
-            <select id="filterPakejRooming" onchange="filterRoomingNamelist()" class="text-[11px] border border-slate-200 rounded-xl px-2.5 py-2 bg-white font-medium"><option value="">Semua Pakej</option><option value="-">-</option><option value="JIMAT STANDARD">JIMAT STANDARD</option><option value="JIMAT PREMIUM">JIMAT PREMIUM</option><option value="EKONOMI LITE">EKONOMI LITE</option><option value="EKONOMI">EKONOMI</option><option value="STANDARD">STANDARD</option><option value="PREMIUM">PREMIUM</option><option value="PREMIUM PLUS">PREMIUM PLUS</option></select>
+            <select id="filterPakejRooming" onchange="filterRoomingNamelist()" class="text-[11px] border border-slate-200 rounded-xl px-2.5 py-2 bg-white font-medium"><option value="">Semua Pakej</option><option value="JIMAT STANDARD">JIMAT STANDARD</option><option value="JIMAT PREMIUM">JIMAT PREMIUM</option><option value="EKONOMI LITE">EKONOMI LITE</option><option value="EKONOMI">EKONOMI</option><option value="STANDARD">STANDARD</option><option value="PREMIUM">PREMIUM</option><option value="PREMIUM PLUS">PREMIUM PLUS</option></select>
           </div>
         </div>
         <div class="px-2.5 py-1.5 bg-slate-50/70 border-b border-slate-200 grid grid-cols-12 text-[9px] font-bold text-slate-500 tracking-wider">
@@ -444,7 +444,7 @@ function renderRoomingHTML(){
           <p class="text-[9px] text-slate-400 mt-0.5">Dijana automatik: B + Kapasiti</p>
         </div>
         <select id="newRoomLokasi" class="w-full p-2 border border-slate-200 rounded-xl bg-white text-[11px]"><option value="MEKAH">MEKAH</option><option value="MADINAH">MADINAH</option><option value="TAIF">TAIF</option><option value="JEDDAH">JEDDAH</option></select>
-        <select id="newRoomPakej" class="w-full p-2 border border-slate-200 rounded-xl bg-white text-[11px] font-bold"><option value="-">-</option><option value="JIMAT STANDARD">JIMAT STANDARD</option><option value="JIMAT PREMIUM">JIMAT PREMIUM</option><option value="EKONOMI LITE">EKONOMI LITE</option><option value="EKONOMI">EKONOMI</option><option value="STANDARD">STANDARD</option><option value="PREMIUM">PREMIUM</option><option value="PREMIUM PLUS">PREMIUM PLUS</option></select>
+        <select id="newRoomPakej" class="w-full p-2 border border-slate-200 rounded-xl bg-white text-[11px] font-bold"><option value="JIMAT STANDARD">JIMAT STANDARD</option><option value="JIMAT PREMIUM">JIMAT PREMIUM</option><option value="EKONOMI LITE">EKONOMI LITE</option><option value="EKONOMI">EKONOMI</option><option value="STANDARD">STANDARD</option><option value="PREMIUM">PREMIUM</option><option value="PREMIUM PLUS">PREMIUM PLUS</option></select>
         <input id="newRoomHotel" placeholder="Nama Hotel" class="w-full p-2 border border-slate-200 rounded-xl bg-white text-[11px]">
         <div class="flex gap-2 items-center">
           <input id="newRoomCap" type="number" value="4" min="1" max="8" oninput="updateNewRoomIdFromCap()" class="flex-1 p-2 border border-slate-200 rounded-xl font-bold bg-white text-[11px]">
@@ -899,7 +899,16 @@ function renderNamelist(){
         ${insToggle}
       </div>
       <div class="col-span-1 flex items-center gap-0.5">
-        "+buildNamelistPakejSelect(f['PAKEJ']||f['JENIS PAKEJ']||'-', j.id||j.airtableId)+"
+        <select onchange="updateJemaahField('${r.id}','PAKEJ',this.value)" class="text-[9px] border border-slate-200 rounded-full px-2 py-1 bg-white">
+          <option value="-" ${pk==='-'?'selected':''}>-</option>
+          <option value="JIMAT STANDARD" ${pk==='JIMAT STANDARD'?'selected':''}>JIMAT STANDARD</option>
+          <option value="JIMAT PREMIUM" ${pk==='JIMAT PREMIUM'?'selected':''}>JIMAT PREMIUM</option>
+          <option value="EKONOMI LITE" ${pk==='EKONOMI LITE'?'selected':''}>EKONOMI LITE</option>
+          <option value="EKONOMI" ${pk==='EKONOMI'?'selected':''}>EKONOMI</option>
+          <option value="STANDARD" ${pk==='STANDARD'?'selected':''}>STANDARD</option>
+          <option value="PREMIUM" ${pk==='PREMIUM'?'selected':''}>PREMIUM</option>
+          <option value="PREMIUM PLUS" ${pk==='PREMIUM PLUS'?'selected':''}>PREMIUM PLUS</option>
+        </select>
       </div>
       <div class="col-span-1 text-center">${statusIcon}</div>
     </div>`;
@@ -2290,7 +2299,16 @@ renderNamelist = function(){
           </div>
         </div>
         <div class="col-span-1 flex items-center gap-0.5">
-          "+buildNamelistPakejSelect(f['PAKEJ']||f['JENIS PAKEJ']||'-', j.id||j.airtableId)+"
+          <select onchange="updateJemaahField('${r.id}','PAKEJ',this.value)" class="text-[9px] border border-slate-200 rounded-full px-2 py-1 bg-white">
+          <option value="-" ${pk==='-'?'selected':''}>-</option>
+          <option value="JIMAT STANDARD" ${pk==='JIMAT STANDARD'?'selected':''}>JIMAT STANDARD</option>
+          <option value="JIMAT PREMIUM" ${pk==='JIMAT PREMIUM'?'selected':''}>JIMAT PREMIUM</option>
+          <option value="EKONOMI LITE" ${pk==='EKONOMI LITE'?'selected':''}>EKONOMI LITE</option>
+          <option value="EKONOMI" ${pk==='EKONOMI'?'selected':''}>EKONOMI</option>
+          <option value="STANDARD" ${pk==='STANDARD'?'selected':''}>STANDARD</option>
+          <option value="PREMIUM" ${pk==='PREMIUM'?'selected':''}>PREMIUM</option>
+          <option value="PREMIUM PLUS" ${pk==='PREMIUM PLUS'?'selected':''}>PREMIUM PLUS</option>
+        </select>
         </div>
         <div class="col-span-1 text-center">${statusIcon}</div>
       </div>`;
@@ -2468,47 +2486,3 @@ window.assignStaffToRoom = assignStaffToRoom_FIXED;
 window.removeStaffFromRoom = removeStaffFromRoom_FIXED;
 
 console.log('V102 RACE FIX loaded - queue per staff');
-
-
-// FIX PAKEJ NAMELIST ONLY - with "-" option and selected, does not touch BOARD BASIS layout
-function buildNamelistPakejSelect(currentVal, jemaahId){
-  const cur = (currentVal||'-').toString().trim().toUpperCase();
-  const opts = ['-','JIMAT STANDARD','JIMAT PREMIUM','EKONOMI LITE','EKONOMI','STANDARD','PREMIUM','PREMIUM PLUS'];
-  let h = `<select onchange="updateJemaahPakejNamelist('${jemaahId}', this.value)" class="text-[10px] border border-slate-200 rounded-full px-2 py-1 bg-white font-bold w-[110px]">`;
-  for(const o of opts){
-    const sel = (cur===o) ? 'selected' : '';
-    h+=`<option value="${o}" ${sel}>${o}</option>`;
-  }
-  h+='</select>';
-  return h;
-}
-function updateJemaahPakejNamelist(jemaahId, value){
-  const j = (window.jemaahList||[]).find(x=>x.id===jemaahId||x.airtableId===jemaahId);
-  if(!j) return;
-  if(!j.fields) j.fields={};
-  j.fields['PAKEJ']=value;
-  if(typeof saveJemaahList==='function') saveJemaahList();
-  // persist to Airtable
-  const base = window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base');
-  const pat = window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
-  if(base&&pat&&j.airtableId){
-    fetch(`https://api.airtable.com/v0/${base}/JEMAAH%20LIST/${j.airtableId}`,{
-      method:'PATCH', headers:{'Authorization':`Bearer ${pat}`,'Content-Type':'application/json'},
-      body: JSON.stringify({fields:{'PAKEJ': value}})
-    }).then(r=>r.json()).then(d=>{
-      if(d.error){
-        return fetch(`https://api.airtable.com/v0/${base}/JEMAAH%20LIST/${j.airtableId}`,{
-          method:'PATCH', headers:{'Authorization':`Bearer ${pat}`,'Content-Type':'application/json'},
-          body: JSON.stringify({fields:{'JENIS PAKEJ': value}})
-        });
-      }
-    }).catch(()=>{});
-  }
-  // update UI without full re-render to avoid layout jump
-  if(typeof renderNamelist==='function'){
-    const sel = document.querySelector(`select[data-pakej-id="${jemaahId}"]`);
-    if(!sel) renderNamelist();
-  }
-}
-window.updateJemaahPakejNamelist=updateJemaahPakejNamelist;
-window.buildNamelistPakejSelect=buildNamelistPakejSelect;
