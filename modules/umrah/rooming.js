@@ -1,3 +1,12 @@
+
+function sortJemaahAZ_PRINT(list){
+  return [...list].sort((a,b)=>{
+    const na = (a.fields['NAMA JEMAAH']||a.fields['NAMA']||getJemaahName(a.fields)||'').toString().toUpperCase();
+    const nb = (b.fields['NAMA JEMAAH']||b.fields['NAMA']||getJemaahName(b.fields)||'').toString().toUpperCase();
+    return na.localeCompare(nb);
+  });
+}
+
 // ROOMING V102 SUPER CLEAN - All history comments removed - Functional code only
 console.log('ROOMING V102 SUPER CLEAN loaded');
 // ROOMING V102 FIX TAB CLICK - FIX async STRAY + _origDropJemaahToRoom DUPLICATE + _autoScrollInterval
@@ -818,7 +827,7 @@ function renderNamelist(){
     });
   }
   const total=allRoomingJemaah.length;
-  const belumGlobal=sortJemaahAZ(allRoomingJemaah).filter(r=>!isJemaahAssignedAny)(r.id)).length;
+  const belumGlobal=allRoomingJemaah.filter(r=>!isJemaahAssignedAny(r.id)).length;
   // V24.16: belumInLoc kira termasuk tanpa katil juga
   const belumInLoc=allRoomingJemaah.filter(r=>{
     const assignedNormal = isJemaahAssignedInLocation(r.id, activeLocation);
@@ -2489,51 +2498,26 @@ window.removeStaffFromRoom = removeStaffFromRoom_FIXED;
 
 console.log('V102 RACE FIX loaded - queue per staff');
 
-
-// ===== FIX PRINT NAMELIST SORT A-Z =====
-const _origPrintNamelist = window.printNamelist || window.printNamelistPortrait || window.generateNamelistPrint;
-function sortJemaahAZ(list){
-  return [...list].sort((a,b)=>{
-    const nameA = (a.fields['NAMA JEMAAH']||a.fields['NAMA']||'').toString().toUpperCase();
-    const nameB = (b.fields['NAMA JEMAAH']||b.fields['NAMA']||'').toString().toUpperCase();
-    return nameA.localeCompare(nameB);
-  });
-}
-// Override print functions to sort A-Z
-function printNamelistSorted(){
-  const list = window.allRoomingJemaah || window.jemaahList || [];
-  const sorted = sortJemaahAZ(list.filter(r=>!r.fields['STAFF'])); // only jemaah
-  const staff = list.filter(r=>r.fields['STAFF']);
-  const allSorted = [...sorted, ...staff]; // jemaah A-Z then staff
-  // Store sorted for print function to use
-  window._printSortedJemaah = allSorted;
-  if(typeof window.printNamelistOriginal==='function'){
-    window.printNamelistOriginal(allSorted);
-  } else if(typeof window.printNamelistPortrait==='function'){
-    // Call original print with sorted
-    const orig = window.printNamelistPortrait;
-    // Temporarily replace allRoomingJemaah
+// Patch print namelist to sort A-Z
+(function(){
+  const origPrint = window.printNamelist;
+  if(!origPrint) return;
+  window.printNamelist = function(){
     const backup = window.allRoomingJemaah;
-    window.allRoomingJemaah = allSorted;
-    orig();
-    window.allRoomingJemaah = backup;
-  } else {
-    // Fallback: try to find print logic
-    const backup = window.allRoomingJemaah;
-    window.allRoomingJemaah = allSorted;
-    if(typeof window.printNamelist==='function' && window.printNamelist!==printNamelistSorted){
-      window.printNamelist = window._origPrintNamelist;
-      window.printNamelist();
-      window.printNamelist = printNamelistSorted;
+    try{
+      if(backup && Array.isArray(backup)){
+        const jemaahOnly = backup.filter(r=> !(r.fields['IS_STAFF']||r.fields['STAFF']));
+        const staffOnly = backup.filter(r=> (r.fields['IS_STAFF']||r.fields['STAFF']));
+        window.allRoomingJemaah = [...sortJemaahAZ_PRINT(jemaahOnly), ...staffOnly.sort((a,b)=>{
+          const na=(a.fields['NAMA JEMAAH']||'').toUpperCase();
+          const nb=(b.fields['NAMA JEMAAH']||'').toUpperCase();
+          return na.localeCompare(nb);
+        })];
+      }
+      return origPrint.apply(this, arguments);
+    } finally {
+      window.allRoomingJemaah = backup;
     }
-    window.allRoomingJemaah = backup;
-  }
-}
-// Save originals
-if(window.printNamelist && !window.printNamelistOriginal){
-  window.printNamelistOriginal = window.printNamelist;
-  window._origPrintNamelist = window.printNamelist;
-}
-window.printNamelist = printNamelistSorted;
-
-// Also patch the actual HTML generation inside print - sort filtered before map
+  };
+})();
+console.log('PRINT SORT A-Z FIXED - syntax error removed');
