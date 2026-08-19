@@ -1,24 +1,12 @@
+// ROOMING V97 - NO RED BANNER + TRAIN CHECKBOX FIXED + REMOVE STAFF BOTH TABLES + PAKEJ SINGLE SELECT 7 OPTIONS - 2026-08-19
+console.log('ROOMING V97 loaded - train visible, no banner, pakej single select');
+// ROOMING V97 - NO RED BANNER + TRAIN CHECKBOX FOR STAFF FIXED + REMOVE STAFF BOTH TABLES + PAKEJ SINGLE SELECT 7 OPTIONS - 2026-08-19
+console.log('ROOMING V97 loaded - no banner, train checkbox visible, pakej single select 7 options');
 // ROOMING V96 - SUPER VISIBLE BANNER + TRAIN FIX + PAKEJ 7 NEW + REMOVE BOTH TABLES - 2026-08-19
 console.log('ROOMING V96 loaded - SUPER VISIBLE');
 // ROOMING V95 - REBUILD TRAIN VISIBLE + REMOVE STAFF BOTH TABLES + 7 PAKEJ OPTIONS + PRINT ORIGINAL S NUMBERING - 2026-08-19
 
-// V96 VISIBLE BANNER - to prove file loaded
-(function(){
-  const checkBanner = () => {
-    if(document.getElementById('v96-banner')) return;
-    const header = document.querySelector('header') || document.body;
-    if(!header) return;
-    const banner = document.createElement('div');
-    banner.id='v96-banner';
-    banner.style.cssText='position:fixed;top:0;left:0;right:0;background:#FF0000;color:#fff;padding:6px 12px;font-size:12px;font-weight:bold;z-index:99999;text-align:center;';
-    banner.innerHTML='🔴 ROOMING V96 LOADED - TRAIN FIX + PAKEJ 7 OPTIONS + REMOVE SYNC - '+new Date().toISOString()+' <button onclick="this.parentElement.remove()" style="margin-left:12px;background:#fff;color:#f00;border-radius:12px;padding:2px 8px;font-size:10px">X</button>';
-    document.body.prepend(banner);
-    console.log('V96 banner injected');
-  };
-  setTimeout(checkBanner, 500);
-  setTimeout(checkBanner, 1500);
-  document.addEventListener('DOMContentLoaded', checkBanner);
-})();
+
 
 console.log('ROOMING V95 loaded - TRAIN visible amber, remove staff both tables, pakej 7 options, print original');
 // ROOMING V93 - RESTORE ORIGINAL PRINT LAYOUT + FIX STAFF TANPA KATIL S NUMBERING (NOT NA) - 2026-08-19
@@ -186,7 +174,7 @@ async function updateStaffTrain(staffId, checked){
 async function assignStaffToRoom(staffId,roomId){
   const staff=staffList.find(s=>s.id===staffId||s.airtableId===staffId); if(!staff) return;
   const rec=allRoomingRecords.find(r=>r.id===roomId); if(!rec) return;
-  // FIX: allow multiple rooms linking - append not overwrite
+  // FIX: allow  rooms linking - append not overwrite
   if(!staff.roomIds) staff.roomIds=[];
   if(!staff.roomIds.includes(roomId)) staff.roomIds.push(roomId);
   staff.roomLink = staff.roomIds[0];
@@ -315,6 +303,7 @@ async function deleteStaff(staffId){
   saveStaffList(); renderStaffList();
 }
 
+
 function renderStaffList(){
   const cont=document.getElementById('staffListContainer'); const badge=document.getElementById('staffTotalBadge'); if(!cont) return; if(badge) badge.textContent=staffList.length+' Staff';
   if(staffList.length===0){ cont.innerHTML='<div class="p-2.5 text-center text-[11px] text-slate-400">Tiada staff / extra</div>'; return; }
@@ -327,14 +316,14 @@ function renderStaffList(){
     else if(boardVal==='FULLBOARD (MADINAH)' || boardVal==='BB (MADINAH)') boardCls='bg-blue-100 border-blue-200 text-blue-800';
     else if(boardVal==='FULLBOARD') boardCls='bg-emerald-100 border-emerald-200 text-emerald-800';
     const trainChecked = s.train||s.fields?.TRAIN||false;
-    const trainCls = trainChecked ? 'bg-amber-400 border-amber-500 text-amber-900' : 'bg-white border-slate-200';
-    return `<div ${drag} class="flex flex-col gap-1 px-2.5 py-2 rounded-xl border text-[11px] ${cls}">
+    const trainCls = trainChecked ? 'bg-amber-300 border-amber-500 text-amber-900' : 'bg-white border-slate-300';
+    return `<div ${drag} class="flex flex-col gap-1.5 px-2.5 py-2 rounded-xl border text-[11px] ${cls}">
       <div class="flex items-center justify-between">
         <div class="flex gap-2 items-center"><span class="text-slate-400 text-[10px]">${String(idx+1).padStart(2,'0')}</span><span class="font-medium truncate max-w-[120px]">${s.name}</span>${assignedInLoc?'<span class="ml-1 px-1 py-0.5 bg-slate-200 rounded text-[8px]">ASSIGNED di '+activeLocation+'</span>':''}</div>
         <div class="flex gap-1"><button onclick="quickAssignStaff('${s.id}')" class="w-5 h-5 rounded-full border ${assignedInLoc?'opacity-30':'hover:bg-[#7A0C2E] hover:text-white'} text-[10px]">+</button><button onclick="deleteStaff('${s.id}')" class="w-5 h-5 rounded-full border hover:bg-red-50 text-[10px]"><i class="fa-solid fa-trash text-[9px]"></i></button></div>
       </div>
-      <div class="flex items-center gap-1">
-        <select onchange="updateStaffField('${s.id}','boardBasis',this.value)" class="text-[8px] border rounded-full px-1.5 py-0.5 font-bold ${boardCls} outline-none flex-1">
+      <div class="flex items-center gap-1.5">
+        <select onchange="updateStaffField('${s.id}','boardBasis',this.value)" class="text-[8px] border rounded-full px-2 py-0.5 font-bold ${boardCls} outline-none flex-1">
           <option value="" ${!boardVal?'selected':''}>- BOARD</option>
           <option value="FULLBOARD" ${boardVal==='FULLBOARD'?'selected':''}>FULLBOARD</option>
           <option value="FULLBOARD (MEKAH)" ${boardVal==='FULLBOARD (MEKAH)'?'selected':''}>FULLBOARD (MEKAH)</option>
@@ -342,11 +331,64 @@ function renderStaffList(){
           <option value="BB (MEKAH)" ${boardVal==='BB (MEKAH)'?'selected':''}>BB (MEKAH)</option>
           <option value="BB (MADINAH)" ${boardVal==='BB (MADINAH)'?'selected':''}>BB (MADINAH)</option>
         </select>
-        <label class="flex items-center gap-1 text-[8px] border rounded-full px-2 py-0.5 cursor-pointer font-bold ${trainCls}"><input type="checkbox" ${trainChecked?'checked':''} onchange="updateStaffTrain('${s.id}',this.checked)" class="w-3 h-3 accent-amber-600"> TRAIN 🔥 V96</label>
+        <label class="flex items-center gap-1 text-[8px] border rounded-full px-2 py-1 cursor-pointer font-bold ${trainCls}"><input type="checkbox" ${trainChecked?'checked':''} onchange="updateStaffTrain('${s.id}',this.checked)" class="w-3 h-3 accent-amber-600"> TRAIN</label>
       </div>
     </div>`;
   }).join('');
 }
+async function removeStaffFromRoom(roomId, staffId){
+  console.log('V97 removeStaffFromRoom', roomId, staffId);
+  const staff=staffList.find(s=>s.id===staffId||s.airtableId===staffId); 
+  if(!staff){
+    const rec=allRoomingRecords.find(r=>r.id===roomId);
+    if(rec){
+      const arr=(rec.fields['STAFF / EXTRA']||'').split(',').map(x=>x.trim()).filter(x=>x&&x!==staffId);
+      rec.fields['STAFF / EXTRA']=arr.join(',');
+      const staffField='STAFF LIST (ROOMING)';
+      if(rec.fields[staffField]) rec.fields[staffField]=rec.fields[staffField].filter(id=>id!==staffId);
+      renderRoomingGrid();
+      const base=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base')||localStorage.getItem('effah_base_id');
+      const pat=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
+      if(base&&pat){
+        await fetch(`https://api.airtable.com/v0/${base}/ROOMING%20LIST/${roomId}`,{
+          method:'PATCH',
+          headers:{'Authorization':`Bearer ${pat}`,'Content-Type':'application/json'},
+          body: JSON.stringify({fields:{'STAFF / EXTRA': arr.join(','), 'STAFF LIST (ROOMING)': rec.fields['STAFF LIST (ROOMING)']||[]}})
+        });
+      }
+    }
+    return;
+  }
+  staff.roomIds = (staff.roomIds||[]).filter(id=>id!==roomId);
+  staff.roomLink = staff.roomIds.length? staff.roomIds[0] : null;
+  if(typeof saveStaffList==='function') saveStaffList();
+  renderStaffList(); renderRoomingGrid(); renderLocationTabs();
+  const base=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base')||localStorage.getItem('effah_base_id');
+  const pat=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
+  if(!base||!pat||!staff.airtableId){ console.warn('V97 missing Airtable config'); return; }
+  try{
+    const res1=await fetch(`https://api.airtable.com/v0/${base}/STAFF%20LIST%20%28ROOMING%29/${staff.airtableId}`,{
+      method:'PATCH',
+      headers:{'Authorization':`Bearer ${pat}`,'Content-Type':'application/json'},
+      body: JSON.stringify({fields:{'ROOMING LIST': staff.roomIds, 'ROOM': staff.roomIds}})
+    });
+    const data1=await res1.json();
+    console.log('V97 STAFF cleared', data1);
+    const roomRec=allRoomingRecords.find(r=>r.id===roomId);
+    if(roomRec){
+      const staffField='STAFF LIST (ROOMING)';
+      const newList=(roomRec.fields[staffField]||[]).filter(id=>id!==staffId && id!==staff.airtableId);
+      roomRec.fields[staffField]=newList;
+      const res2=await fetch(`https://api.airtable.com/v0/${base}/ROOMING%20LIST/${roomId}`,{
+        method:'PATCH',
+        headers:{'Authorization':`Bearer ${pat}`,'Content-Type':'application/json'},
+        body: JSON.stringify({fields:{[staffField]: newList}})
+      });
+      console.log('V97 ROOMING cleared', await res2.json());
+    }
+  }catch(e){ console.error('V97 remove failed', e); }
+}
+
 
 
 function cleanTripNameForRooming(name){
@@ -498,7 +540,7 @@ function renderRoomingHTML(){
               <i class="fa-solid fa-magnifying-glass absolute left-2.5 top-2.5 text-slate-400 text-[10px]"></i>
               <input id="searchRoomingJemaah" onkeyup="filterRoomingNamelist()" placeholder="Cari nama jemaah..." class="w-full text-[11px] pl-7 pr-2.5 py-2 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:outline-none">
             </div>
-            <select id="filterPakejRooming" onchange="filterRoomingNamelist()" class="text-[11px] border border-slate-200 rounded-xl px-2.5 py-2 bg-white font-bold"><option value="">Semua Pakej</option><option>JIMAT STANDARD</option><option>JIMAT PREMIUM</option><option>EKONOMI LITE</option><option>EKONOMI</option><option>STANDARD</option><option>PREMIUM</option><option>PREMIUM PLUS</option></select>
+            <select id="filterPakejRooming" onchange="filterRoomingNamelist()" class="text-[11px] border border-slate-200 rounded-xl px-2.5 py-2 bg-white font-medium"><option value="">Semua Pakej</option><option>JIMAT STANDARD</option><option>JIMAT PREMIUM</option><option>EKONOMI LITE</option><option>EKONOMI</option><option>STANDARD</option><option>PREMIUM</option><option>PREMIUM PLUS</option></select>
           </div>
         </div>
         <div class="px-2.5 py-1.5 bg-slate-50/70 border-b border-slate-200 grid grid-cols-12 text-[9px] font-bold text-slate-500 tracking-wider">
@@ -559,7 +601,7 @@ function renderRoomingHTML(){
           <p class="text-[9px] text-slate-400 mt-0.5">Dijana automatik: B + Kapasiti</p>
         </div>
         <select id="newRoomLokasi" class="w-full p-2 border border-slate-200 rounded-xl bg-white text-[11px]"><option value="MEKAH">MEKAH</option><option value="MADINAH">MADINAH</option><option value="TAIF">TAIF</option><option value="JEDDAH">JEDDAH</option></select>
-        <select id="newRoomPakej" class="w-full p-2 border-2 border-red-500 rounded-xl bg-yellow-100 text-[12px] font-bold"><option>JIMAT STANDARD ✅ NEW</option><option>JIMAT PREMIUM ✅ NEW</option><option>EKONOMI LITE ✅ NEW</option><option>EKONOMI ✅ NEW</option><option>STANDARD ✅ NEW</option><option>PREMIUM ✅ NEW</option><option>PREMIUM PLUS ✅ NEW</option></select>
+        <select id="newRoomPakej" class="w-full p-2 border border-slate-200 rounded-xl bg-white text-[11px] font-bold"><option>JIMAT STANDARD</option><option>JIMAT PREMIUM</option><option>EKONOMI LITE</option><option>EKONOMI</option><option>STANDARD</option><option>PREMIUM</option><option>PREMIUM PLUS</option></select>
         <input id="newRoomHotel" placeholder="Nama Hotel" class="w-full p-2 border border-slate-200 rounded-xl bg-white text-[11px]">
         <div class="flex gap-2 items-center">
           <input id="newRoomCap" type="number" value="4" min="1" max="8" oninput="updateNewRoomIdFromCap()" class="flex-1 p-2 border border-slate-200 rounded-xl font-bold bg-white text-[11px]">
@@ -1520,10 +1562,10 @@ async function updateJemaahField(jemaahId, field, value){
         payloadValue = value.split(',').map(s=>s.trim()).filter(Boolean);
       }
     }
-    // If null, send empty array for multiple select to clear? Airtable needs null to clear multiple select
+    // If null, send empty array for  select to clear? Airtable needs null to clear  select
     const fieldsToSend = {};
     if(payloadValue===null || (Array.isArray(payloadValue) && payloadValue.length===0)){
-      // For multiple select, sending [] or null clears, but Airtable docs: use [] to clear? Use null
+      // For  select, sending [] or null clears, but Airtable docs: use [] to clear? Use null
       fieldsToSend[field] = field==='INSURAN' || field==='BOARD BASIS' ? [] : '';
     } else {
       fieldsToSend[field] = payloadValue;
@@ -1547,7 +1589,7 @@ async function updateJemaahBoardMulti(jemaahId, selectedArr){
   rec.fields['BOARD']=selectedArr.join(', ');
   renderNamelist();
   try{
-    // Try save as array (for multiple select field)
+    // Try save as array (for  select field)
     let res=await fetch(`https://api.airtable.com/v0/${base}/DATA%20JEMAAH%20UMRAH/${jemaahId}`,{method:'PATCH',headers:{Authorization:`Bearer ${pat}`,'Content-Type':'application/json'},body:JSON.stringify({fields: {'BOARD BASIS': selectedArr.length?selectedArr:null}})});
     let data=await res.json();
     if(data.error){
