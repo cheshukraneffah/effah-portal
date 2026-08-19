@@ -1817,9 +1817,9 @@ function generateRoomingPrint(orientation){ orientation = orientation || 'landsc
     const tripId = window.selectedTripRecord?.id || localStorage.getItem('effah_active_trip_id') || '';
     
     // NAMELIST ROWS - keep existing logic but ensure board badge shows actual value
-    let combinedStaff = [...staffList].sort((a,b)=>{ const na=(a.fields['NAMA']||a.fields['NAMA JEMAAH']||'').toString().toUpperCase(); const nb=(b.fields['NAMA']||b.fields['NAMA JEMAAH']||'').toString().toUpperCase(); return na.localeCompare(nb); });
+    let combinedStaff = [...staffList].sort((a,b)=>{ try{ const na=(getJemaahName(a.fields)||a.fields['NAMA']||'').toString().toUpperCase(); const nb=(getJemaahName(b.fields)||b.fields['NAMA']||'').toString().toUpperCase(); return na.localeCompare(nb); }catch(e){ return 0; } });
     // FIX SORT A-Z untuk print
-    let sortedJemaahForPrint = [...allRoomingJemaah].sort((a,b)=>{ const na=(a.fields['NAMA JEMAAH']||a.fields['NAMA']||'').toString().toUpperCase(); const nb=(b.fields['NAMA JEMAAH']||b.fields['NAMA']||'').toString().toUpperCase(); return na.localeCompare(nb); });
+    let sortedJemaahForPrint = [...allRoomingJemaah].sort((a,b)=>{ try{ const na=(getJemaahName(a.fields)||a.fields['NAMA JEMAAH']||a.fields['NAMA']||'').toString().toUpperCase(); const nb=(getJemaahName(b.fields)||b.fields['NAMA JEMAAH']||b.fields['NAMA']||'').toString().toUpperCase(); return na.localeCompare(nb); }catch(e){ return 0; } });
     let namelistRows = sortedJemaahForPrint.map((r,i)=>{
       const f=r.fields;
       const name=getJemaahName(f);
