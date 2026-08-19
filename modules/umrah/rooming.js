@@ -1,3 +1,5 @@
+// ROOMING V88 - STAFF IN TANPA KATIL MODAL + CATATAN SAVE + DRAG FIX - 2026-08-19
+console.log('ROOMING V88 loaded - staff in tanpa katil modal, catatan save, drag fix');
 // ROOMING V87 - FIX CATATAN BILIK SAVE + STAFF AS TANPA KATIL DROP + GRIP FIX - 2026-08-19
 console.log('ROOMING V87 loaded - catatan save fix + staff tanpa katil');
 // ROOMING V86 - STAFF DRAG & DROP + FIX COUNT 23 vs 25 (INCLUDE TANPA KATIL) + STAFF AS TANPA KATIL - 2026-08-19
@@ -1491,9 +1493,21 @@ function openTanpaKatilModal(roomId){
       return true;
     });
     console.log('available tanpa katil (BELUM ASSIGN IN LOC) list:', available.map(j=>getJemaahName(j.fields)));
-    console.log('available count for', activeLocation, available.length);
-    if(available.length===0){
-      alert('Tiada Baki Jemaah\n\nSemua jemaah telah ada bilik di ' + activeLocation + '. Tiada jemaah belum assign untuk ditambah sebagai Tanpa Katil.');
+    // Include unassigned STAFF as well
+    const availableStaff = staffList.filter(s=>{
+      const assigned = isStaffAssignedInLocation(s.id||s.airtableId, activeLocation);
+      return !assigned;
+    });
+    console.log('available staff count', availableStaff.length);
+    const combinedAvailable = [...available.map(j=>({type:'jemaah', data:j})), ...availableStaff.map(s=>({type:'staff', data:s}))];
+    console.log('combined available count for', activeLocation, combinedAvailable.length);
+    if(combinedAvailable.length===0){
+      alert('Tiada Baki Jemaah/Staff\n\nSemua jemaah dan staff telah ada bilik di ' + activeLocation + '. Tiada baki belum assign untuk ditambah sebagai Tanpa Katil.');
+      return;
+    }
+    const availableForModal = combinedAvailable;
+    if(availableForModal.length===0){
+      alert('Tiada Baki');
       return;
     }
     let existingModal = document.getElementById('tanpaKatilSelectorModal');
@@ -1501,14 +1515,14 @@ function openTanpaKatilModal(roomId){
     const modalHtml = `<div id="tanpaKatilSelectorModal" style="position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px">
       <div style="background:#fff;border-radius:16px;max-width:420px;width:100%;max-height:75vh;overflow:hidden;box-shadow:0 20px 40px rgba(0,0,0,0.2)">
         <div style="padding:12px 16px;border-bottom:1px solid #eee;display:flex;justify-content:space-between;align-items:center">
-          <span style="font-weight:bold;font-size:12px">Pilih Infant / Tanpa Katil - ${activeLocation} (${available.length} baki belum assign)</span>
+          <span style="font-weight:bold;font-size:12px">Pilih Infant / Tanpa Katil - ${activeLocation} (${combinedAvailable.length} baki belum assign)</span>
           <button onclick="document.getElementById('tanpaKatilSelectorModal').remove()" style="w-6 h-6 rounded-full bg-slate-100">X</button>
         </div>
         <div style="padding:6px 8px;background:#fffbe6;border-bottom:1px solid #fde68a;font-size:9px;color:#92400e">Hanya jemaah yang belum ada bilik di ${activeLocation} sahaja. Infant tidak kira kapasiti.</div>
         <div style="padding:8px;max-height:50vh;overflow-y:auto" id="tanpaKatilList">
           <input type="text" id="tanpaKatilSearch" placeholder="Cari nama..." style="width:100%;padding:6px 10px;border:1px solid #ddd;border-radius:20px;font-size:11px;margin-bottom:8px" oninput="filterTanpaKatilList(this.value)">
           <div id="tanpaKatilOptions">
-            ${available.map((j, idx)=>`<button onclick="addTanpaKatilToRoom('${roomId}','${j.id}'); document.getElementById('tanpaKatilSelectorModal').remove()" style="width:100%;text-align:left;padding:8px 10px;border:1px solid #eee;border-radius:10px;margin-bottom:4px;font-size:11px;background:#fff" class="hover:bg-amber-50">${idx+1}. ${getJemaahName(j.fields)}</button>`).join('')}
+            ${combinedAvailable.map((item, idx)=>{ const isStaff = item.type==='staff'; const id = isStaff ? (item.data.id||item.data.airtableId) : item.data.id; const name = isStaff ? (item.data.name||'Staff') : getJemaahName(item.data.fields); const badge = isStaff ? '<span style="background:#FADBD8;color:#7A0C2E;padding:1px 6px;border-radius:10px;font-size:8px">STAFF</span>' : '<span style="background:#7A0C2E;color:#fff;padding:1px 6px;border-radius:10px;font-size:8px">JEMAAH</span>'; const onclick = isStaff ? `addStaffTanpaKatilToRoom('${roomId}','${id}');` : `addTanpaKatilToRoom('${roomId}','${id}');`; return `<button onclick="${onclick} document.getElementById('tanpaKatilSelectorModal').remove()" style="width:100%;text-align:left;padding:6px 10px;border-bottom:1px solid #f0f0f0;font-size:11px;display:flex;justify-content:space-between;align-items:center"><span>${idx+1}. ${name}</span><span style="display:flex;gap:4px;align-items:center">${badge}<span style="background:#7A0C2E;color:#fff;padding:1px 6px;border-radius:10px;font-size:8px">+</span></span></button>`; }).join('')}
           </div>
         </div>
       </div>
@@ -1555,6 +1569,18 @@ async function addTanpaKatilToRoom(roomId, jId){
     if(d.error) console.warn('Airtable save warning', d.error);
   }catch(e){ console.error(e); }
 }
+function addStaffTanpaKatilToRoom(roomId, staffId){
+  if(typeof assignStaffAsTanpaKatil==='function') assignStaffAsTanpaKatil(staffId, roomId);
+  else alert('Function assignStaffAsTanpaKatil not found');
+}
+function filterTanpaKatilList(q){
+  const opts=document.querySelectorAll('#tanpaKatilOptions button');
+  opts.forEach(btn=>{
+    const txt=btn.textContent.toLowerCase();
+    btn.style.display = txt.includes(q.toLowerCase()) ? 'flex' : 'none';
+  });
+}
+
 async function removeTanpaKatilFromRoom(roomId, jId){
   const rec=allRoomingRecords.find(r=>r.id===roomId);
   if(!rec) return;
