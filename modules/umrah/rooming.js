@@ -1,3 +1,5 @@
+// ROOMING V98 - FIX TRAIN CHECKBOX VISIBLE + PAKEJ 7 OPTIONS ALL SELECTS + REMOVE SINGLE STAFF ONLY - 2026-08-19
+console.log('ROOMING V98 loaded - train visible, pakej 7 options all selects, remove single');
 // ROOMING V97 - NO RED BANNER + TRAIN CHECKBOX FIXED + REMOVE STAFF BOTH TABLES + PAKEJ SINGLE SELECT 7 OPTIONS - 2026-08-19
 console.log('ROOMING V97 loaded - train visible, no banner, pakej single select');
 // ROOMING V97 - NO RED BANNER + TRAIN CHECKBOX FOR STAFF FIXED + REMOVE STAFF BOTH TABLES + PAKEJ SINGLE SELECT 7 OPTIONS - 2026-08-19
@@ -156,21 +158,7 @@ async function updateStaffField(staffId, field, value){
   }catch(e){ console.error('updateStaffField failed', e); }
 }
 
-async function updateStaffTrain(staffId, checked){
-  const s=staffList.find(x=>x.id===staffId||x.airtableId===staffId); if(!s) return;
-  s.train=checked; saveStaffList(); renderStaffList();
-  const base=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base')||localStorage.getItem('effah_base_id');
-  const pat=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
-  if(!base||!pat||!s.airtableId) return;
-  try{
-    await fetch(`https://api.airtable.com/v0/${base}/STAFF%20LIST%20%28ROOMING%29/${s.airtableId}`,{
-      method:'PATCH',
-      headers:{'Authorization':`Bearer ${pat}`,'Content-Type':'application/json'},
-      body: JSON.stringify({fields:{'TRAIN': checked}})
-    });
-  }catch(e){ console.error('updateStaffTrain failed', e); }
-}
-
+async 
 async function assignStaffToRoom(staffId,roomId){
   const staff=staffList.find(s=>s.id===staffId||s.airtableId===staffId); if(!staff) return;
   const rec=allRoomingRecords.find(r=>r.id===roomId); if(!rec) return;
@@ -231,59 +219,6 @@ async function assignStaffToRoom(staffId,roomId){
   }catch(e){ console.error('assignStaffToRoom link failed', e); }
 
 }
-async function removeStaffFromRoom(roomId, staffId){
-  console.log('V95 removeStaffFromRoom', roomId, staffId);
-  const staff=staffList.find(s=>s.id===staffId||s.airtableId===staffId); 
-  if(!staff){
-    const rec=allRoomingRecords.find(r=>r.id===roomId);
-    if(rec){
-      const arr=(rec.fields['STAFF / EXTRA']||'').split(',').map(x=>x.trim()).filter(x=>x&&x!==staffId);
-      rec.fields['STAFF / EXTRA']=arr.join(',');
-      const staffField='STAFF LIST (ROOMING)';
-      if(rec.fields[staffField]) rec.fields[staffField]=rec.fields[staffField].filter(id=>id!==staffId);
-      renderRoomingGrid();
-      const base=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base')||localStorage.getItem('effah_base_id');
-      const pat=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
-      if(base&&pat){
-        await fetch(`https://api.airtable.com/v0/${base}/ROOMING%20LIST/${roomId}`,{
-          method:'PATCH',
-          headers:{'Authorization':`Bearer ${pat}`,'Content-Type':'application/json'},
-          body: JSON.stringify({fields:{'STAFF / EXTRA': arr.join(','), 'STAFF LIST (ROOMING)': rec.fields['STAFF LIST (ROOMING)']||[]}})
-        });
-      }
-    }
-    return;
-  }
-  staff.roomIds = (staff.roomIds||[]).filter(id=>id!==roomId);
-  staff.roomLink = staff.roomIds.length? staff.roomIds[0] : null;
-  if(typeof saveStaffList==='function') saveStaffList();
-  renderStaffList(); renderRoomingGrid(); renderLocationTabs();
-  const base=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base')||localStorage.getItem('effah_base_id');
-  const pat=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
-  if(!base||!pat||!staff.airtableId){ console.warn('V95 missing Airtable config for remove'); return; }
-  try{
-    const res1=await fetch(`https://api.airtable.com/v0/${base}/STAFF%20LIST%20%28ROOMING%29/${staff.airtableId}`,{
-      method:'PATCH',
-      headers:{'Authorization':`Bearer ${pat}`,'Content-Type':'application/json'},
-      body: JSON.stringify({fields:{'ROOMING LIST': staff.roomIds, 'ROOM': staff.roomIds}})
-    });
-    const data1=await res1.json();
-    console.log('V95 STAFF table cleared', data1);
-    const roomRec=allRoomingRecords.find(r=>r.id===roomId);
-    if(roomRec){
-      const staffField='STAFF LIST (ROOMING)';
-      const newList=(roomRec.fields[staffField]||[]).filter(id=>id!==staffId && id!==staff.airtableId);
-      roomRec.fields[staffField]=newList;
-      const res2=await fetch(`https://api.airtable.com/v0/${base}/ROOMING%20LIST/${roomId}`,{
-        method:'PATCH',
-        headers:{'Authorization':`Bearer ${pat}`,'Content-Type':'application/json'},
-        body: JSON.stringify({fields:{[staffField]: newList}})
-      });
-      const data2=await res2.json();
-      console.log('V95 ROOMING LIST staff cleared', data2);
-    }
-  }catch(e){ console.error('V95 removeStaffFromRoom failed', e); alert('Gagal remove staff Airtable: '+e.message); }
-}
 function removeStaff(roomId,staffName){
   const s=staffList.find(x=>x.id===staffName||x.airtableId===staffName||x.name===staffName);
   if(s){ removeStaffFromRoom(roomId, s.id); return; }
@@ -304,90 +239,6 @@ async function deleteStaff(staffId){
 }
 
 
-function renderStaffList(){
-  const cont=document.getElementById('staffListContainer'); const badge=document.getElementById('staffTotalBadge'); if(!cont) return; if(badge) badge.textContent=staffList.length+' Staff';
-  if(staffList.length===0){ cont.innerHTML='<div class="p-2.5 text-center text-[11px] text-slate-400">Tiada staff / extra</div>'; return; }
-  cont.innerHTML=staffList.map((s,idx)=>{
-    const assignedInLoc=isStaffAssignedInLocation(s.id, activeLocation); 
-    const cls=assignedInLoc?'opacity-50 bg-slate-50':'bg-white hover:bg-slate-50 cursor-grab'; const drag=assignedInLoc?'':`draggable="true" ondragstart="dragStaff(event,'${s.id}')" ondragend="dragStaffEnd(event)"`;
-    const boardVal=s.boardBasis||'';
-    let boardCls='bg-white border-slate-200';
-    if(boardVal==='FULLBOARD (MEKAH)' || boardVal==='BB (MEKAH)') boardCls='bg-orange-100 border-orange-200 text-orange-800';
-    else if(boardVal==='FULLBOARD (MADINAH)' || boardVal==='BB (MADINAH)') boardCls='bg-blue-100 border-blue-200 text-blue-800';
-    else if(boardVal==='FULLBOARD') boardCls='bg-emerald-100 border-emerald-200 text-emerald-800';
-    const trainChecked = s.train||s.fields?.TRAIN||false;
-    const trainCls = trainChecked ? 'bg-amber-300 border-amber-500 text-amber-900' : 'bg-white border-slate-300';
-    return `<div ${drag} class="flex flex-col gap-1.5 px-2.5 py-2 rounded-xl border text-[11px] ${cls}">
-      <div class="flex items-center justify-between">
-        <div class="flex gap-2 items-center"><span class="text-slate-400 text-[10px]">${String(idx+1).padStart(2,'0')}</span><span class="font-medium truncate max-w-[120px]">${s.name}</span>${assignedInLoc?'<span class="ml-1 px-1 py-0.5 bg-slate-200 rounded text-[8px]">ASSIGNED di '+activeLocation+'</span>':''}</div>
-        <div class="flex gap-1"><button onclick="quickAssignStaff('${s.id}')" class="w-5 h-5 rounded-full border ${assignedInLoc?'opacity-30':'hover:bg-[#7A0C2E] hover:text-white'} text-[10px]">+</button><button onclick="deleteStaff('${s.id}')" class="w-5 h-5 rounded-full border hover:bg-red-50 text-[10px]"><i class="fa-solid fa-trash text-[9px]"></i></button></div>
-      </div>
-      <div class="flex items-center gap-1.5">
-        <select onchange="updateStaffField('${s.id}','boardBasis',this.value)" class="text-[8px] border rounded-full px-2 py-0.5 font-bold ${boardCls} outline-none flex-1">
-          <option value="" ${!boardVal?'selected':''}>- BOARD</option>
-          <option value="FULLBOARD" ${boardVal==='FULLBOARD'?'selected':''}>FULLBOARD</option>
-          <option value="FULLBOARD (MEKAH)" ${boardVal==='FULLBOARD (MEKAH)'?'selected':''}>FULLBOARD (MEKAH)</option>
-          <option value="FULLBOARD (MADINAH)" ${boardVal==='FULLBOARD (MADINAH)'?'selected':''}>FULLBOARD (MADINAH)</option>
-          <option value="BB (MEKAH)" ${boardVal==='BB (MEKAH)'?'selected':''}>BB (MEKAH)</option>
-          <option value="BB (MADINAH)" ${boardVal==='BB (MADINAH)'?'selected':''}>BB (MADINAH)</option>
-        </select>
-        <label class="flex items-center gap-1 text-[8px] border rounded-full px-2 py-1 cursor-pointer font-bold ${trainCls}"><input type="checkbox" ${trainChecked?'checked':''} onchange="updateStaffTrain('${s.id}',this.checked)" class="w-3 h-3 accent-amber-600"> TRAIN</label>
-      </div>
-    </div>`;
-  }).join('');
-}
-async function removeStaffFromRoom(roomId, staffId){
-  console.log('V97 removeStaffFromRoom', roomId, staffId);
-  const staff=staffList.find(s=>s.id===staffId||s.airtableId===staffId); 
-  if(!staff){
-    const rec=allRoomingRecords.find(r=>r.id===roomId);
-    if(rec){
-      const arr=(rec.fields['STAFF / EXTRA']||'').split(',').map(x=>x.trim()).filter(x=>x&&x!==staffId);
-      rec.fields['STAFF / EXTRA']=arr.join(',');
-      const staffField='STAFF LIST (ROOMING)';
-      if(rec.fields[staffField]) rec.fields[staffField]=rec.fields[staffField].filter(id=>id!==staffId);
-      renderRoomingGrid();
-      const base=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base')||localStorage.getItem('effah_base_id');
-      const pat=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
-      if(base&&pat){
-        await fetch(`https://api.airtable.com/v0/${base}/ROOMING%20LIST/${roomId}`,{
-          method:'PATCH',
-          headers:{'Authorization':`Bearer ${pat}`,'Content-Type':'application/json'},
-          body: JSON.stringify({fields:{'STAFF / EXTRA': arr.join(','), 'STAFF LIST (ROOMING)': rec.fields['STAFF LIST (ROOMING)']||[]}})
-        });
-      }
-    }
-    return;
-  }
-  staff.roomIds = (staff.roomIds||[]).filter(id=>id!==roomId);
-  staff.roomLink = staff.roomIds.length? staff.roomIds[0] : null;
-  if(typeof saveStaffList==='function') saveStaffList();
-  renderStaffList(); renderRoomingGrid(); renderLocationTabs();
-  const base=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base')||localStorage.getItem('effah_base_id');
-  const pat=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
-  if(!base||!pat||!staff.airtableId){ console.warn('V97 missing Airtable config'); return; }
-  try{
-    const res1=await fetch(`https://api.airtable.com/v0/${base}/STAFF%20LIST%20%28ROOMING%29/${staff.airtableId}`,{
-      method:'PATCH',
-      headers:{'Authorization':`Bearer ${pat}`,'Content-Type':'application/json'},
-      body: JSON.stringify({fields:{'ROOMING LIST': staff.roomIds, 'ROOM': staff.roomIds}})
-    });
-    const data1=await res1.json();
-    console.log('V97 STAFF cleared', data1);
-    const roomRec=allRoomingRecords.find(r=>r.id===roomId);
-    if(roomRec){
-      const staffField='STAFF LIST (ROOMING)';
-      const newList=(roomRec.fields[staffField]||[]).filter(id=>id!==staffId && id!==staff.airtableId);
-      roomRec.fields[staffField]=newList;
-      const res2=await fetch(`https://api.airtable.com/v0/${base}/ROOMING%20LIST/${roomId}`,{
-        method:'PATCH',
-        headers:{'Authorization':`Bearer ${pat}`,'Content-Type':'application/json'},
-        body: JSON.stringify({fields:{[staffField]: newList}})
-      });
-      console.log('V97 ROOMING cleared', await res2.json());
-    }
-  }catch(e){ console.error('V97 remove failed', e); }
-}
 
 
 
@@ -540,7 +391,7 @@ function renderRoomingHTML(){
               <i class="fa-solid fa-magnifying-glass absolute left-2.5 top-2.5 text-slate-400 text-[10px]"></i>
               <input id="searchRoomingJemaah" onkeyup="filterRoomingNamelist()" placeholder="Cari nama jemaah..." class="w-full text-[11px] pl-7 pr-2.5 py-2 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:outline-none">
             </div>
-            <select id="filterPakejRooming" onchange="filterRoomingNamelist()" class="text-[11px] border border-slate-200 rounded-xl px-2.5 py-2 bg-white font-medium"><option value="">Semua Pakej</option><option>JIMAT STANDARD</option><option>JIMAT PREMIUM</option><option>EKONOMI LITE</option><option>EKONOMI</option><option>STANDARD</option><option>PREMIUM</option><option>PREMIUM PLUS</option></select>
+            <select id="filterPakejRooming" onchange="filterRoomingNamelist()" class="text-[11px] border border-slate-200 rounded-xl px-2.5 py-2 bg-white font-medium"><option value="">Semua Pakej</option><option value="JIMAT STANDARD">JIMAT STANDARD</option><option value="JIMAT PREMIUM">JIMAT PREMIUM</option><option value="EKONOMI LITE">EKONOMI LITE</option><option value="EKONOMI">EKONOMI</option><option value="STANDARD">STANDARD</option><option value="PREMIUM">PREMIUM</option><option value="PREMIUM PLUS">PREMIUM PLUS</option></select>
           </div>
         </div>
         <div class="px-2.5 py-1.5 bg-slate-50/70 border-b border-slate-200 grid grid-cols-12 text-[9px] font-bold text-slate-500 tracking-wider">
@@ -601,7 +452,7 @@ function renderRoomingHTML(){
           <p class="text-[9px] text-slate-400 mt-0.5">Dijana automatik: B + Kapasiti</p>
         </div>
         <select id="newRoomLokasi" class="w-full p-2 border border-slate-200 rounded-xl bg-white text-[11px]"><option value="MEKAH">MEKAH</option><option value="MADINAH">MADINAH</option><option value="TAIF">TAIF</option><option value="JEDDAH">JEDDAH</option></select>
-        <select id="newRoomPakej" class="w-full p-2 border border-slate-200 rounded-xl bg-white text-[11px] font-bold"><option>JIMAT STANDARD</option><option>JIMAT PREMIUM</option><option>EKONOMI LITE</option><option>EKONOMI</option><option>STANDARD</option><option>PREMIUM</option><option>PREMIUM PLUS</option></select>
+        <select id="newRoomPakej" class="w-full p-2 border border-slate-200 rounded-xl bg-white text-[11px] font-bold"><option value="JIMAT STANDARD">JIMAT STANDARD</option><option value="JIMAT PREMIUM">JIMAT PREMIUM</option><option value="EKONOMI LITE">EKONOMI LITE</option><option value="EKONOMI">EKONOMI</option><option value="STANDARD">STANDARD</option><option value="PREMIUM">PREMIUM</option><option value="PREMIUM PLUS">PREMIUM PLUS</option></select>
         <input id="newRoomHotel" placeholder="Nama Hotel" class="w-full p-2 border border-slate-200 rounded-xl bg-white text-[11px]">
         <div class="flex gap-2 items-center">
           <input id="newRoomCap" type="number" value="4" min="1" max="8" oninput="updateNewRoomIdFromCap()" class="flex-1 p-2 border border-slate-200 rounded-xl font-bold bg-white text-[11px]">
@@ -1057,13 +908,7 @@ function renderNamelist(){
         ${insToggle}
       </div>
       <div class="col-span-1 flex items-center gap-0.5">
-        <select onchange="updateJemaahField('${r.id}','PAKEJ',this.value)" class="text-[7px] border rounded-full px-1 py-0.5 bg-white font-bold outline-none w-full ${pk==='-'?'border-dashed text-slate-400':'bg-slate-50'}" title="PAKEJ">
-          <option value="" ${!pk || pk==='-'?'selected':''}>-</option>
-          <option value="JIMAT" ${pk==='JIMAT'?'selected':''}>JIMAT</option>
-          <option value="EKONOMI" ${pk==='EKONOMI'?'selected':''}>EKO</option>
-          <option value="STANDARD" ${pk==='STANDARD'?'selected':''}>STD</option>
-          <option value="PREMIUM" ${pk==='PREMIUM'?'selected':''}>PREM</option>
-        </select>
+        <select onchange="updateJemaahField('${r.id}','PAKEJ',this.value)" class="text-[9px] border border-slate-200 rounded-full px-2 py-1 bg-white"><option value="JIMAT STANDARD">JIMAT STANDARD</option><option value="JIMAT PREMIUM">JIMAT PREMIUM</option><option value="EKONOMI LITE">EKONOMI LITE</option><option value="EKONOMI">EKONOMI</option><option value="STANDARD">STANDARD</option><option value="PREMIUM">PREMIUM</option><option value="PREMIUM PLUS">PREMIUM PLUS</option></select>
       </div>
       <div class="col-span-1 text-center">${statusIcon}</div>
     </div>`;
@@ -1220,7 +1065,7 @@ const emptyCount=Math.max(0,cap-count); const emptySlots=Array.from({length:empt
         <button onclick="deleteRoom('${rec.id}','${roomId}')" class="w-6 h-6 rounded-full bg-slate-50 hover:bg-red-50 border text-[10px] shrink-0"><i class="fa-solid fa-trash"></i></button>
       </div>
       <div class="flex items-center gap-1.5 text-[10px]">
-        <div class="flex items-center gap-1 px-2.5 py-1 bg-slate-50 rounded-full border"><select onchange="updateRoomField('${rec.id}','PAKEJ / HOTEL',this.value)" class="bg-transparent text-[10px] font-bold outline-none"><option ${pakej==='JIMAT'?'selected':''}>JIMAT</option><option ${pakej==='EKONOMI'?'selected':''}>EKONOMI</option><option ${pakej==='STANDARD'?'selected':''}>STANDARD</option><option ${pakej==='PREMIUM'?'selected':''}>PREMIUM</option></select></div>
+        <div class="flex items-center gap-1 px-2.5 py-1 bg-slate-50 rounded-full border"><select onchange="updateRoomField('${rec.id}','PAKEJ / HOTEL',this.value)" class="text-[10px] border border-slate-200 rounded-full px-2 py-1 bg-white font-bold"><option value="JIMAT STANDARD">JIMAT STANDARD</option><option value="JIMAT PREMIUM">JIMAT PREMIUM</option><option value="EKONOMI LITE">EKONOMI LITE</option><option value="EKONOMI">EKONOMI</option><option value="STANDARD">STANDARD</option><option value="PREMIUM">PREMIUM</option><option value="PREMIUM PLUS">PREMIUM PLUS</option></select></div>
         <div class="ml-auto flex items-center gap-1 bg-slate-50 rounded-full px-1 py-0.5 border"><button onclick="updateCap('${rec.id}',-1)" class="w-5 h-5 rounded-full bg-white border text-[10px]">−</button><span class="font-bold w-4 text-center text-[11px]">${cap}</span><button onclick="updateCap('${rec.id}',1)" class="w-5 h-5 rounded-full bg-white border text-[10px]">+</button><span class="text-[9px] ml-1">${count}/${cap}</span></div>
       </div>
       <div class="space-y-1">${jSlots}${sSlots}${emptySlots}${tanpaKatilSlots?`<div class="pt-2 mt-2 border-t border-dashed border-amber-300"><div class="text-[8px] font-bold text-amber-700 mb-1">TANPA KATIL / INFANT</div>${tanpaKatilSlots}</div>`:''}</div>
@@ -1230,6 +1075,98 @@ const emptyCount=Math.max(0,cap-count); const emptySlots=Array.from({length:empt
     </div>`;
   }).join('');
 }
+
+function renderStaffList(){
+  const cont=document.getElementById('staffListContainer'); const badge=document.getElementById('staffTotalBadge'); if(!cont) return; if(badge) badge.textContent=staffList.length+' Staff';
+  if(staffList.length===0){ cont.innerHTML='<div class="p-2.5 text-center text-[11px] text-slate-400">Tiada staff / extra</div>'; return; }
+  cont.innerHTML=staffList.map((s,idx)=>{
+    const assignedInLoc=isStaffAssignedInLocation(s.id, activeLocation); 
+    const cls=assignedInLoc?'opacity-50 bg-slate-50':'bg-white hover:bg-slate-50 cursor-grab'; const drag=assignedInLoc?'':`draggable="true" ondragstart="dragStaff(event,'${s.id}')" ondragend="dragStaffEnd(event)"`;
+    const boardVal=s.boardBasis||'';
+    let boardCls='bg-white border-slate-200';
+    if(boardVal==='FULLBOARD (MEKAH)' || boardVal==='BB (MEKAH)') boardCls='bg-orange-100 border-orange-200 text-orange-800';
+    else if(boardVal==='FULLBOARD (MADINAH)' || boardVal==='BB (MADINAH)') boardCls='bg-blue-100 border-blue-200 text-blue-800';
+    else if(boardVal==='FULLBOARD') boardCls='bg-emerald-100 border-emerald-200 text-emerald-800';
+    const trainChecked = !!(s.train||s.fields?.TRAIN);
+    const trainCls = trainChecked ? 'bg-amber-300 border-amber-600 text-amber-900' : 'bg-white border-slate-300 text-slate-600';
+    const staffId = s.id||s.airtableId;
+    return `<div ${drag} class="flex flex-col gap-1.5 px-2.5 py-2 rounded-xl border text-[11px] ${cls}">
+      <div class="flex items-center justify-between">
+        <div class="flex gap-2 items-center"><span class="text-slate-400 text-[10px]">${String(idx+1).padStart(2,'0')}</span><span class="font-medium truncate max-w-[120px]">${s.name}</span>${assignedInLoc?'<span class="ml-1 px-1 py-0.5 bg-slate-200 rounded text-[8px]">ASSIGNED di '+activeLocation+'</span>':''}</div>
+        <div class="flex gap-1"><button onclick="quickAssignStaff('${staffId}')" class="w-5 h-5 rounded-full border ${assignedInLoc?'opacity-30':'hover:bg-[#7A0C2E] hover:text-white'} text-[10px]">+</button><button onclick="deleteStaff('${staffId}')" class="w-5 h-5 rounded-full border hover:bg-red-50 text-[10px]"><i class="fa-solid fa-trash text-[9px]"></i></button></div>
+      </div>
+      <div class="flex items-center gap-2">
+        <select onchange="updateStaffField('${staffId}','boardBasis',this.value)" class="text-[8px] border rounded-full px-2 py-1 font-bold ${boardCls} outline-none flex-1">
+          <option value="" ${!boardVal?'selected':''}>- BOARD</option>
+          <option value="FULLBOARD" ${boardVal==='FULLBOARD'?'selected':''}>FULLBOARD</option>
+          <option value="FULLBOARD (MEKAH)" ${boardVal==='FULLBOARD (MEKAH)'?'selected':''}>FULLBOARD (MEKAH)</option>
+          <option value="FULLBOARD (MADINAH)" ${boardVal==='FULLBOARD (MADINAH)'?'selected':''}>FULLBOARD (MADINAH)</option>
+          <option value="BB (MEKAH)" ${boardVal==='BB (MEKAH)'?'selected':''}>BB (MEKAH)</option>
+          <option value="BB (MADINAH)" ${boardVal==='BB (MADINAH)'?'selected':''}>BB (MADINAH)</option>
+        </select>
+        <label class="flex items-center gap-1 text-[8px] border rounded-full px-2 py-1 cursor-pointer font-bold ${trainCls}"><input type="checkbox" ${trainChecked?'checked':''} onchange="updateStaffTrain('${staffId}',this.checked)" class="w-3.5 h-3.5 accent-amber-600"> TRAIN</label>
+      </div>
+    </div>`;
+  }).join('');
+
+async function removeStaffFromRoom(roomId, staffId){
+  console.log('V98 removeStaffFromRoom single', roomId, staffId);
+  const staff=staffList.find(s=>s.id===staffId||s.airtableId===staffId); 
+  if(!staff){
+    const rec=allRoomingRecords.find(r=>r.id===roomId);
+    if(rec){
+      const staffField='STAFF LIST (ROOMING)';
+      const current=rec.fields[staffField]||[];
+      const newList=current.filter(id=>id!==staffId);
+      rec.fields[staffField]=newList;
+      renderRoomingGrid();
+      const base=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base')||localStorage.getItem('effah_base_id');
+      const pat=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
+      if(base&&pat){
+        await fetch(`https://api.airtable.com/v0/${base}/ROOMING%20LIST/${roomId}`,{
+          method:'PATCH',
+          headers:{'Authorization':`Bearer ${pat}`,'Content-Type':'application/json'},
+          body: JSON.stringify({fields:{[staffField]: newList}})
+        });
+      }
+    }
+    return;
+  }
+  // Remove only this staff from roomIds
+  const prevLen = (staff.roomIds||[]).length;
+  staff.roomIds = (staff.roomIds||[]).filter(id=>id!==roomId);
+  staff.roomLink = staff.roomIds.length? staff.roomIds[0] : null;
+  console.log('V98 staff roomIds', prevLen, '->', staff.roomIds.length);
+  if(typeof saveStaffList==='function') saveStaffList();
+  renderStaffList(); renderRoomingGrid(); renderLocationTabs();
+  const base=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base')||localStorage.getItem('effah_base_id');
+  const pat=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
+  if(!base||!pat||!staff.airtableId) return;
+  try{
+    const res1=await fetch(`https://api.airtable.com/v0/${base}/STAFF%20LIST%20%28ROOMING%29/${staff.airtableId}`,{
+      method:'PATCH',
+      headers:{'Authorization':`Bearer ${pat}`,'Content-Type':'application/json'},
+      body: JSON.stringify({fields:{'ROOMING LIST': staff.roomIds, 'ROOM': staff.roomIds}})
+    });
+    console.log('V98 STAFF table cleared single', await res1.json());
+    const roomRec=allRoomingRecords.find(r=>r.id===roomId);
+    if(roomRec){
+      const staffField='STAFF LIST (ROOMING)';
+      const current=roomRec.fields[staffField]||[];
+      const newList=current.filter(id=>id!==staffId && id!==staff.airtableId);
+      roomRec.fields[staffField]=newList;
+      const res2=await fetch(`https://api.airtable.com/v0/${base}/ROOMING%20LIST/${roomId}`,{
+        method:'PATCH',
+        headers:{'Authorization':`Bearer ${pat}`,'Content-Type':'application/json'},
+        body: JSON.stringify({fields:{[staffField]: newList}})
+      });
+      console.log('V98 ROOMING LIST cleared single', await res2.json());
+    }
+  }catch(e){ console.error('V98 remove failed', e); }
+}
+}
+
+
 function setActiveLocation(loc){ activeLocation=loc.toUpperCase(); localStorage.setItem('effah_active_location',activeLocation); const el=document.getElementById('copyTargetLoc'); if(el) el.textContent=activeLocation; renderLocationTabs(); renderRoomingGrid(); renderNamelist(); renderStaffList(); }
 let _autoScrollInterval=null;
 function _stopAutoScroll(){ if(_autoScrollInterval){ clearInterval(_autoScrollInterval); _autoScrollInterval=null; } }
@@ -2401,13 +2338,7 @@ renderNamelist = function(){
           </div>
         </div>
         <div class="col-span-1 flex items-center gap-0.5">
-          <select onchange="updateJemaahField('${r.id}','PAKEJ',this.value)" class="text-[7px] border rounded-full px-1 py-0.5 bg-white font-bold outline-none w-full ${pk==='-'?'border-dashed text-slate-400':'bg-slate-50'}" title="PAKEJ">
-            <option value="" ${!pk || pk==='-'?'selected':''}>-</option>
-            <option value="JIMAT" ${pk==='JIMAT'?'selected':''}>JIMAT</option>
-            <option value="EKONOMI" ${pk==='EKONOMI'?'selected':''}>EKO</option>
-            <option value="STANDARD" ${pk==='STANDARD'?'selected':''}>STD</option>
-            <option value="PREMIUM" ${pk==='PREMIUM'?'selected':''}>PREM</option>
-          </select>
+          <select onchange="updateJemaahField('${r.id}','PAKEJ',this.value)" class="text-[9px] border border-slate-200 rounded-full px-2 py-1 bg-white"><option value="JIMAT STANDARD">JIMAT STANDARD</option><option value="JIMAT PREMIUM">JIMAT PREMIUM</option><option value="EKONOMI LITE">EKONOMI LITE</option><option value="EKONOMI">EKONOMI</option><option value="STANDARD">STANDARD</option><option value="PREMIUM">PREMIUM</option><option value="PREMIUM PLUS">PREMIUM PLUS</option></select>
         </div>
         <div class="col-span-1 text-center">${statusIcon}</div>
       </div>`;
@@ -2475,3 +2406,24 @@ setTimeout(()=>{
   if(!namelist||!grid){ createMissingRoomingStructure(); } else { if(typeof fetchRoomingData==='function') fetchRoomingData(); }
 }, 1500);
 console.log('ROOMING V80 full (1767 base preserved + staff multi + insuran multi + blank auto-create) loaded');
+
+function updateStaffTrain(staffId, checked){
+  const s=staffList.find(x=>x.id===staffId||x.airtableId===staffId);
+  if(!s){ console.warn('updateStaffTrain staff not found', staffId); return; }
+  s.train=checked;
+  if(!s.fields) s.fields={};
+  s.fields['TRAIN']=checked;
+  if(typeof saveStaffList==='function') saveStaffList();
+  renderStaffList();
+  const base=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base')||localStorage.getItem('effah_base_id');
+  const pat=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
+  if(base&&pat&&s.airtableId){
+    fetch(`https://api.airtable.com/v0/${base}/STAFF%20LIST%20%28ROOMING%29/${s.airtableId}`,{
+      method:'PATCH',
+      headers:{'Authorization':`Bearer ${pat}`,'Content-Type':'application/json'},
+      body: JSON.stringify({fields:{'TRAIN': checked}})
+    }).then(r=>r.json()).then(d=>console.log('V98 staff train saved', d)).catch(e=>console.error(e));
+  } else {
+    console.log('V98 staff train local only', staffId, checked);
+  }
+}
