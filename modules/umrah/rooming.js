@@ -1,3 +1,5 @@
+// ROOMING V86 - STAFF DRAG & DROP + FIX COUNT 23 vs 25 (INCLUDE TANPA KATIL) + STAFF AS TANPA KATIL - 2026-08-19
+console.log('ROOMING V86 loaded - staff draggable, count includes tanpa katil, staff as tanpa katil allowed');
 // ROOMING V85 - FIX STAFF COUNT MISMATCH + REMOVE BOARD BASIS TEXTBOX - 2026-08-19
 console.log('ROOMING V85 loaded - fix staff count, remove Board Basis textbox');
 // ROOMING V84 - INSURAN PILL ASING (TAKAFUL) (ETIQA) (AL-KHAIRI) + BOARD SEPARATE - 2026-08-19
@@ -978,12 +980,13 @@ function renderRoomingGrid(){
   rooms=getRoomOrderedList(rooms);
   const bilikEl=document.getElementById('roomingBiliks'); if(bilikEl) bilikEl.textContent=rooms.length+' Bilik';
   const totalJ=rooms.reduce((s,r)=>s+(r.fields['JEMAAH']?.length||0),0);
+  const totalBaby=rooms.reduce((s,r)=>s+(r.fields['JEMAAH TANPA KATIL']?.length||0),0);
+  const totalJFull = totalJ + totalBaby;
   // Fix: count staff from both STAFF/EXTRA text field AND staffList linked records
   const staffFromText = rooms.reduce((s,r)=>s+(r.fields['STAFF / EXTRA']||'').split(',').filter(Boolean).length,0);
-  const staffFromLinked = rooms.reduce((s,r)=>s+getStaffForRoom(r.id).length,0);
+  const staffFromLinked = rooms.reduce((s,r)=>{ try{ return s+getStaffForRoom(r.id).length; }catch(e){ return s; } },0);
   const totalStaff = staffFromText + staffFromLinked;
-
-  const occEl=document.getElementById('roomingOccupancy'); if(occEl) occEl.textContent=`${totalJ} Jemaah + ${totalStaff} Staff • ${activeLocation}`;
+  const occEl=document.getElementById('roomingOccupancy'); if(occEl) occEl.textContent=`${totalJFull} Jemaah + ${totalStaff} Staff • ${activeLocation}`;
   renderRoomingOverview(rooms);
   if(rooms.length===0){ grid.innerHTML=`<div class="col-span-2 p-6 text-center text-[11px] border border-dashed rounded-2xl bg-white">Tiada bilik untuk <b>${activeLocation}</b><br><button onclick="openNewRoomModal()" class="mt-2.5 px-3 py-1.5 bg-[#7A0C2E] text-white rounded-full text-[11px]">+ Bilik Baru untuk ${activeLocation}</button></div>`; return; }
   grid.innerHTML=rooms.map((rec, roomIdx)=>{
@@ -1081,6 +1084,97 @@ function dragRoom(e,roomId){
   const el=e.currentTarget.closest('[data-room-id]');
   if(el) setTimeout(()=>el.style.opacity='0.4',0);
 }
+function dragStaff(e, staffId){
+  e.dataTransfer.setData('text/plain', staffId);
+  e.dataTransfer.setData('application/x-staff-id', staffId);
+  e.dataTransfer.effectAllowed='move';
+  window._draggedStaffId=staffId;
+  if(e.target) e.target.style.opacity='0.5';
+  console.log('dragStaff', staffId);
+}
+function dropStaffToRoom(e, roomId, isTanpaKatil){
+  e.preventDefault();
+  const staffId = e.dataTransfer.getData('application/x-staff-id') || e.dataTransfer.getData('text/plain') || window._draggedStaffId;
+  console.log('dropStaffToRoom', staffId, 'to', roomId, 'tanpa', isTanpaKatil);
+  if(!staffId) return;
+  // Check if it's actually staff (exists in staffList)
+  const isStaff = staffList.some(s=>s.id===staffId||s.airtableId===staffId);
+  if(isStaff){
+    if(isTanpaKatil){
+      assignStaffAsTanpaKatil(staffId, roomId);
+    } else {
+      quickAssignStaffToRoom(staffId, roomId);
+    }
+  } else {
+    // Might be jemaah dropped as staff? Handle as jemaah
+    const jemaahId=staffId;
+    if(isTanpaKatil) assignJemaahAsTanpaKatil(jemaahId, roomId);
+    else quickAssignToRoom(jemaahId, roomId);
+  }
+  window._draggedStaffId=null;
+}
+function assignStaffAsTanpaKatil(staffId, roomId){
+  // Allow staff to be assigned as JEMAAH TANPA KATIL (like jemaah without bed)
+  const room = allRoomingRecords.find(r=>r.id===roomId);
+  if(!room) return;
+  const field = 'JEMAAH TANPA KATIL';
+  const current = room.fields[field]||[];
+  if(current.includes(staffId)) return alert('Staff sudah ada sebagai tanpa katil di bilik ini');
+  // Add staff ID to tanpa katil list
+  const newList = [...current, staffId];
+  // Optimistic update
+  room.fields[field]=newList;
+  renderRoomingGrid();
+  // Save to Airtable
+  const base=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base')||localStorage.getItem('effah_base_id'); const pat=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
+  if(base&&pat){
+    fetch(`https://api.airtable.com/v0/${base}/ROOMING%20LIST/${roomId}`,{method:'PATCH',headers:{Authorization:`Bearer ${pat}`,'Content-Type':'application/json'},body:JSON.stringify({fields:{[field]: newList}})}).then(r=>r.json()).then(data=>{ console.log('staff tanpa katil assigned', data); }).catch(err=>{ console.error(err); alert('Gagal assign staff tanpa katil'); fetchRoomingData(); });
+  }
+  // Also mark staff as assigned in staffList for UI
+  const s=getStaffById(staffId);
+  if(s){ s.roomIds = [...(s.roomIds||[]), roomId]; }
+}
+function quickAssignStaffToRoom(staffId, roomId){
+  // Existing quickAssignStaff but with specific room
+  if(typeof quickAssignStaff==='function' && !roomId){
+    return quickAssignStaff(staffId);
+  }
+  const room = allRoomingRecords.find(r=>r.id===roomId);
+  if(!room) return;
+  // Add to STAFF / EXTRA or linked staff field
+  // Try to use linked staff field if exists
+  const staffField = room.fields['STAFF LIST (ROOMING)'] ? 'STAFF LIST (ROOMING)' : 'STAFF / EXTRA';
+  if(staffField==='STAFF LIST (ROOMING)'){
+    const current = room.fields[staffField]||[];
+    if(current.includes(staffId)) return;
+    const newList=[...current, staffId];
+    room.fields[staffField]=newList;
+    renderRoomingGrid();
+    const base=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base')||localStorage.getItem('effah_base_id'); const pat=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
+    if(base&&pat){
+      fetch(`https://api.airtable.com/v0/${base}/ROOMING%20LIST/${roomId}`,{method:'PATCH',headers:{Authorization:`Bearer ${pat}`,'Content-Type':'application/json'},body:JSON.stringify({fields:{[staffField]: newList}})}).catch(()=>{});
+    }
+  } else {
+    // Fallback to quickAssignStaff which auto finds room
+    if(typeof quickAssignStaff==='function') quickAssignStaff(staffId);
+  }
+}
+// Override drop handlers to accept staff
+const _origDropJemaahToRoom = typeof dropJemaahToRoom==='function'? dropJemaahToRoom : null;
+function dropJemaahToRoom(e, roomId, isTanpaKatil){
+  const staffId = e.dataTransfer.getData('application/x-staff-id') || window._draggedStaffId;
+  if(staffId){
+    return dropStaffToRoom(e, roomId, isTanpaKatil);
+  }
+  if(_origDropJemaahToRoom) return _origDropJemaahToRoom(e, roomId, isTanpaKatil);
+  // Fallback original logic
+  e.preventDefault();
+  const jemaahId = e.dataTransfer.getData('text/plain') || window._draggedJemaahId;
+  if(!jemaahId) return;
+  if(isTanpaKatil) assignJemaahAsTanpaKatil(jemaahId, roomId);
+  else quickAssignToRoom(jemaahId, roomId);
+}
+
 function dragRoomEnd(e){
   const el=e.currentTarget.closest('[data-room-id]');
   if(el) el.style.opacity='1';
@@ -1883,7 +1977,9 @@ function renderStaffList_V80(){
     }).join('');
     const assigned=isStaffAssignedInLocation(staffId, activeLocation);
     const rowCls=assigned?'bg-slate-50 text-slate-500':'bg-white hover:bg-slate-50';
-    return `<div class="flex items-center gap-2 p-2 border-b border-slate-100 text-[11px] ${rowCls}">
+    const dragStaff = assigned ? '' : `draggable="true" ondragstart="dragStaff(event,'${staffId}')" ondragend="dragEnd(event)"`;
+    return `<div ${dragStaff} class="flex items-center gap-2 p-2 border-b border-slate-100 text-[11px] ${rowCls} ${!assigned?'cursor-grab active:cursor-grabbing hover:bg-amber-50':''}">
+      <span class="w-5 h-5 flex items-center justify-center text-[10px] text-slate-300">${!assigned?'≡':''}</span>
       <span class="w-6 text-[9px] text-slate-400">${String(idx+1).padStart(2,'0')}</span>
       <span class="flex-1 truncate font-medium">${s.name||'-'}</span>
       <span class="text-[7px] px-1 rounded ${assigned?'bg-slate-200':''}">${assigned?'ASSIGNED di '+activeLocation:''}</span>
