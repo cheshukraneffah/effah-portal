@@ -1104,7 +1104,15 @@ const emptyCount=Math.max(0,cap-count); const emptySlots=Array.from({length:empt
         <button onclick="deleteRoom('${rec.id}','${roomId}')" class="w-6 h-6 rounded-full bg-slate-50 hover:bg-red-50 border text-[10px] shrink-0"><i class="fa-solid fa-trash"></i></button>
       </div>
       <div class="flex items-center gap-1.5 text-[10px]">
-        <div class="flex items-center gap-1 px-2.5 py-1 bg-slate-50 rounded-full border"><select onchange="updateRoomField('${rec.id}','PAKEJ / HOTEL',this.value)" class="text-[10px] border border-slate-200 rounded-full px-2 py-1 bg-white font-bold"><option value="JIMAT STANDARD">JIMAT STANDARD</option><option value="JIMAT PREMIUM">JIMAT PREMIUM</option><option value="EKONOMI LITE">EKONOMI LITE</option><option value="EKONOMI">EKONOMI</option><option value="STANDARD">STANDARD</option><option value="PREMIUM">PREMIUM</option><option value="PREMIUM PLUS">PREMIUM PLUS</option></select></div>
+        <div class="flex items-center gap-1 px-2.5 py-1 bg-slate-50 rounded-full border"><select onchange="updateRoomField('${rec.id}','PAKEJ / HOTEL',this.value)" class="text-[10px] border border-slate-200 rounded-full px-2 py-1 bg-white font-bold">
+          <option value="JIMAT STANDARD" ${pakej==='JIMAT STANDARD'?'selected':''}>JIMAT STANDARD</option>
+          <option value="JIMAT PREMIUM" ${pakej==='JIMAT PREMIUM'?'selected':''}>JIMAT PREMIUM</option>
+          <option value="EKONOMI LITE" ${pakej==='EKONOMI LITE'?'selected':''}>EKONOMI LITE</option>
+          <option value="EKONOMI" ${pakej==='EKONOMI'?'selected':''}>EKONOMI</option>
+          <option value="STANDARD" ${pakej==='STANDARD'?'selected':''}>STANDARD</option>
+          <option value="PREMIUM" ${pakej==='PREMIUM'?'selected':''}>PREMIUM</option>
+          <option value="PREMIUM PLUS" ${pakej==='PREMIUM PLUS'?'selected':''}>PREMIUM PLUS</option>
+        </select></div>
         <div class="ml-auto flex items-center gap-1 bg-slate-50 rounded-full px-1 py-0.5 border"><button onclick="updateCap('${rec.id}',-1)" class="w-5 h-5 rounded-full bg-white border text-[10px]">−</button><span class="font-bold w-4 text-center text-[11px]">${cap}</span><button onclick="updateCap('${rec.id}',1)" class="w-5 h-5 rounded-full bg-white border text-[10px]">+</button><span class="text-[9px] ml-1">${count}/${cap}</span></div>
       </div>
       <div class="space-y-1">${jSlots}${sSlots}${emptySlots}${tanpaKatilSlots?`<div class="pt-2 mt-2 border-t border-dashed border-amber-300"><div class="text-[8px] font-bold text-amber-700 mb-1">TANPA KATIL / INFANT</div>${tanpaKatilSlots}</div>`:''}</div>
