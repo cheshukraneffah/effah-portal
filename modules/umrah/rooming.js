@@ -818,7 +818,7 @@ function renderNamelist(){
     });
   }
   const total=allRoomingJemaah.length;
-  const belumGlobal=allRoomingJemaah.filter(r=>!isJemaahAssignedAny(r.id)).length;
+  const belumGlobal=sortJemaahAZ(allRoomingJemaah).filter(r=>!isJemaahAssignedAny)(r.id)).length;
   // V24.16: belumInLoc kira termasuk tanpa katil juga
   const belumInLoc=allRoomingJemaah.filter(r=>{
     const assignedNormal = isJemaahAssignedInLocation(r.id, activeLocation);
@@ -832,6 +832,7 @@ function renderNamelist(){
   const topUnassignedBadge=document.getElementById('topUnassignedBadge'); if(topUnassignedBadge) topUnassignedBadge.style.display='none';
   const topAssignedBadge=document.getElementById('topAssignedBadge'); if(topAssignedBadge) topAssignedBadge.style.display='none';
   if(total===0){ cont.innerHTML='<div class="p-6 text-center text-[11px] text-slate-400">Tiada jemaah untuk trip ini</div>'; return; }
+  filtered = [...filtered].sort((a,b)=>{ const na=(getJemaahName(a.fields)||'').toUpperCase(); const nb=(getJemaahName(b.fields)||'').toUpperCase(); return na.localeCompare(nb); });
   cont.innerHTML=filtered.map((r,i)=>{
         const name=getJemaahName(r.fields);
     const assignedNormalInLoc=isJemaahAssignedInLocation(r.id, activeLocation);
@@ -2240,7 +2241,8 @@ renderNamelist = function(){
       });
     }
     const boardOptions = ['FULLBOARD','FULLBOARD (MEKAH)','BB (MEKAH)','FULLBOARD (MADINAH)','BB (MADINAH)'];
-    cont.innerHTML=filtered.map((r,i)=>{
+    filtered = [...filtered].sort((a,b)=>{ const na=(getJemaahName(a.fields)||'').toUpperCase(); const nb=(getJemaahName(b.fields)||'').toUpperCase(); return na.localeCompare(nb); });
+  cont.innerHTML=filtered.map((r,i)=>{
       const name=getJemaahName(r.fields);
       const assignedNormalInLoc=isJemaahAssignedInLocation(r.id, activeLocation);
       const assignedTanpaInLoc=allRoomingRecords.some(rec=> (rec.fields['LOKASI / CITY']||'MEKAH').toUpperCase()===activeLocation.toUpperCase() && ((rec.fields['JEMAAH TANPA KATIL']||[]).includes(r.id)));
@@ -2486,3 +2488,52 @@ window.assignStaffToRoom = assignStaffToRoom_FIXED;
 window.removeStaffFromRoom = removeStaffFromRoom_FIXED;
 
 console.log('V102 RACE FIX loaded - queue per staff');
+
+
+// ===== FIX PRINT NAMELIST SORT A-Z =====
+const _origPrintNamelist = window.printNamelist || window.printNamelistPortrait || window.generateNamelistPrint;
+function sortJemaahAZ(list){
+  return [...list].sort((a,b)=>{
+    const nameA = (a.fields['NAMA JEMAAH']||a.fields['NAMA']||'').toString().toUpperCase();
+    const nameB = (b.fields['NAMA JEMAAH']||b.fields['NAMA']||'').toString().toUpperCase();
+    return nameA.localeCompare(nameB);
+  });
+}
+// Override print functions to sort A-Z
+function printNamelistSorted(){
+  const list = window.allRoomingJemaah || window.jemaahList || [];
+  const sorted = sortJemaahAZ(list.filter(r=>!r.fields['STAFF'])); // only jemaah
+  const staff = list.filter(r=>r.fields['STAFF']);
+  const allSorted = [...sorted, ...staff]; // jemaah A-Z then staff
+  // Store sorted for print function to use
+  window._printSortedJemaah = allSorted;
+  if(typeof window.printNamelistOriginal==='function'){
+    window.printNamelistOriginal(allSorted);
+  } else if(typeof window.printNamelistPortrait==='function'){
+    // Call original print with sorted
+    const orig = window.printNamelistPortrait;
+    // Temporarily replace allRoomingJemaah
+    const backup = window.allRoomingJemaah;
+    window.allRoomingJemaah = allSorted;
+    orig();
+    window.allRoomingJemaah = backup;
+  } else {
+    // Fallback: try to find print logic
+    const backup = window.allRoomingJemaah;
+    window.allRoomingJemaah = allSorted;
+    if(typeof window.printNamelist==='function' && window.printNamelist!==printNamelistSorted){
+      window.printNamelist = window._origPrintNamelist;
+      window.printNamelist();
+      window.printNamelist = printNamelistSorted;
+    }
+    window.allRoomingJemaah = backup;
+  }
+}
+// Save originals
+if(window.printNamelist && !window.printNamelistOriginal){
+  window.printNamelistOriginal = window.printNamelist;
+  window._origPrintNamelist = window.printNamelist;
+}
+window.printNamelist = printNamelistSorted;
+
+// Also patch the actual HTML generation inside print - sort filtered before map
