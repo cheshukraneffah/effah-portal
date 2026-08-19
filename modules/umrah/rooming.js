@@ -1,5 +1,9 @@
+// ROOMING V101 - FIX PRINT fbRaw toUpperCase ARRAY + _autoScrollInterval REFERENCEERROR + 422 HANDLING - 2026-08-19
+console.log('ROOMING V101 loaded - print fix, autoScroll fix');
+var _autoScrollInterval=null;
 // ROOMING V100 - FIX GHOST BOARD STAFF + INSURAN MULTI DROPDOWN (like BOARD) + REMOVE FIX + TRAIN + PAKEJ 7 - 2026-08-19
 console.log('ROOMING V100 loaded - ghost fix, insuran multi');
+var _autoScrollInterval=null;
 // ROOMING V99b - BOARD STAFF MULTI DROPDOWN + REMOVE FIX + TRAIN + PAKEJ 7 - 2026-08-19
 console.log('ROOMING V99b loaded - board staff multi');
 // ROOMING V99a - FIX REMOVE BUTTON ONLY (event) + TRAIN VISIBLE - 2026-08-19
@@ -585,8 +589,7 @@ async function updateRoomCatatan(roomId, value){
     let lastError=null;
     for(let fieldName of fieldNames){
       try{
-        const res=await fetch(`https://api.airtable.com/v0/${base}/ROOMING%20LIST/${roomId}`,{
-          method:'PATCH',
+        const res=await fetch(`https://api.airtable.com/v0/${base}/ROOMING%20LIST/${roomId}`,{method:'PATCH',
           headers:{'Authorization':`Bearer ${pat}`,'Content-Type':'application/json'},
           body: JSON.stringify({fields:{[fieldName]: value}})
         });
@@ -1161,8 +1164,7 @@ async function removeStaffFromRoom(roomId, staffId){
       const base=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base')||localStorage.getItem('effah_base_id');
       const pat=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
       if(base&&pat){
-        await fetch(`https://api.airtable.com/v0/${base}/ROOMING%20LIST/${roomId}`,{
-          method:'PATCH',
+        await fetch(`https://api.airtable.com/v0/${base}/ROOMING%20LIST/${roomId}`,{method:'PATCH',
           headers:{'Authorization':`Bearer ${pat}`,'Content-Type':'application/json'},
           body: JSON.stringify({fields:{[staffField]: newList}})
         });
@@ -1193,8 +1195,7 @@ async function removeStaffFromRoom(roomId, staffId){
       const current=roomRec.fields[staffField]||[];
       const newList=current.filter(id=>id!==staffId && id!==staff.airtableId);
       roomRec.fields[staffField]=newList;
-      const res2=await fetch(`https://api.airtable.com/v0/${base}/ROOMING%20LIST/${roomId}`,{
-        method:'PATCH',
+      const res2=await fetch(`https://api.airtable.com/v0/${base}/ROOMING%20LIST/${roomId}`,{method:'PATCH',
         headers:{'Authorization':`Bearer ${pat}`,'Content-Type':'application/json'},
         body: JSON.stringify({fields:{[staffField]: newList}})
       });
@@ -1205,7 +1206,7 @@ async function removeStaffFromRoom(roomId, staffId){
 
 
 function setActiveLocation(loc){ activeLocation=loc.toUpperCase(); localStorage.setItem('effah_active_location',activeLocation); const el=document.getElementById('copyTargetLoc'); if(el) el.textContent=activeLocation; renderLocationTabs(); renderRoomingGrid(); renderNamelist(); renderStaffList(); }
-let _autoScrollInterval=null;
+var _autoScrollInterval=null;
 function _stopAutoScroll(){ if(_autoScrollInterval){ clearInterval(_autoScrollInterval); _autoScrollInterval=null; } }
 function _startAutoScroll(){
   if(_autoScrollInterval) return;
@@ -1949,9 +1950,9 @@ function generateRoomingPrint(orientation){ orientation = orientation || 'landsc
       
       // FIXED LOGIC: Determine board makan per location - INCLUDING STAFF
       function isStaffBoardMatch(sObj, locUpper){
-        const fbRaw = (sObj.boardBasis||sObj.fields?.['BOARD']||sObj.board||'').toString().trim();
+        const fbRawRaw = sObj.boardBasis||sObj.fields?.['BOARD']||sObj.board||''; const fbRaw = (Array.isArray(fbRawRaw)? fbRawRaw.join(', ') : fbRawRaw).toString().trim();
         if(!fbRaw) return false;
-        const up=fbRaw.toUpperCase();
+        const up=(Array.isArray(fbRaw)? (fbRaw[0]||'') : fbRaw).toString().toUpperCase();
         if(up==='-'||up==='NO BOARD') return false;
         if(locUpper==='MEKAH') return up.includes('MEKAH')||up==='FULLBOARD'||up==='BOARD'||up.includes('FULLBOARD');
         if(locUpper==='MADINAH') return up.includes('MADINAH')||up==='FULLBOARD'||up==='BOARD'||up.includes('FULLBOARD');
@@ -2041,7 +2042,7 @@ function generateRoomingPrint(orientation){ orientation = orientation || 'landsc
           // staff in this hotel
           const staffInHotel = staffList.filter(s=> s.roomIds && s.roomIds.some(rid=> hRooms.some(hr=>hr.id===rid)));
           staffInHotel.forEach(s=>{
-            const fbRaw=(s.boardBasis||s.fields?.['BOARD']||s.board||'').toString().toUpperCase().trim();
+            const fbRawRaw=s.boardBasis||s.fields?.['BOARD']||s.board||''; const fbRaw=(Array.isArray(fbRawRaw)? fbRawRaw.join(', ') : fbRawRaw).toString().toUpperCase().trim();
             if(fbFilter(fbRaw)) cnt++;
           });
           return cnt;
@@ -2187,7 +2188,7 @@ function generateRoomingPrint(orientation){ orientation = orientation || 'landsc
                     rawStaffName = rawStaffName.replace(/\(EFFAH\)/i,'').trim();
                     const displayName = isStaffRow ? rawStaffName + ' (EFFAH)' : getJemaahName(item.rec.fields);
                     const fbRaw = isStaffRow ? (item.rec.fields['BOARD']||'FULLBOARD') : (getFullboardVal(item.rec.fields)||'');
-                    const up=(fbRaw||'').toUpperCase();
+                    const up=(Array.isArray(fbRaw)? (fbRaw[0]||'') : (fbRaw||'')).toString().toUpperCase();
                     let badge='';
                     if(up.includes('MEKAH')) badge='<span style="background:#FDE68A;border:1px solid #92400E;padding:1px 6px;border-radius:10px;font-weight:bold;font-size:8px">'+fbRaw+'</span>';
                     else if(up.includes('MADINAH')) badge='<span style="background:#BFDBFE;border:1px solid #1E40AF;padding:1px 6px;border-radius:10px;font-weight:bold;font-size:8px">'+fbRaw+'</span>';
