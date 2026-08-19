@@ -281,53 +281,15 @@ function toggleBoardMulti(jemaahId, option){
   updateJemaahBoardMulti(jemaahId, arr);
 }
 function clearBoardMulti(jemaahId){ updateJemaahBoardMulti(jemaahId, []); }
-
-function toggleStaffBoardMulti(staffId, boardVal){
-  const staff = (typeof getStaffById==='function'? getStaffById(staffId) : staffList.find(s=>s.id===staffId||s.airtableId===staffId));
-  if(!staff) return;
-  if(!staff.board) staff.board=[];
-  if(!Array.isArray(staff.board)) staff.board = staff.board ? [staff.board] : [];
-  const idx = staff.board.indexOf(boardVal);
-  if(idx>=0) staff.board.splice(idx,1); else staff.board.push(boardVal);
-  // also keep TRAIN separate
-  const isTrain = staff.board.includes('TRAIN') || !!staff.train;
-  staff.train = isTrain;
-  if(typeof saveStaffList==='function') saveStaffList();
-  if(typeof renderStaffList==='function') renderStaffList();
-  if(typeof renderRoomingGrid==='function') renderRoomingGrid();
-  // PATCH to Airtable BOARD BASIS
-  const base = window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base')||localStorage.getItem('effah_base_id');
-  const pat = window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
-  if(base&&pat&&staff.airtableId){
-    // BOARD BASIS is multiple select, send array
-    const boardToSave = staff.board.filter(b=>b!=='TRAIN');
-    fetch(`https://api.airtable.com/v0/${base}/STAFF%20LIST%20%28ROOMING%29/${staff.airtableId}`,{
-      method:'PATCH',
-      headers:{'Authorization':`Bearer ${pat}`,'Content-Type':'application/json'},
-      body: JSON.stringify({fields:{'BOARD BASIS': boardToSave.length? boardToSave : [], 'TRAIN': isTrain}})
-    }).then(r=>r.json()).then(d=>console.log('BOARD BASIS saved', staffId, boardToSave)).catch(e=>console.error('BOARD save fail', e));
-  }
+function toggleStaffBoardMulti(staffId, option){
+  const s=getStaffById(staffId); if(!s) return;
+  let arr=getStaffBoardArray(s);
+  if(arr.includes(option)) arr=arr.filter(x=>x!==option); else arr.push(option);
+  s.boardBasis=arr; s.board=arr.join(', '); if(s.fields) s.fields['BOARD']=arr.join(', ');
+  saveStaffList(); if(typeof renderStaffList==='function') renderStaffList();
+  const base=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base')||localStorage.getItem('effah_base_id'); const pat=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
+  if(base&&pat&&s.airtableId){ fetch(`https://api.airtable.com/v0/${base}/STAFF%20LIST%20%28ROOMING%29/${s.airtableId}`,{method:'PATCH',headers:{Authorization:`Bearer ${pat}`,'Content-Type':'application/json'},body:JSON.stringify({fields:{'BOARD': arr.join(', ')}})}).catch(()=>{}); }
 }
-window.toggleStaffBoardMulti = toggleStaffBoardMulti;
-
-function clearBoardMulti(staffId){
-  const staff = (typeof getStaffById==='function'? getStaffById(staffId) : staffList.find(s=>s.id===staffId||s.airtableId===staffId));
-  if(!staff) return;
-  const hadTrain = !!staff.train;
-  staff.board = hadTrain ? ['TRAIN'] : [];
-  if(typeof saveStaffList==='function') saveStaffList();
-  renderStaffList(); renderRoomingGrid();
-  const base = window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base');
-  const pat = window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
-  if(base&&pat&&staff.airtableId){
-    fetch(`https://api.airtable.com/v0/${base}/STAFF%20LIST%20%28ROOMING%29/${staff.airtableId}`,{
-      method:'PATCH', headers:{'Authorization':`Bearer ${pat}`,'Content-Type':'application/json'},
-      body: JSON.stringify({fields:{'BOARD BASIS': []}})
-    }).catch(()=>{});
-  }
-}
-window.clearBoardMulti=clearBoardMulti;
-
 function clearStaffBoardMulti(staffId){ const s=getStaffById(staffId); if(!s) return; s.boardBasis=[]; s.board=''; if(s.fields) s.fields['BOARD']=''; saveStaffList(); if(typeof renderStaffList==='function') renderStaffList(); }
 function toggleInsuranMulti(jemaahId, option){
   const rec=allRoomingJemaah.find(r=>r.id===jemaahId); if(!rec) return;
@@ -937,7 +899,7 @@ function renderNamelist(){
         ${insToggle}
       </div>
       <div class="col-span-1 flex items-center gap-0.5">
-        <select "+buildPakejSelectHtml(f['PAKEJ']||f['JENIS PAKEJ']||'-', rec.id||j.id)+"
+        "+buildNamelistPakejSelect(f['PAKEJ']||f['JENIS PAKEJ']||'-', j.id||j.airtableId)+"
       </div>
       <div class="col-span-1 text-center">${statusIcon}</div>
     </div>`;
@@ -1095,7 +1057,6 @@ const emptyCount=Math.max(0,cap-count); const emptySlots=Array.from({length:empt
       </div>
       <div class="flex items-center gap-1.5 text-[10px]">
         <div class="flex items-center gap-1 px-2.5 py-1 bg-slate-50 rounded-full border"><select onchange="updateRoomField('${rec.id}','PAKEJ / HOTEL',this.value)" class="text-[10px] border border-slate-200 rounded-full px-2 py-1 bg-white font-bold">
-          <option value="-" ${pakej==='-'||pakej===''?'selected':''}>-</option>
           <option value="JIMAT STANDARD" ${pakej==='JIMAT STANDARD'?'selected':''}>JIMAT STANDARD</option>
           <option value="JIMAT PREMIUM" ${pakej==='JIMAT PREMIUM'?'selected':''}>JIMAT PREMIUM</option>
           <option value="EKONOMI LITE" ${pakej==='EKONOMI LITE'?'selected':''}>EKONOMI LITE</option>
@@ -2329,7 +2290,7 @@ renderNamelist = function(){
           </div>
         </div>
         <div class="col-span-1 flex items-center gap-0.5">
-          <select "+buildPakejSelectHtml(f['PAKEJ']||f['JENIS PAKEJ']||'-', rec.id||j.id)+"
+          "+buildNamelistPakejSelect(f['PAKEJ']||f['JENIS PAKEJ']||'-', j.id||j.airtableId)+"
         </div>
         <div class="col-span-1 text-center">${statusIcon}</div>
       </div>`;
@@ -2509,109 +2470,45 @@ window.removeStaffFromRoom = removeStaffFromRoom_FIXED;
 console.log('V102 RACE FIX loaded - queue per staff');
 
 
-// V102 FIX PAKEJ PERSIST - ensure field name PAKEJ / HOTEL and save "-" as empty or "-"
-const _origUpdateRoomField = typeof updateRoomField==='function' ? updateRoomField : null;
-async function updateRoomField_FIXED(recId, field, value){
-  const rec = allRoomingRecords.find(r=>r.id===recId);
-  if(!rec){ console.warn('rec not found', recId); return; }
-  // Normalize field name
-  let fieldName = field;
-  if(field==='PAKEJ') fieldName='PAKEJ / HOTEL';
-  // If value is "-" save as "-" (or empty if you prefer)
-  const saveVal = value;
-  // Optimistic update
-  rec.fields[fieldName]=saveVal;
-  if(fieldName==='PAKEJ / HOTEL'){
-    rec.fields['PAKEJ']=saveVal;
-  }
-  if(typeof renderRoomingGrid==='function') renderRoomingGrid();
-  if(typeof saveRoomingLocal==='function') saveRoomingLocal();
-  const base = window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base')||localStorage.getItem('effah_base_id');
-  const pat = window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
-  if(!base||!pat||!rec.airtableId){ console.log('Local only update', fieldName, saveVal); return; }
-  try{
-    const res = await fetch(`https://api.airtable.com/v0/${base}/ROOMING%20LIST/${rec.airtableId}`,{
-      method:'PATCH', headers:{'Authorization':`Bearer ${pat}`,'Content-Type':'application/json'},
-      body: JSON.stringify({fields:{[fieldName]: saveVal}})
-    });
-    const data = await res.json();
-    if(data.error){ console.error('updateRoomField error', data.error); alert('Airtable error: '+JSON.stringify(data.error)); }
-    else console.log('PAKEJ saved', recId, saveVal);
-  }catch(e){ console.error('updateRoomField fail', e); }
-}
-window.updateRoomField = updateRoomField_FIXED;
-
-
-// ===== V102 FIX PAKEJ JEMAAH NAMELIST PERSIST + "-" OPTION =====
-function updateJemaahPakej_FIXED(jemaahId, value){
-  const j = (typeof getJemaahById==='function'? getJemaahById(jemaahId) : (window.jemaahList||[]).find(x=>x.id===jemaahId||x.airtableId===jemaahId));
-  if(!j){ console.warn('jemaah not found', jemaahId); return; }
-  const saveVal = value;
-  // Optimistic
-  if(!j.fields) j.fields={};
-  j.fields['PAKEJ'] = saveVal;
-  j.fields['JENIS PAKEJ'] = saveVal;
-  j.fields['PAKEJ JEMAAH'] = saveVal;
-  if(typeof saveJemaahList==='function') saveJemaahList();
-  if(typeof renderNamelist==='function') renderNamelist();
-  const base = window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base')||localStorage.getItem('effah_base_id');
-  const pat = window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
-  if(!base||!pat||!j.airtableId) return;
-  // Try multiple field names, Airtable may use PAKEJ or JENIS PAKEJ
-  fetch(`https://api.airtable.com/v0/${base}/JEMAAH%20LIST/${j.airtableId}`,{
-    method:'PATCH',
-    headers:{'Authorization':`Bearer ${pat}`,'Content-Type':'application/json'},
-    body: JSON.stringify({fields:{'PAKEJ': saveVal}})
-  }).then(r=>r.json()).then(d=>{
-    if(d.error){
-      // try JENIS PAKEJ
-      return fetch(`https://api.airtable.com/v0/${base}/JEMAAH%20LIST/${j.airtableId}`,{
-        method:'PATCH', headers:{'Authorization':`Bearer ${pat}`,'Content-Type':'application/json'},
-        body: JSON.stringify({fields:{'JENIS PAKEJ': saveVal}})
-      });
-    }
-    return d;
-  }).then(d=>console.log('PAKEJ JEMAAH saved', jemaahId, saveVal)).catch(e=>console.error('PAKEJ JEMAAH save fail', e));
-}
-window.updateJemaahPakej = updateJemaahPakej_FIXED;
-window.updateJemaahPakejFixed = updateJemaahPakej_FIXED;
-
-
-function buildPakejSelectHtml(currentVal, jemaahId){
+// FIX PAKEJ NAMELIST ONLY - with "-" option and selected, does not touch BOARD BASIS layout
+function buildNamelistPakejSelect(currentVal, jemaahId){
   const cur = (currentVal||'-').toString().trim().toUpperCase();
   const opts = ['-','JIMAT STANDARD','JIMAT PREMIUM','EKONOMI LITE','EKONOMI','STANDARD','PREMIUM','PREMIUM PLUS'];
-  let html = `<select onchange="updateJemaahPakej('${jemaahId}', this.value)" class="text-[10px] border border-slate-200 rounded-full px-2 py-1 bg-white font-bold w-full">`;
+  let h = `<select onchange="updateJemaahPakejNamelist('${jemaahId}', this.value)" class="text-[10px] border border-slate-200 rounded-full px-2 py-1 bg-white font-bold w-[110px]">`;
   for(const o of opts){
-    const sel = (cur===o || (cur==='' && o==='-')) ? 'selected' : '';
-    html+=`<option value="${o}" ${sel}>${o}</option>`;
+    const sel = (cur===o) ? 'selected' : '';
+    h+=`<option value="${o}" ${sel}>${o}</option>`;
   }
-  html+='</select>';
-  return html;
+  h+='</select>';
+  return h;
 }
-window.buildPakejSelectHtml = buildPakejSelectHtml;
-
-
-// Override namelist PAKEJ column rendering after load - patch existing rows
-const _origRenderNamelist = typeof renderNamelist==='function' ? renderNamelist : null;
-if(_origRenderNamelist){
-  window.renderNamelist = function(){
-    _origRenderNamelist();
-    // After original render, fix PAKEJ selects that show truncated JIMAT STA
-    setTimeout(()=>{
-      const rows = document.querySelectorAll('#namelist-container select, [id*="namelist"] select');
-      rows.forEach(sel=>{
-        if(sel.innerHTML.includes('JIMAT STANDARD') && !sel.innerHTML.includes('value="-"')){
-          const curVal = sel.value || '-';
-          // preserve current value
-          if(!sel.innerHTML.includes('>-<')){
-            const jemaahRow = sel.closest('[data-jemaah-id]') || sel.closest('tr');
-            const jId = jemaahRow?.dataset?.jemaahId || sel.getAttribute('data-id') || '';
-            if(jId){
-              sel.outerHTML = buildPakejSelectHtml(curVal, jId);
-            }
-          }
-        }
-      });
-    },100);
-  };
+function updateJemaahPakejNamelist(jemaahId, value){
+  const j = (window.jemaahList||[]).find(x=>x.id===jemaahId||x.airtableId===jemaahId);
+  if(!j) return;
+  if(!j.fields) j.fields={};
+  j.fields['PAKEJ']=value;
+  if(typeof saveJemaahList==='function') saveJemaahList();
+  // persist to Airtable
+  const base = window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base');
+  const pat = window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
+  if(base&&pat&&j.airtableId){
+    fetch(`https://api.airtable.com/v0/${base}/JEMAAH%20LIST/${j.airtableId}`,{
+      method:'PATCH', headers:{'Authorization':`Bearer ${pat}`,'Content-Type':'application/json'},
+      body: JSON.stringify({fields:{'PAKEJ': value}})
+    }).then(r=>r.json()).then(d=>{
+      if(d.error){
+        return fetch(`https://api.airtable.com/v0/${base}/JEMAAH%20LIST/${j.airtableId}`,{
+          method:'PATCH', headers:{'Authorization':`Bearer ${pat}`,'Content-Type':'application/json'},
+          body: JSON.stringify({fields:{'JENIS PAKEJ': value}})
+        });
+      }
+    }).catch(()=>{});
+  }
+  // update UI without full re-render to avoid layout jump
+  if(typeof renderNamelist==='function'){
+    const sel = document.querySelector(`select[data-pakej-id="${jemaahId}"]`);
+    if(!sel) renderNamelist();
+  }
 }
+window.updateJemaahPakejNamelist=updateJemaahPakejNamelist;
+window.buildNamelistPakejSelect=buildNamelistPakejSelect;
