@@ -1,3 +1,5 @@
+// ROOMING V89 - FIX MULTIPLE STAFF PER ROOM + INFANT UNKNOWN (STAFF TANPA KATIL RENDER) + CATATAN SAVE - 2026-08-19
+console.log('ROOMING V89 loaded - fix multi staff per room, staff tanpa katil no Unknown');
 // ROOMING V88 - STAFF IN TANPA KATIL MODAL + CATATAN SAVE + DRAG FIX - 2026-08-19
 console.log('ROOMING V88 loaded - staff in tanpa katil modal, catatan save, drag fix');
 // ROOMING V87 - FIX CATATAN BILIK SAVE + STAFF AS TANPA KATIL DROP + GRIP FIX - 2026-08-19
@@ -1058,9 +1060,24 @@ function renderRoomingGrid(){
       return `<div class="flex items-center justify-between px-2.5 py-2 bg-slate-100 text-slate-800 border border-slate-200 rounded-xl text-[11px]"><span class="truncate font-medium flex items-center">${jName}${fbBadge}</span><button onclick="removeJemaahFromRoom('${rec.id}','${jId}')" class="ml-2 w-4 h-4 rounded-full bg-white hover:bg-slate-200 text-[10px]">✕</button></div>`; 
     }).join('');
     const sSlots=staffArr.map(s=>`<div class="flex items-center justify-between px-2.5 py-2 bg-[#FADBD8] text-[#7A0C2E] border border-[#F5B7B1] rounded-xl text-[11px]"><span class="truncate">👤 ${s}</span><button onclick="removeStaff('${rec.id}','${s.replace(/'/g,"\\'")}')" class="ml-2 w-4 h-4 rounded-full bg-white/70 text-[10px]">✕</button></div>`).join('');
-    const tanpaKatilIds = f['JEMAAH TANPA KATIL'] || f['INFANT'] || [];
-    const tanpaKatilSlots = tanpaKatilIds.map(tId=>{ const tRec=allRoomingJemaah.find(j=>j.id===tId); const tName=tRec?getJemaahName(tRec.fields):'Unknown'; return `<div class="flex items-center justify-between px-2.5 py-2 bg-amber-50 text-amber-900 border border-amber-200 rounded-xl text-[11px] border-dashed"><span class="truncate">INFANT ${tName}</span><button onclick="removeTanpaKatilFromRoom('${rec.id}','${tId}')" class="ml-2 w-4 h-4 rounded-full bg-white text-[10px]">✕</button></div>`; }).join('');
-    const emptyCount=Math.max(0,cap-count); const emptySlots=Array.from({length:emptyCount}).map((_,i)=>`<div ondragover="allowDrop(event)" ondrop="dropJemaah(event,'${rec.id}')" class="px-2.5 py-2 border border-dashed border-slate-300 rounded-xl text-[10px] text-slate-400 text-center">Slot Kosong ${count+i+1}</div>`).join('');
+    const jTanpaRaw = f['JEMAAH TANPA KATIL']||f['INFANT']||[];
+    const staffTanpaLocal = (typeof getStaffTanpaKatilForRoom==='function'? getStaffTanpaKatilForRoom(rec.id) : (f['_STAFF_TANPA_KATIL']||[]));
+    const combinedTanpa = [...new Set([...jTanpaRaw, ...staffTanpaLocal])];
+    const tanpaKatilSlots = combinedTanpa.map(tId=>{
+      const sRec = (typeof getStaffById==='function'? getStaffById(tId) : staffList.find(s=>s.id===tId||s.airtableId===tId));
+      if(sRec){
+        const sName=sRec.name||'Staff Unknown';
+        return `<div class="flex items-center justify-between px-2.5 py-2 bg-[#FADBD8] text-[#7A0C2E] border border-[#F5B7B1] rounded-xl text-[11px] mt-1"><span class="truncate font-medium flex items-center gap-1">👤 ${sName} <span class="text-[8px] bg-white/50 px-1.5 py-0.5 rounded-full">STAFF TANPA KATIL</span></span><button onclick="removeStaffTanpaKatilFromRoom('${rec.id}','${tId}')" class="ml-2 w-4 h-4 rounded-full bg-white hover:bg-red-50 text-[10px]">✕</button></div>`;
+      } else {
+        const jRec=allRoomingJemaah.find(j=>j.id===tId);
+        const jName=jRec? getJemaahName(jRec.fields) : null;
+        if(!jName){
+          return `<div class="flex items-center justify-between px-2.5 py-2 bg-amber-50 text-amber-800 border border-amber-200 rounded-xl text-[11px] mt-1"><span class="truncate font-medium">⚠️ ID ${tId.substring(0,8)}... tak jumpa </span><button onclick="removeTanpaKatilFromRoom('${rec.id}','${tId}')" class="ml-2 w-4 h-4 rounded-full bg-white hover:bg-slate-200 text-[10px]">✕</button></div>`;
+        }
+        return `<div class="flex items-center justify-between px-2.5 py-2 bg-amber-50 text-amber-800 border border-amber-200 rounded-xl text-[11px] mt-1"><span class="truncate font-medium">👶 ${jName}</span><button onclick="removeTanpaKatilFromRoom('${rec.id}','${tId}')" class="ml-2 w-4 h-4 rounded-full bg-white hover:bg-slate-200 text-[10px]">✕</button></div>`;
+      }
+    }).join('');
+const emptyCount=Math.max(0,cap-count); const emptySlots=Array.from({length:emptyCount}).map((_,i)=>`<div ondragover="allowDrop(event)" ondrop="dropJemaah(event,'${rec.id}')" class="px-2.5 py-2 border border-dashed border-slate-300 rounded-xl text-[10px] text-slate-400 text-center">Slot Kosong ${count+i+1}</div>`).join('');
     const localCatatan = (typeof loadLocalCatatan==='function'? loadLocalCatatan(rec.id) : '') || '';
     const catatanVal = f['CATATAN BILIK'] || f['CATATAN'] || f['NOTES'] || f['REMARK'] || localCatatan || '';
     const catatanField = `<div class="mt-2"><div class="text-[8px] font-bold text-slate-500 mb-1">CATATAN BILIK</div><textarea id="catatan-${rec.id}" placeholder="Catatan bilik..." onblur="updateRoomCatatan('${rec.id}', this.value)" oninput="clearTimeout(window._catatanTimer); window._catatanTimer=setTimeout(()=>updateRoomCatatan('${rec.id}', this.value), 1000)" class="w-full text-[10px] px-2.5 py-1.5 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:outline-none focus:border-[#7A0C2E]/30 resize-none" rows="2">${catatanVal}</textarea></div>`;
@@ -1160,7 +1177,8 @@ function assignStaffAsTanpaKatil(staffId, roomId){
   // Check if staff already assigned anywhere in this room (as staff or tanpa katil)
   const existingJTanpa = room.fields['JEMAAH TANPA KATIL']||[];
   const existingStaff = room.fields['STAFF LIST (ROOMING)']||[];
-  if(existingJTanpa.includes(staffId) || existingStaff.includes(staffId)) return alert('Staff sudah ada di bilik ini');
+  if(existingJTanpa.includes(staffId)) return alert('Staff ini sudah ada sebagai tanpa katil di bilik ini');
+  if(existingStaff.includes(staffId)) return alert('Staff ini sudah ada di bilik ini (bukan tanpa katil)');
   
   // For staff, we will store in a separate local mapping AND try to save to JEMAAH TANPA KATIL if Airtable allows
   // Also store in STAFF TANPA KATIL localStorage mapping
@@ -1201,6 +1219,37 @@ function getStaffTanpaKatilForRoom(roomId){
     return JSON.parse(localStorage.getItem(key)||'[]');
   }catch(e){ return []; }
 }
+function removeStaffTanpaKatilFromRoom(roomId, staffId){
+  const room=allRoomingRecords.find(r=>r.id===roomId);
+  if(room){
+    const key='effah_staff_tanpa_'+roomId;
+    let list=[];
+    try{ list=JSON.parse(localStorage.getItem(key)||'[]'); }catch(e){ list=[]; }
+    list=list.filter(id=>id!==staffId);
+    try{ localStorage.setItem(key, JSON.stringify(list)); }catch(e){}
+    if(room.fields['_STAFF_TANPA_KATIL']) room.fields['_STAFF_TANPA_KATIL']=room.fields['_STAFF_TANPA_KATIL'].filter(id=>id!==staffId);
+    // Also remove from JEMAAH TANPA KATIL if exists there
+    if(room.fields['JEMAAH TANPA KATIL']) room.fields['JEMAAH TANPA KATIL']=room.fields['JEMAAH TANPA KATIL'].filter(id=>id!==staffId);
+    renderRoomingGrid();
+    const base=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base')||localStorage.getItem('effah_base_id'); const pat=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
+    if(base&&pat){
+      fetch(`https://api.airtable.com/v0/${base}/ROOMING%20LIST/${roomId}`,{method:'PATCH',headers:{Authorization:`Bearer ${pat}`,'Content-Type':'application/json'},body:JSON.stringify({fields:{'JEMAAH TANPA KATIL': room.fields['JEMAAH TANPA KATIL']||[]}})}).catch(()=>{});
+    }
+  }
+}
+function removeTanpaKatilFromRoom(roomId, jId){
+  const room=allRoomingRecords.find(r=>r.id===roomId);
+  if(!room) return;
+  const current=room.fields['JEMAAH TANPA KATIL']||[];
+  const newList=current.filter(id=>id!==jId);
+  room.fields['JEMAAH TANPA KATIL']=newList;
+  renderRoomingGrid();
+  const base=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base')||localStorage.getItem('effah_base_id'); const pat=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
+  if(base&&pat){
+    fetch(`https://api.airtable.com/v0/${base}/ROOMING%20LIST/${roomId}`,{method:'PATCH',headers:{Authorization:`Bearer ${pat}`,'Content-Type':'application/json'},body:JSON.stringify({fields:{'JEMAAH TANPA KATIL': newList}})}).catch(()=>{});
+  }
+}
+
 
 function quickAssignStaffToRoom(staffId, roomId){
   // Existing quickAssignStaff but with specific room
@@ -1214,7 +1263,7 @@ function quickAssignStaffToRoom(staffId, roomId){
   const staffField = room.fields['STAFF LIST (ROOMING)'] ? 'STAFF LIST (ROOMING)' : 'STAFF / EXTRA';
   if(staffField==='STAFF LIST (ROOMING)'){
     const current = room.fields[staffField]||[];
-    if(current.includes(staffId)) return;
+    if(current.includes(staffId)) { console.log('staff already in this room', staffId); return; }
     const newList=[...current, staffId];
     room.fields[staffField]=newList;
     renderRoomingGrid();
