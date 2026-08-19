@@ -1,5 +1,5 @@
-// ROOMING V94 - FIX STAFF TRAIN RESTORED + REMOVE STAFF AIRTABLE SYNC BOTH SIDES + NEW PAKEJ 7 OPTIONS + RESTORE PRINT ORIGINAL S NUMBERING - 2026-08-19
-console.log('ROOMING V94 loaded - train restored, remove sync fix, pakej 7 options');
+// ROOMING V95 - REBUILD TRAIN VISIBLE + REMOVE STAFF BOTH TABLES + 7 PAKEJ OPTIONS + PRINT ORIGINAL S NUMBERING - 2026-08-19
+console.log('ROOMING V95 loaded - TRAIN visible amber, remove staff both tables, pakej 7 options, print original');
 // ROOMING V93 - RESTORE ORIGINAL PRINT LAYOUT + FIX STAFF TANPA KATIL S NUMBERING (NOT NA) - 2026-08-19
 console.log('ROOMING V93 loaded - original print layout restored, staff tanpa katil S numbering');
 // ROOMING V91 - FIX PRINT 6 ROWS + REMOVE TANPA KATIL NOT MOVE TO REGULAR + MANY STAFF PER ROOM - 2026-08-19
@@ -223,20 +223,57 @@ async function assignStaffToRoom(staffId,roomId){
 
 }
 async function removeStaffFromRoom(roomId, staffId){
-  const staff=staffList.find(s=>s.id===staffId||s.airtableId===staffId); if(!staff) return;
+  console.log('V95 removeStaffFromRoom', roomId, staffId);
+  const staff=staffList.find(s=>s.id===staffId||s.airtableId===staffId); 
+  if(!staff){
+    const rec=allRoomingRecords.find(r=>r.id===roomId);
+    if(rec){
+      const arr=(rec.fields['STAFF / EXTRA']||'').split(',').map(x=>x.trim()).filter(x=>x&&x!==staffId);
+      rec.fields['STAFF / EXTRA']=arr.join(',');
+      const staffField='STAFF LIST (ROOMING)';
+      if(rec.fields[staffField]) rec.fields[staffField]=rec.fields[staffField].filter(id=>id!==staffId);
+      renderRoomingGrid();
+      const base=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base')||localStorage.getItem('effah_base_id');
+      const pat=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
+      if(base&&pat){
+        await fetch(`https://api.airtable.com/v0/${base}/ROOMING%20LIST/${roomId}`,{
+          method:'PATCH',
+          headers:{'Authorization':`Bearer ${pat}`,'Content-Type':'application/json'},
+          body: JSON.stringify({fields:{'STAFF / EXTRA': arr.join(','), 'STAFF LIST (ROOMING)': rec.fields['STAFF LIST (ROOMING)']||[]}})
+        });
+      }
+    }
+    return;
+  }
   staff.roomIds = (staff.roomIds||[]).filter(id=>id!==roomId);
   staff.roomLink = staff.roomIds.length? staff.roomIds[0] : null;
-  saveStaffList(); renderStaffList(); renderRoomingGrid(); renderLocationTabs();
+  if(typeof saveStaffList==='function') saveStaffList();
+  renderStaffList(); renderRoomingGrid(); renderLocationTabs();
   const base=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base')||localStorage.getItem('effah_base_id');
   const pat=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
-  if(!base||!pat||!staff.airtableId) return;
+  if(!base||!pat||!staff.airtableId){ console.warn('V95 missing Airtable config for remove'); return; }
   try{
-    await fetch(`https://api.airtable.com/v0/${base}/STAFF%20LIST%20%28ROOMING%29/${staff.airtableId}`,{
+    const res1=await fetch(`https://api.airtable.com/v0/${base}/STAFF%20LIST%20%28ROOMING%29/${staff.airtableId}`,{
       method:'PATCH',
       headers:{'Authorization':`Bearer ${pat}`,'Content-Type':'application/json'},
       body: JSON.stringify({fields:{'ROOMING LIST': staff.roomIds, 'ROOM': staff.roomIds}})
     });
-  }catch(e){ console.error('removeStaffFromRoom failed', e); }
+    const data1=await res1.json();
+    console.log('V95 STAFF table cleared', data1);
+    const roomRec=allRoomingRecords.find(r=>r.id===roomId);
+    if(roomRec){
+      const staffField='STAFF LIST (ROOMING)';
+      const newList=(roomRec.fields[staffField]||[]).filter(id=>id!==staffId && id!==staff.airtableId);
+      roomRec.fields[staffField]=newList;
+      const res2=await fetch(`https://api.airtable.com/v0/${base}/ROOMING%20LIST/${roomId}`,{
+        method:'PATCH',
+        headers:{'Authorization':`Bearer ${pat}`,'Content-Type':'application/json'},
+        body: JSON.stringify({fields:{[staffField]: newList}})
+      });
+      const data2=await res2.json();
+      console.log('V95 ROOMING LIST staff cleared', data2);
+    }
+  }catch(e){ console.error('V95 removeStaffFromRoom failed', e); alert('Gagal remove staff Airtable: '+e.message); }
 }
 function removeStaff(roomId,staffName){
   const s=staffList.find(x=>x.id===staffName||x.airtableId===staffName||x.name===staffName);
@@ -268,6 +305,8 @@ function renderStaffList(){
     if(boardVal==='FULLBOARD (MEKAH)' || boardVal==='BB (MEKAH)') boardCls='bg-orange-100 border-orange-200 text-orange-800';
     else if(boardVal==='FULLBOARD (MADINAH)' || boardVal==='BB (MADINAH)') boardCls='bg-blue-100 border-blue-200 text-blue-800';
     else if(boardVal==='FULLBOARD') boardCls='bg-emerald-100 border-emerald-200 text-emerald-800';
+    const trainChecked = s.train||s.fields?.TRAIN||false;
+    const trainCls = trainChecked ? 'bg-amber-400 border-amber-500 text-amber-900' : 'bg-white border-slate-200';
     return `<div ${drag} class="flex flex-col gap-1 px-2.5 py-2 rounded-xl border text-[11px] ${cls}">
       <div class="flex items-center justify-between">
         <div class="flex gap-2 items-center"><span class="text-slate-400 text-[10px]">${String(idx+1).padStart(2,'0')}</span><span class="font-medium truncate max-w-[120px]">${s.name}</span>${assignedInLoc?'<span class="ml-1 px-1 py-0.5 bg-slate-200 rounded text-[8px]">ASSIGNED di '+activeLocation+'</span>':''}</div>
@@ -282,7 +321,7 @@ function renderStaffList(){
           <option value="BB (MEKAH)" ${boardVal==='BB (MEKAH)'?'selected':''}>BB (MEKAH)</option>
           <option value="BB (MADINAH)" ${boardVal==='BB (MADINAH)'?'selected':''}>BB (MADINAH)</option>
         </select>
-        <label class="flex items-center gap-1 text-[8px] border rounded-full px-1.5 py-0.5 bg-white cursor-pointer"><input type="checkbox" ${s.train?'checked':''} onchange="updateStaffTrain('${s.id}',this.checked)" class="w-3 h-3"> TRAIN</label>
+        <label class="flex items-center gap-1 text-[8px] border rounded-full px-2 py-0.5 cursor-pointer font-bold ${trainCls}"><input type="checkbox" ${trainChecked?'checked':''} onchange="updateStaffTrain('${s.id}',this.checked)" class="w-3 h-3 accent-amber-600"> TRAIN</label>
       </div>
     </div>`;
   }).join('');
@@ -438,7 +477,7 @@ function renderRoomingHTML(){
               <i class="fa-solid fa-magnifying-glass absolute left-2.5 top-2.5 text-slate-400 text-[10px]"></i>
               <input id="searchRoomingJemaah" onkeyup="filterRoomingNamelist()" placeholder="Cari nama jemaah..." class="w-full text-[11px] pl-7 pr-2.5 py-2 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:outline-none">
             </div>
-            <select id="filterPakejRooming" onchange="filterRoomingNamelist()" class="text-[11px] border border-slate-200 rounded-xl px-2.5 py-2 bg-white font-medium"><option value="">Semua Pakej</option><option>JIMAT STANDARD</option><option>JIMAT PREMIUM</option><option>EKONOMI LITE</option><option>EKONOMI</option><option>STANDARD</option><option>PREMIUM</option><option>PREMIUM PLUS</option></select>
+            <select id="filterPakejRooming" onchange="filterRoomingNamelist()" class="text-[11px] border border-slate-200 rounded-xl px-2.5 py-2 bg-white font-bold"><option value="">Semua Pakej</option><option>JIMAT STANDARD</option><option>JIMAT PREMIUM</option><option>EKONOMI LITE</option><option>EKONOMI</option><option>STANDARD</option><option>PREMIUM</option><option>PREMIUM PLUS</option></select>
           </div>
         </div>
         <div class="px-2.5 py-1.5 bg-slate-50/70 border-b border-slate-200 grid grid-cols-12 text-[9px] font-bold text-slate-500 tracking-wider">
@@ -499,7 +538,7 @@ function renderRoomingHTML(){
           <p class="text-[9px] text-slate-400 mt-0.5">Dijana automatik: B + Kapasiti</p>
         </div>
         <select id="newRoomLokasi" class="w-full p-2 border border-slate-200 rounded-xl bg-white text-[11px]"><option value="MEKAH">MEKAH</option><option value="MADINAH">MADINAH</option><option value="TAIF">TAIF</option><option value="JEDDAH">JEDDAH</option></select>
-        <select id="newRoomPakej" class="w-full p-2 border border-slate-200 rounded-xl bg-white text-[11px]"><option>JIMAT STANDARD</option><option>JIMAT PREMIUM</option><option>EKONOMI LITE</option><option>EKONOMI</option><option>STANDARD</option><option>PREMIUM</option><option>PREMIUM PLUS</option></select>
+        <select id="newRoomPakej" class="w-full p-2 border border-slate-200 rounded-xl bg-white text-[11px] font-bold"><option>JIMAT STANDARD</option><option>JIMAT PREMIUM</option><option>EKONOMI LITE</option><option>EKONOMI</option><option>STANDARD</option><option>PREMIUM</option><option>PREMIUM PLUS</option></select>
         <input id="newRoomHotel" placeholder="Nama Hotel" class="w-full p-2 border border-slate-200 rounded-xl bg-white text-[11px]">
         <div class="flex gap-2 items-center">
           <input id="newRoomCap" type="number" value="4" min="1" max="8" oninput="updateNewRoomIdFromCap()" class="flex-1 p-2 border border-slate-200 rounded-xl font-bold bg-white text-[11px]">
