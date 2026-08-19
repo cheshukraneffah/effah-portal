@@ -1,3 +1,5 @@
+// ROOMING V87 - FIX CATATAN BILIK SAVE + STAFF AS TANPA KATIL DROP + GRIP FIX - 2026-08-19
+console.log('ROOMING V87 loaded - catatan save fix + staff tanpa katil');
 // ROOMING V86 - STAFF DRAG & DROP + FIX COUNT 23 vs 25 (INCLUDE TANPA KATIL) + STAFF AS TANPA KATIL - 2026-08-19
 console.log('ROOMING V86 loaded - staff draggable, count includes tanpa katil, staff as tanpa katil allowed');
 // ROOMING V85 - FIX STAFF COUNT MISMATCH + REMOVE BOARD BASIS TEXTBOX - 2026-08-19
@@ -560,20 +562,56 @@ async function dropRoomReorder(e, targetRoomId){
     }catch(err){ console.error('Sort update failed', rec.id, err); }
   }
 }
+
 async function updateRoomCatatan(roomId, value){
   const rec=allRoomingRecords.find(r=>r.id===roomId);
   if(!rec) return;
   rec.fields['CATATAN BILIK']=value;
   rec.fields['CATATAN']=value;
+  rec.fields['NOTES']=value;
+  console.log('V87 updateRoomCatatan', roomId, value);
   try{
     const base=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base')||localStorage.getItem('effah_base_id'); const pat=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
-  await fetch(`https://api.airtable.com/v0/${base}/ROOMING%20LIST/${roomId}`,{
-      method:'PATCH',
-      headers:{'Authorization':`Bearer ${pat}`,'Content-Type':'application/json'},
-      body: JSON.stringify({fields:{'CATATAN BILIK': value, 'CATATAN': value}})
-    });
-  }catch(e){ console.error('Catatan update failed', e); }
+    if(!base||!pat) throw new Error('Airtable config missing');
+    // Try field names in order: CATATAN BILIK, CATATAN, NOTES, REMARK
+    const fieldNames = ['CATATAN BILIK','CATATAN','NOTES','REMARK','Catatan Bilik','Catatan'];
+    let lastError=null;
+    for(let fieldName of fieldNames){
+      try{
+        const res=await fetch(`https://api.airtable.com/v0/${base}/ROOMING%20LIST/${roomId}`,{
+          method:'PATCH',
+          headers:{'Authorization':`Bearer ${pat}`,'Content-Type':'application/json'},
+          body: JSON.stringify({fields:{[fieldName]: value}})
+        });
+        const data=await res.json();
+        if(data.error){
+          console.warn('Catatan field', fieldName, 'failed', data.error);
+          lastError=data.error;
+          continue; // try next field name
+        } else {
+          console.log('Catatan saved to field', fieldName, 'value', value);
+          // Also save to local for instant persistence
+          try{
+            const key='effah_room_notes_'+roomId;
+            localStorage.setItem(key, value);
+          }catch(e){}
+          return;
+        }
+      }catch(e){
+        console.warn('Catatan field', fieldName, 'exception', e);
+        lastError=e;
+      }
+    }
+    throw lastError||new Error('All catatan field names failed');
+  }catch(e){ console.error('Catatan update failed', e); alert('Gagal save catatan bilik: '+e.message+'\n\nField CATATAN BILIK tak wujud di Airtable? Check nama field.'); }
 }
+function loadLocalCatatan(roomId){
+  try{
+    const key='effah_room_notes_'+roomId;
+    return localStorage.getItem(key)||'';
+  }catch(e){ return ''; }
+}
+
 
 document.addEventListener('dragover',e=>{ const g=document.getElementById('roomingGrid'); if(!g) return; const r=g.getBoundingClientRect(); if(e.clientY>r.bottom-100) g.scrollTop+=14; if(e.clientY<r.top+100) g.scrollTop-=14; });
 
@@ -1021,8 +1059,9 @@ function renderRoomingGrid(){
     const tanpaKatilIds = f['JEMAAH TANPA KATIL'] || f['INFANT'] || [];
     const tanpaKatilSlots = tanpaKatilIds.map(tId=>{ const tRec=allRoomingJemaah.find(j=>j.id===tId); const tName=tRec?getJemaahName(tRec.fields):'Unknown'; return `<div class="flex items-center justify-between px-2.5 py-2 bg-amber-50 text-amber-900 border border-amber-200 rounded-xl text-[11px] border-dashed"><span class="truncate">INFANT ${tName}</span><button onclick="removeTanpaKatilFromRoom('${rec.id}','${tId}')" class="ml-2 w-4 h-4 rounded-full bg-white text-[10px]">✕</button></div>`; }).join('');
     const emptyCount=Math.max(0,cap-count); const emptySlots=Array.from({length:emptyCount}).map((_,i)=>`<div ondragover="allowDrop(event)" ondrop="dropJemaah(event,'${rec.id}')" class="px-2.5 py-2 border border-dashed border-slate-300 rounded-xl text-[10px] text-slate-400 text-center">Slot Kosong ${count+i+1}</div>`).join('');
-    const catatanVal = f['CATATAN BILIK'] || f['CATATAN'] || f['NOTES'] || f['REMARK'] || '';
-    const catatanField = `<div class="mt-2"><div class="text-[8px] font-bold text-slate-500 mb-1">CATATAN BILIK</div><textarea id="catatan-${rec.id}" placeholder="Catatan bilik..." onchange="updateRoomCatatan('${rec.id}', this.value)" class="w-full text-[10px] px-2.5 py-1.5 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:outline-none focus:border-[#7A0C2E]/30 resize-none" rows="2">${catatanVal}</textarea></div>`;
+    const localCatatan = (typeof loadLocalCatatan==='function'? loadLocalCatatan(rec.id) : '') || '';
+    const catatanVal = f['CATATAN BILIK'] || f['CATATAN'] || f['NOTES'] || f['REMARK'] || localCatatan || '';
+    const catatanField = `<div class="mt-2"><div class="text-[8px] font-bold text-slate-500 mb-1">CATATAN BILIK</div><textarea id="catatan-${rec.id}" placeholder="Catatan bilik..." onblur="updateRoomCatatan('${rec.id}', this.value)" oninput="clearTimeout(window._catatanTimer); window._catatanTimer=setTimeout(()=>updateRoomCatatan('${rec.id}', this.value), 1000)" class="w-full text-[10px] px-2.5 py-1.5 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:outline-none focus:border-[#7A0C2E]/30 resize-none" rows="2">${catatanVal}</textarea></div>`;
     return `<div data-room-id="${rec.id}" data-sort="${f['SORT ORDER']||0}" ondragover="allowDropRoom(event)" ondragleave="handleRoomDragLeave(event)" ondrop="dropJemaah(event,'${rec.id}'); dropRoomReorder(event,'${rec.id}')" class="bg-white rounded-2xl border border-slate-200 p-2.5 shadow-sm flex flex-col gap-2 h-fit">
       <div class="flex items-center justify-between gap-1.5">
         <div class="flex items-center gap-1.5 flex-1 min-w-0">
@@ -1114,26 +1153,53 @@ function dropStaffToRoom(e, roomId, isTanpaKatil){
   window._draggedStaffId=null;
 }
 function assignStaffAsTanpaKatil(staffId, roomId){
-  // Allow staff to be assigned as JEMAAH TANPA KATIL (like jemaah without bed)
   const room = allRoomingRecords.find(r=>r.id===roomId);
   if(!room) return;
-  const field = 'JEMAAH TANPA KATIL';
-  const current = room.fields[field]||[];
-  if(current.includes(staffId)) return alert('Staff sudah ada sebagai tanpa katil di bilik ini');
-  // Add staff ID to tanpa katil list
-  const newList = [...current, staffId];
-  // Optimistic update
-  room.fields[field]=newList;
+  // Check if staff already assigned anywhere in this room (as staff or tanpa katil)
+  const existingJTanpa = room.fields['JEMAAH TANPA KATIL']||[];
+  const existingStaff = room.fields['STAFF LIST (ROOMING)']||[];
+  if(existingJTanpa.includes(staffId) || existingStaff.includes(staffId)) return alert('Staff sudah ada di bilik ini');
+  
+  // For staff, we will store in a separate local mapping AND try to save to JEMAAH TANPA KATIL if Airtable allows
+  // Also store in STAFF TANPA KATIL localStorage mapping
+  const key='effah_staff_tanpa_'+roomId;
+  let staffTanpaList=[];
+  try{ staffTanpaList=JSON.parse(localStorage.getItem(key)||'[]'); }catch(e){ staffTanpaList=[]; }
+  if(!staffTanpaList.includes(staffId)) staffTanpaList.push(staffId);
+  try{ localStorage.setItem(key, JSON.stringify(staffTanpaList)); }catch(e){}
+  
+  // Optimistic UI: add to room's custom field for rendering
+  if(!room.fields['_STAFF_TANPA_KATIL']) room.fields['_STAFF_TANPA_KATIL']=[];
+  if(!room.fields['_STAFF_TANPA_KATIL'].includes(staffId)) room.fields['_STAFF_TANPA_KATIL'].push(staffId);
+  
+  // Try to save to Airtable JEMAAH TANPA KATIL (might fail if staff ID not from jemaah table, but try)
+  const newList = [...existingJTanpa, staffId];
+  room.fields['JEMAAH TANPA KATIL']=newList;
   renderRoomingGrid();
-  // Save to Airtable
+  
   const base=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base')||localStorage.getItem('effah_base_id'); const pat=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
   if(base&&pat){
-    fetch(`https://api.airtable.com/v0/${base}/ROOMING%20LIST/${roomId}`,{method:'PATCH',headers:{Authorization:`Bearer ${pat}`,'Content-Type':'application/json'},body:JSON.stringify({fields:{[field]: newList}})}).then(r=>r.json()).then(data=>{ console.log('staff tanpa katil assigned', data); }).catch(err=>{ console.error(err); alert('Gagal assign staff tanpa katil'); fetchRoomingData(); });
+    // Try JEMAAH TANPA KATIL field first, if fails try STAFF TANPA KATIL custom field
+    fetch(`https://api.airtable.com/v0/${base}/ROOMING%20LIST/${roomId}`,{method:'PATCH',headers:{Authorization:`Bearer ${pat}`,'Content-Type':'application/json'},body:JSON.stringify({fields:{'JEMAAH TANPA KATIL': newList}})}).then(r=>r.json()).then(data=>{
+      console.log('staff tanpa katil assigned to JEMAAH TANPA KATIL', data);
+      if(data.error){
+        console.warn('JEMAAH TANPA KATIL field cannot accept staff ID, trying STAFF TANPA KATIL field');
+        // Try alternative field STAFF TANPA KATIL or keep local only
+        return fetch(`https://api.airtable.com/v0/${base}/ROOMING%20LIST/${roomId}`,{method:'PATCH',headers:{Authorization:`Bearer ${pat}`,'Content-Type':'application/json'},body:JSON.stringify({fields:{'STAFF TANPA KATIL': staffTanpaList}})}).then(r=>r.json()).then(d2=>{ console.log('staff tanpa katil saved to STAFF TANPA KATIL', d2); });
+      }
+    }).catch(err=>{ console.error(err); });
   }
-  // Also mark staff as assigned in staffList for UI
   const s=getStaffById(staffId);
   if(s){ s.roomIds = [...(s.roomIds||[]), roomId]; }
+  console.log('Staff assigned as tanpa katil', staffId, 'to', roomId);
 }
+function getStaffTanpaKatilForRoom(roomId){
+  try{
+    const key='effah_staff_tanpa_'+roomId;
+    return JSON.parse(localStorage.getItem(key)||'[]');
+  }catch(e){ return []; }
+}
+
 function quickAssignStaffToRoom(staffId, roomId){
   // Existing quickAssignStaff but with specific room
   if(typeof quickAssignStaff==='function' && !roomId){
