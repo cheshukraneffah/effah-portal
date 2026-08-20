@@ -424,7 +424,7 @@ function renderRoomingHTML(){
             <span id="headerNamaJemaah" class="bg-[#7A0C2E] text-white px-1.5 py-0.5 rounded text-[9px]">NAMA JEMAAH</span>
             <span id="sortIcon" class="text-[10px]">${roomingSortActive ? (roomingSortDir==='asc'?'↑':'↓') : '↕'}</span>
           </div>
-          <div class="col-span-2 text-center">BOARD BASIS</div><div class="col-span-1 text-center">TRAIN</div><div class="col-span-2 text-center">INSURAN</div><div class="col-span-1 text-center">PAKEJ</div><div class="col-span-1 text-center">VISA</div><div class="col-span-1 text-center">+</div>
+          <div class="col-span-2 text-center">BOARD BASIS</div><div class="col-span-1 text-center">TRAIN</div><div class="col-span-2 text-center">INSURAN</div><div class="col-span-1 text-center">PAKEJ</div><div class="col-span-2 text-center">VISA</div>
         </div>
         <div id="namelistContainer" class="flex-1 overflow-y-auto max-h-[58vh] divide-y divide-slate-100 bg-white min-h-[180px] relative"></div>
         <div class="border-t-2 border-slate-200 bg-white relative">
@@ -935,8 +935,8 @@ function renderNamelist(){
           <option value="PREMIUM PLUS" ${pk==='PREMIUM PLUS'?'selected':''}>PREMIUM PLUS</option>
         </select>
       </div>
-            <div class="col-span-1 flex items-center justify-center">
-        <select onchange="updateJemaahField('${r.id}','STATUS VISA',this.value)" class="text-[7px] border border-slate-300 rounded-full px-1.5 py-0.5 bg-white w-full max-w-[75px] truncate font-bold ${getVisaClass(getVisaVal(r.fields))}">
+            <div class="col-span-2 flex items-center justify-center">
+        <select onchange="updateJemaahField('${r.id}','STATUS VISA',this.value)" class="text-[8px] border border-slate-300 rounded-full px-2 py-1 bg-white w-full max-w-[110px] truncate font-bold ${getVisaClass(getVisaVal(r.fields))}">
           <option value="" ${getVisaVal(r.fields)===''?'selected':''}>- VISA</option>
           <option value="TOURIST" ${getVisaVal(r.fields)==='TOURIST'?'selected':''}>TOURIST</option>
           <option value="TOURIST (VALID)" ${getVisaVal(r.fields)==='TOURIST (VALID)'?'selected':''}>TOURIST (VALID)</option>
@@ -945,7 +945,6 @@ function renderNamelist(){
           <option value="IQAMA (VALID)" ${getVisaVal(r.fields)==='IQAMA (VALID)'?'selected':''}>IQAMA (VALID)</option>
         </select>
       </div>
-      <div class="col-span-1 text-center">${statusIcon}</div>
     </div>`;
   }).join('');
   makeNamelistSticky();
