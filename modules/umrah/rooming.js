@@ -887,24 +887,33 @@ function renderNamelist(){
     }).join('');
     
 
-    const insToggle = ['TAKAFUL','ETIQA','AL-KHAIRI'].map(opt=>{
-      const active = insArr.includes(opt);
-      let cls = 'bg-white text-slate-400 border-slate-200 hover:border-slate-300';
-      if(active){
-        if(opt==='TAKAFUL') cls='bg-emerald-500 text-white border-emerald-600';
-        else if(opt==='ETIQA') cls='bg-amber-300 text-amber-900 border-amber-400';
-        else if(opt==='AL-KHAIRI') cls='bg-blue-400 text-white border-blue-500';
-      }
-      const label = opt==='TAKAFUL'?'TAK':opt==='AL-KHAIRI'?'KHAIRI':opt;
-      return `<button onclick="toggleInsuran('${r.id}','${opt}')" class="px-1 py-0.5 rounded-full border text-[7px] font-bold ${cls}" title="${opt}">${label}</button>`;
-    }).join('');
+    const insArr2 = getInsuranArrayV2 ? getInsuranArrayV2(r.fields) : getInsuranArray(r.fields);
+      const insDisplay = insArr2.length ? insArr2.join(', ') : '- INSURAN';
+      const insCls = insArr2.length ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-white border-slate-200 text-slate-400';
+      const insuranOptions = ['TAKAFUL','ETIQA','AL-KHAIRI'];
+      const insCheckboxes = insuranOptions.map(opt=>{
+        const checked = insArr2.includes(opt);
+        return `<label class="flex items-center gap-1.5 px-2 py-1.5 hover:bg-slate-50 rounded text-[10px] cursor-pointer"><input type="checkbox" ${checked?'checked':''} onchange="toggleInsuranMulti('${r.id}','${opt}')" class="w-3.5 h-3.5 accent-[#7A0C2E]"> <span class="px-1.5 py-0.5 rounded-full text-[8px] ${opt==='TAKAFUL'?'bg-emerald-100':opt==='ETIQA'?'bg-amber-100':'bg-blue-100'}">${opt}</span></label>`;
+      }).join('');
+      const insToggle = `<div class="relative w-full">
+        <button onclick="event.stopPropagation(); toggleInsuranDropdown('${r.id}')" class="text-[7px] border rounded-full px-2 py-0.5 font-bold ${insCls} outline-none w-full truncate text-left flex items-center justify-between bg-white opacity-100" style="opacity:1;" title="INSURAN - klik untuk pilih">
+          <span class="truncate">${insDisplay}</span><span class="ml-1">▼</span>
+        </button>
+        <div id="insuranDrop-${r.id}" class="hidden absolute left-0 top-full mt-1 w-[190px] bg-white border border-slate-200 rounded-xl shadow-xl z-[9999] p-1" style="background:#ffffff !important; opacity:1 !important;">
+          ${insCheckboxes}
+          <div class="border-t border-slate-100 mt-1 pt-1 flex justify-between">
+            <button onclick="clearInsuranMulti('${r.id}'); closeInsuranDropdown('${r.id}')" class="text-[8px] px-2 py-0.5 rounded-full bg-slate-100">Clear</button>
+            <button onclick="closeInsuranDropdown('${r.id}')" class="text-[8px] px-2 py-0.5 rounded-full bg-[#7A0C2E] text-white">OK</button>
+          </div>
+        </div>
+      </div>`;
 
         return `<div ${drag} class="grid grid-cols-12 items-center px-1.5 py-1.5 text-[11px] border-b border-slate-50 ${rowCls}">
       <div class="col-span-1 text-slate-400 text-[10px]">${String(i+1).padStart(2,'0')}</div>
       <div class="col-span-3 font-medium truncate text-[10px] ${assignedInLoc?'text-slate-500 italic':''}" title="${name}">${name}</div>
       <div class="col-span-2 flex items-center gap-0.5 relative">
         <div class="relative w-full">
-          <button onclick="event.stopPropagation(); toggleBoardDropdown('${r.id}')" class="text-[8px] border rounded-full px-2 py-1 font-bold ${fbCls} outline-none w-full truncate text-left flex items-center justify-between bg-white opacity-100" style="opacity:1; isolation:isolate;" title="BOARD BASIS - klik untuk pilih 2">
+          <button onclick="event.stopPropagation(); toggleBoardDropdown('${r.id}')" class="text-[7px] border rounded-full px-2 py-0.5 font-bold ${fbCls} outline-none w-full truncate text-left flex items-center justify-between bg-white opacity-100" style="opacity:1; isolation:isolate;" title="BOARD BASIS - klik untuk pilih 2">
             <span class="truncate">${fbDisplay}</span><span class="ml-1">▼</span>
           </button>
           <div id="boardDrop-${r.id}" class="hidden absolute left-0 top-full mt-1 w-[190px] bg-white border border-slate-200 rounded-xl shadow-xl z-[9999] p-1" style="background:#ffffff !important; opacity:1 !important; isolation:isolate;">
@@ -937,7 +946,7 @@ function renderNamelist(){
         </select>
       </div>
       <div class="col-span-2 flex items-center justify-center" >
-        <select onchange="updateJemaahField('${r.id}','STATUS VISA',this.value)" class="text-[8px] border border-slate-300 rounded-full px-2 py-1 bg-white w-full max-w-[110px] truncate font-bold ${getVisaClass(getVisaVal(r.fields))}">
+        <select onchange="updateJemaahField('${r.id}','STATUS VISA',this.value)" class="text-[7px] border border-slate-300 rounded-full px-2 py-0.5 bg-white w-full max-w-[80px] truncate font-bold ${getVisaClass(getVisaVal(r.fields))}">
           <option value="" ${getVisaVal(r.fields)===''?'selected':''}>- VISA</option>
           <option value="TOURIST" ${getVisaVal(r.fields)==='TOURIST'?'selected':''}>TOURIST</option>
           <option value="TOURIST (VALID)" ${getVisaVal(r.fields)==='TOURIST (VALID)'?'selected':''}>TOURIST (VALID)</option>
@@ -2213,7 +2222,7 @@ function renderStaffList_V80(){
       <span class="flex-1 truncate font-medium">${s.name||'-'}</span>
       <span class="text-[7px] px-1 rounded ${assigned?'bg-slate-200':''}">${assigned?'ASSIGNED di '+activeLocation:''}</span>
       <div class="relative w-[150px]">
-        <button onclick="event.stopPropagation(); toggleStaffDropdown('${staffId}')" class="text-[8px] border rounded-full px-2 py-1 font-bold ${fbCls} w-full text-left flex justify-between items-center bg-white" style="opacity:1;"><span class="truncate">${fbDisplay}</span><span>▼</span></button>
+        <button onclick="event.stopPropagation(); toggleStaffDropdown('${staffId}')" class="text-[7px] border rounded-full px-2 py-0.5 font-bold ${fbCls} w-full text-left flex justify-between items-center bg-white" style="opacity:1;"><span class="truncate">${fbDisplay}</span><span>▼</span></button>
         <div id="staffBoardDrop-${staffId}" class="hidden absolute right-0 top-full mt-1 w-[190px] bg-white border border-slate-200 rounded-xl shadow-xl z-[9999] p-1">
           ${boardCheckboxes}
           <div class="border-t border-slate-100 mt-1 pt-1 flex justify-between"><button onclick="clearStaffBoardMulti('${staffId}'); closeStaffDropdown('${staffId}')" class="text-[8px] px-2 py-0.5 rounded-full bg-slate-100">Clear</button><button onclick="closeStaffDropdown('${staffId}')" class="text-[8px] px-2 py-0.5 rounded-full bg-[#7A0C2E] text-white">OK</button></div>
@@ -2289,7 +2298,7 @@ renderNamelist = function(){
       <div class="col-span-3 font-medium truncate text-[10px] ${assignedInLoc?'text-slate-500 italic':''}" title="${name}">${name}</div>
       <div class="col-span-2 flex items-center gap-0.5 relative">
         <div class="relative w-full">
-          <button onclick="event.stopPropagation(); toggleBoardDropdown('${r.id}')" class="text-[8px] border rounded-full px-2 py-1 font-bold ${fbCls} outline-none w-full truncate text-left flex items-center justify-between bg-white opacity-100" style="opacity:1; isolation:isolate;" title="BOARD BASIS - klik untuk pilih 2">
+          <button onclick="event.stopPropagation(); toggleBoardDropdown('${r.id}')" class="text-[7px] border rounded-full px-2 py-0.5 font-bold ${fbCls} outline-none w-full truncate text-left flex items-center justify-between bg-white opacity-100" style="opacity:1; isolation:isolate;" title="BOARD BASIS - klik untuk pilih 2">
             <span class="truncate">${fbDisplay}</span><span class="ml-1">▼</span>
           </button>
           <div id="boardDrop-${r.id}" class="hidden absolute left-0 top-full mt-1 w-[190px] bg-white border border-slate-200 rounded-xl shadow-xl z-[9999] p-1" style="background:#ffffff !important; opacity:1 !important; isolation:isolate;">
@@ -2322,7 +2331,7 @@ renderNamelist = function(){
         </select>
       </div>
       <div class="col-span-2 flex items-center justify-center" >
-        <select onchange="updateJemaahField('${r.id}','STATUS VISA',this.value)" class="text-[8px] border border-slate-300 rounded-full px-2 py-1 bg-white w-full max-w-[110px] truncate font-bold ${getVisaClass(getVisaVal(r.fields))}">
+        <select onchange="updateJemaahField('${r.id}','STATUS VISA',this.value)" class="text-[7px] border border-slate-300 rounded-full px-2 py-0.5 bg-white w-full max-w-[80px] truncate font-bold ${getVisaClass(getVisaVal(r.fields))}">
           <option value="" ${getVisaVal(r.fields)===''?'selected':''}>- VISA</option>
           <option value="TOURIST" ${getVisaVal(r.fields)==='TOURIST'?'selected':''}>TOURIST</option>
           <option value="TOURIST (VALID)" ${getVisaVal(r.fields)==='TOURIST (VALID)'?'selected':''}>TOURIST (VALID)</option>
