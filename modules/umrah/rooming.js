@@ -771,10 +771,7 @@ function isJemaahAssignedInLocation(jId, location){
   const loc = (location||activeLocation).toUpperCase();
   return allRoomingRecords.some(r=> (r.fields['LOKASI / CITY']||'MEKAH').toUpperCase()===loc && (r.fields['JEMAAH']||[]).includes(jId));
 }
-function isStaffAssignedInLocation(staffId, loc){
-  loc = (loc||activeLocation||'MEKAH').toUpperCase();
-  return allRoomingRecords.some(rec=> (rec.fields['LOKASI / CITY']||'MEKAH').toUpperCase()===loc && ( ((rec.fields['STAFF / EXTRA']||[]).includes(staffId)) || ((rec.fields['STAFF']||[]).includes(staffId)) || ((rec.fields['JEMAAH TANPA KATIL']||[]).includes(staffId)) ) );
-}
+
 function getStaffForRoom(roomId){
   const tanpaLocal = (typeof getStaffTanpaKatilForRoom==='function'? getStaffTanpaKatilForRoom(roomId) : []);
   const room = allRoomingRecords.find(r=>r.id===roomId);
@@ -1089,8 +1086,7 @@ function renderStaffList(){
   if(staffList.length===0){ cont.innerHTML='<div class="p-2.5 text-center text-[11px] text-slate-400">Tiada staff / extra</div>'; return; }
   cont.innerHTML=staffList.map((s,idx)=>{
     const assignedNormal = isStaffAssignedInLocation(s.id, activeLocation);
-    const assignedTanpa = allRoomingRecords.some(rec=> (rec.fields['LOKASI / CITY']||'MEKAH').toUpperCase()===activeLocation.toUpperCase() && ((rec.fields['JEMAAH TANPA KATIL']||[]).includes(s.id) || (rec.fields['STAFF TANPA KATIL']||[]).includes(s.id) || (rec.fields['STAFF']||[]).includes(s.id) && (rec.fields['JEMAAH TANPA KATIL']||[]).includes(s.id)));
-    const assignedInLoc = assignedNormal || assignedTanpa;
+    const assignedInLoc = assignedNormal;
     const cls=assignedInLoc?'bg-slate-100 text-slate-400 border-slate-200':'bg-white hover:bg-slate-50 cursor-grab border-slate-200'; // V102 FIX GHOST - no opacity
     const drag=assignedInLoc?'':`draggable="true" ondragstart="dragStaff(event,'${s.id}')" ondragend="dragStaffEnd(event)"`;
     const boardArr=(typeof getStaffBoardArray==='function'? getStaffBoardArray(s) : []);
@@ -2533,3 +2529,30 @@ function updateStaffBoardSingle_FIXED(staffId, value){
   }
 }
 window.updateStaffBoardSingle = updateStaffBoardSingle_FIXED;
+
+
+function isStaffAssignedInLocation(staffId, loc){
+  loc = (loc||activeLocation||'MEKAH').toString().toUpperCase();
+  // Check all rooming records for this location, any assignment type
+  for(const rec of (window.allRoomingRecords||[])){
+    const recLoc = (rec.fields['LOKASI / CITY']||'MEKAH').toString().toUpperCase();
+    if(recLoc!==loc) continue;
+    const staffExtra = rec.fields['STAFF / EXTRA']||[];
+    const staff = rec.fields['STAFF']||[];
+    const tanpa = rec.fields['JEMAAH TANPA KATIL']||[];
+    const staffTanpa = rec.fields['STAFF TANPA KATIL']||[];
+    if(staffExtra.includes(staffId) || staff.includes(staffId) || tanpa.includes(staffId) || staffTanpa.includes(staffId)){
+      return true;
+    }
+    // Also check if staffList entry has roomIds that include this rec (legacy)
+    const s = (window.staffList||[]).find(x=>x.id===staffId||x.airtableId===staffId);
+    if(s && s.roomIds && s.roomIds.includes(rec.id)) return true;
+  }
+  return false;
+}
+function isStaffAssignedAny(staffId){
+  for(const loc of ['MEKAH','MADINAH','TAIF','JEDDAH']){
+    if(isStaffAssignedInLocation(staffId, loc)) return true;
+  }
+  return false;
+}
