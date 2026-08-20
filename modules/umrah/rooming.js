@@ -1,22 +1,6 @@
-// ROOMING V103.1 FIX TAB CLICK - CLEAN + TAB FIX
-// Base: V102 Super Clean (deduped)
-// Fixes:
-// - Duplicate functions removed (68 lines)
-// - JEDDAH duplicate fixed
-// - TAB CLICK: single drag listeners, single _orig wrappers, debounce setActiveLocation, robust _autoScroll
-console.log('ROOMING V103.1 FIX TAB CLICK loaded');
-
-// SINGLETONS
-var _autoScrollInterval = window._autoScrollInterval || null;
-window._autoScrollInterval = _autoScrollInterval;
-window._roomingDragListenersAdded = window._roomingDragListenersAdded || false;
-window._roomingPatched = window._roomingPatched || {};
-window._switchingLocation = window._switchingLocation || false;
-
-
 // ROOMING V103 CLEAN - Deduped + Modular Ready
 // Generated from V102 - Duplicate functions removed, JEDDAH bug fixed
-
+console.log('ROOMING V103 CLEAN loaded');
 var _autoScrollInterval = window._autoScrollInterval || null;
 window._autoScrollInterval = _autoScrollInterval;
 
@@ -648,40 +632,30 @@ function renderRoomingOverview(rooms){
 }
 
 function renderLocationTabs(){
-  const container=document.getElementById('locationTabs'); 
-  if(!container) return;
-  if(container.dataset.rendering==='1') return;
-  container.dataset.rendering='1';
-  try {
-    const base=['MEKAH','MADINAH','TAIF']; 
-    const all=[...base,...(window.customLocations||customLocations||[]).filter(l=>!base.includes(l))];
-    const allLocFromRecords = new Set();
-    (window.allRoomingRecords||allRoomingRecords||[]).forEach(r=>{ const l=(r.fields['LOKASI / CITY']||'').trim().toUpperCase(); if(l) allLocFromRecords.add(l); });
-    allLocFromRecords.forEach(l=>{ if(!all.includes(l)) all.push(l); });
-    const counts={}; all.forEach(l=>counts[l]=0); 
-    (window.allRoomingRecords||allRoomingRecords||[]).forEach(r=>{ 
-      let l=(r.fields['LOKASI / CITY']||'').trim().toUpperCase(); 
-      if(!l) l='MEKAH';
-      if(counts[l]!==undefined) counts[l]++; 
-      else { counts[l]=1; if(!all.includes(l)) all.push(l); } 
-    });
-    let html=all.map(loc=>{
-      const c=counts[loc]||0; 
-      const active=loc===(window.activeLocation||activeLocation); 
-      const isCustom=!['MEKAH','MADINAH','TAIF'].includes(loc);
-      const delBtn=isCustom?`<button type="button" onclick="event.stopPropagation(); deleteCustomLocation('${loc}')" class="ml-1 w-4 h-4 rounded-full bg-white/20 hover:bg-red-500 flex items-center justify-center text-[9px]">✕</button>`:''; 
-      const wrapCls=active?'bg-[#7A0C2E] rounded-full':'bg-white rounded-full border border-slate-200';
-      return `<div class="inline-flex items-center ${wrapCls}"><button type="button" data-loc="${loc}" onclick="window.setActiveLocation('${loc}')" class="px-2.5 py-1 rounded-full text-[11px] font-bold ${active?'text-white':'text-slate-700'}">${loc} (${c})</button>${delBtn}</div>`;
-    }).join('');
-    html+=`<button type="button" onclick="openAddLocationModal()" class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-slate-100 border border-slate-200 text-slate-600 hover:bg-slate-200">+ Lokasi</button>`;
-    container.innerHTML=html;
-  } finally {
-    setTimeout(()=>{ container.dataset.rendering='0'; }, 150);
-  }
+  const container=document.getElementById('locationTabs'); if(!container) return;
+  const base=['MEKAH','MADINAH','TAIF']; 
+  const all=[...base,...customLocations.filter(l=>!base.includes(l))];
+  // collect all distinct locations from records
+  const allLocFromRecords = new Set();
+  allRoomingRecords.forEach(r=>{ const l=(r.fields['LOKASI / CITY']||'').trim().toUpperCase(); if(l) allLocFromRecords.add(l); });
+  allLocFromRecords.forEach(l=>{ if(!all.includes(l)) all.push(l); });
+  const counts={}; all.forEach(l=>counts[l]=0); 
+  allRoomingRecords.forEach(r=>{ 
+    let l=(r.fields['LOKASI / CITY']||'').trim().toUpperCase(); 
+    if(!l) l='MEKAH'; // default
+    if(counts[l]!==undefined) counts[l]++; 
+    else { counts[l]=1; if(!all.includes(l)) all.push(l); } 
+  });
+  let html=all.map(loc=>{
+    const label=loc; // V24.6 no emoji
+    const c=counts[loc]||0; const active=loc===activeLocation; const isCustom=!['MEKAH','MADINAH','TAIF'].includes(loc);
+    const delBtn=isCustom?`<button onclick="event.stopPropagation(); deleteCustomLocation('${loc}')" class="ml-1 w-4 h-4 rounded-full bg-white/20 hover:bg-red-500 hover:text-white flex items-center justify-center text-[9px]">✕</button>`:'';
+    const wrapCls=active?'bg-[#7A0C2E] rounded-full':'bg-white rounded-full border border-slate-200';
+    return `<div class="inline-flex items-center ${wrapCls}"><button onclick="setActiveLocation('${loc}')" class="px-2.5 py-1 rounded-full text-[11px] font-bold ${active?'text-white':'text-slate-700'}">${label} (${c})</button>${delBtn}</div>`;
+  }).join('');
+  html+=`<button onclick="openAddLocationModal()" class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-slate-100 border border-slate-200 text-slate-600 hover:bg-slate-200">+ Lokasi</button>`;
+  container.innerHTML=html;
 }
-window.renderLocationTabs = renderLocationTabs;
-
-
 async function fetchRoomingData(){
   try{
     showRoomingLoading(); 
@@ -1126,30 +1100,8 @@ function renderStaffList(){
 
 
 
-function setActiveLocation(loc){
-  if(!loc) return;
-  if(window._switchingLocation) return;
-  window._switchingLocation = true;
-  try {
-    const newLoc = loc.toString().toUpperCase();
-    activeLocation = newLoc;
-    window.activeLocation = newLoc;
-    localStorage.setItem('effah_active_location', newLoc);
-    const el=document.getElementById('copyTargetLoc'); if(el) el.textContent=newLoc;
-    if(typeof renderLocationTabs==='function') renderLocationTabs();
-    if(typeof renderRoomingGrid==='function') renderRoomingGrid();
-    if(typeof renderNamelist==='function') renderNamelist();
-    if(typeof renderStaffList==='function') renderStaffList();
-    console.log('Location switched to', newLoc);
-  } finally {
-    setTimeout(()=>{ window._switchingLocation = false; }, 350);
-  }
-}
-window.setActiveLocation = setActiveLocation;
-
-
-_stopAutoScroll stub to be replaced
-
+function setActiveLocation(loc){ activeLocation=loc.toUpperCase(); localStorage.setItem('effah_active_location',activeLocation); const el=document.getElementById('copyTargetLoc'); if(el) el.textContent=activeLocation; renderLocationTabs(); renderRoomingGrid(); renderNamelist(); renderStaffList(); }
+function _stopAutoScroll(){ if(_autoScrollInterval){ clearInterval(_autoScrollInterval); _autoScrollInterval=null; } }
 function _startAutoScroll(){
   if(_autoScrollInterval) return;
   _autoScrollInterval=setInterval(()=>{
@@ -1175,9 +1127,6 @@ function _startAutoScroll(){
     }
   }, 30);
 }
-function allowDrop(e){ e.preventDefault(); window._lastDragY=e.clientY; _startAutoScroll(); }
-document.addEventListener('dragover', (e)=>{ window._lastDragY=e.clientY; _startAutoScroll(); });
-document.addEventListener('dragend', ()=>{ _stopAutoScroll(); });
 document.addEventListener('drop', ()=>{ _stopAutoScroll(); });
 function dragJemaah(e,jId){ if(isJemaahAssignedInLocation(jId, activeLocation)) return; e.dataTransfer.setData('text/plain',jId); const r=e.currentTarget; if(r) setTimeout(()=>r.style.opacity='0.3',0); }
 function dragEnd(e){ e.currentTarget.style.opacity='1'; }
@@ -2606,41 +2555,106 @@ function instantRefreshAfterRemove(){
 
 console.log('REALTIME GREY FIX FOR STAFF TANPA KATIL ACTIVE');
 
-// V103.1 SAFETY FOOTER - prevent double wrapping on reload
-(function(){
-  if(window._roomingPatched.footer) return;
-  window._roomingPatched.footer = true;
-  
-  // Ensure updateRoomField wrapper only once
-  if(window.updateRoomField && !window.updateRoomField._patched){
-    const orig = window.updateRoomField;
-    window.updateRoomField = async function(roomId, field, value, shouldRender=true){
-      const rec = (window.allRoomingRecords||[]).find(r=>r.id===roomId||r.airtableId===roomId);
-      if(rec){
-        if(!rec.fields) rec.fields={};
-        rec.fields[field]=value;
-        if(['JEMAAH TANPA KATIL','STAFF / EXTRA','STAFF','STAFF TANPA KATIL','TANPA KATIL'].includes(field)){
-          if(typeof renderStaffList==='function') setTimeout(()=>renderStaffList(), 50);
-          if(typeof renderNamelist==='function') setTimeout(()=>renderNamelist(), 50);
-        }
-      }
-      return orig(roomId, field, value, shouldRender);
-    };
-    window.updateRoomField._patched = true;
-    window._origUpdateRoomField = orig;
+// ===== V103.2 OVERRIDES - FIX TAB CLICK =====
+console.log('V103.2 OVERRIDES applying');
+
+var _autoScrollInterval = window._autoScrollInterval || null;
+window._autoScrollInterval = _autoScrollInterval;
+window._roomingDragListenersAdded = window._roomingDragListenersAdded || false;
+window._switchingLocation = false;
+
+function _stopAutoScroll(){ 
+  try {
+    if(window._autoScrollInterval){ clearInterval(window._autoScrollInterval); window._autoScrollInterval=null; } 
+    if(typeof _autoScrollInterval!=='undefined' && _autoScrollInterval){ clearInterval(_autoScrollInterval); _autoScrollInterval=null; } 
+  } catch(e){}
+}
+function _startAutoScroll(){
+  if(window._autoScrollInterval) return;
+  if(typeof _autoScrollInterval!=='undefined' && _autoScrollInterval) return;
+  try {
+    _autoScrollInterval=setInterval(()=>{
+      const y=window._lastDragY||0;
+      if(y<140){ window.scrollBy(0, -22); }
+      else if(y>window.innerHeight-140){ window.scrollBy(0, 22); }
+    }, 35);
+    window._autoScrollInterval=_autoScrollInterval;
+  } catch(e){}
+}
+function allowDrop(e){ 
+  try { e.preventDefault(); } catch(e){}
+  window._lastDragY=e.clientY; 
+  _startAutoScroll(); 
+}
+window.allowDrop = allowDrop;
+window._stopAutoScroll = _stopAutoScroll;
+window._startAutoScroll = _startAutoScroll;
+
+if(!window._roomingDragListenersAdded){
+  document.addEventListener('dragover', (e)=>{ window._lastDragY=e.clientY; _startAutoScroll(); }, {passive:false});
+  document.addEventListener('dragend', ()=>{ _stopAutoScroll(); });
+  document.addEventListener('drop', ()=>{ _stopAutoScroll(); });
+  window._roomingDragListenersAdded = true;
+  console.log('Drag listeners added ONCE');
+}
+
+function renderLocationTabs(){
+  const container=document.getElementById('locationTabs'); 
+  if(!container) return;
+  if(container.dataset.rendering==='1') return;
+  container.dataset.rendering='1';
+  try {
+    const base=['MEKAH','MADINAH','TAIF']; 
+    const custom = window.customLocations || (typeof customLocations!=='undefined'?customLocations:[]);
+    const all=[...base,...custom.filter(l=>!base.includes(l))];
+    const allLocFromRecords = new Set();
+    const records = window.allRoomingRecords || (typeof allRoomingRecords!=='undefined'?allRoomingRecords:[]);
+    records.forEach(r=>{ const l=(r.fields['LOKASI / CITY']||'').trim().toUpperCase(); if(l) allLocFromRecords.add(l); });
+    allLocFromRecords.forEach(l=>{ if(!all.includes(l)) all.push(l); });
+    const counts={}; all.forEach(l=>counts[l]=0); 
+    records.forEach(r=>{ 
+      let l=(r.fields['LOKASI / CITY']||'').trim().toUpperCase(); 
+      if(!l) l='MEKAH';
+      if(counts[l]!==undefined) counts[l]++; 
+      else { counts[l]=1; if(!all.includes(l)) all.push(l); } 
+    });
+    let html=all.map(loc=>{
+      const c=counts[loc]||0; 
+      const active=loc===(window.activeLocation|| (typeof activeLocation!=='undefined'?activeLocation:'MEKAH')); 
+      const isCustom=!['MEKAH','MADINAH','TAIF'].includes(loc);
+      const delBtn=isCustom?`<button type="button" onclick="event.stopPropagation(); deleteCustomLocation('${loc}')" class="ml-1 w-4 h-4 rounded-full bg-white/20 hover:bg-red-500 flex items-center justify-center text-[9px]">x</button>`:''; 
+      const wrapCls=active?'bg-[#7A0C2E] rounded-full':'bg-white rounded-full border border-slate-200';
+      return `<div class="inline-flex items-center ${wrapCls}"><button type="button" data-loc="${loc}" onclick="window.setActiveLocation('${loc}')" class="px-2.5 py-1 rounded-full text-[11px] font-bold ${active?'text-white':'text-slate-700'}">${loc} (${c})</button>${delBtn}</div>`;
+    }).join('');
+    html+=`<button type="button" onclick="openAddLocationModal()" class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-slate-100 border border-slate-200 text-slate-600 hover:bg-slate-200">+ Lokasi</button>`;
+    container.innerHTML=html;
+  } catch(e){ console.error('renderLocationTabs error', e); }
+  finally {
+    setTimeout(()=>{ container.dataset.rendering='0'; }, 150);
   }
-  
-  // Ensure dropStaff wrapper only once
-  if(window.dropStaff && !window.dropStaff._patched){
-    const origDrop = window.dropStaff;
-    window.dropStaff = function(e, roomId, isTanpaKatil=false){
-      const res = origDrop(e, roomId, isTanpaKatil);
-      setTimeout(()=>{ if(typeof renderStaffList==='function') renderStaffList(); if(typeof renderRoomingGrid==='function') renderRoomingGrid(); }, 100);
-      return res;
-    };
-    window.dropStaff._patched = true;
-    window._origDropStaff = origDrop;
+}
+window.renderLocationTabs = renderLocationTabs;
+
+function setActiveLocation(loc){
+  if(!loc) return;
+  if(window._switchingLocation) return;
+  window._switchingLocation = true;
+  try {
+    const newLoc = loc.toString().toUpperCase();
+    if(typeof activeLocation!=='undefined') activeLocation = newLoc;
+    window.activeLocation = newLoc;
+    localStorage.setItem('effah_active_location', newLoc);
+    const el=document.getElementById('copyTargetLoc'); if(el) el.textContent=newLoc;
+    if(typeof renderLocationTabs==='function') renderLocationTabs();
+    if(typeof renderRoomingGrid==='function') renderRoomingGrid();
+    if(typeof renderNamelist==='function') renderNamelist();
+    if(typeof renderStaffList==='function') renderStaffList();
+    console.log('Location switched to', newLoc);
+  } catch(e){ console.error(e); }
+  finally {
+    setTimeout(()=>{ window._switchingLocation = false; }, 350);
   }
-  
-  console.log('V103.1 footer guards active');
-})();
+}
+window.setActiveLocation = setActiveLocation;
+
+console.log('V103.2 FIX TAB CLICK fully loaded - single listeners, debounced tabs');
