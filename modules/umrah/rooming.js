@@ -295,6 +295,24 @@ function getFullboardVal(f){
   const arr=getBoardArray(f);
   return arr[0]||'';
 }
+
+function toggleStaffDropdown(id){
+  const el=document.getElementById('staffBoardDrop-'+id); 
+  if(!el) { console.warn('staffBoardDrop not found', id); return; }
+  document.querySelectorAll('[id^="boardDrop-"]').forEach(d=>d.classList.add('hidden'));
+  document.querySelectorAll('[id^="staffBoardDrop-"]').forEach(d=>{ if(d.id!=='staffBoardDrop-'+id) d.classList.add('hidden'); });
+  document.querySelectorAll('[id^="insuranDrop-"]').forEach(d=>d.classList.add('hidden'));
+  el.classList.toggle('hidden');
+}
+window.toggleStaffDropdown = toggleStaffDropdown;
+
+function closeStaffDropdown(id){
+  const el=document.getElementById('staffBoardDrop-'+id);
+  if(el) el.classList.add('hidden');
+}
+window.closeStaffDropdown = closeStaffDropdown;
+
+
 function getFullboardDisplay(f){
   const arr=getBoardArray(f);
   if(arr.length===0) return '-';
@@ -2658,3 +2676,32 @@ function setActiveLocation(loc){
 window.setActiveLocation = setActiveLocation;
 
 console.log('V103.2 FIX TAB CLICK fully loaded - single listeners, debounced tabs');
+
+
+// FIX 422 - prevent staff ID going into JEMAAH TANPA KATIL
+(function(){
+  const origUpdate = window.updateRoomField;
+  if(origUpdate && !origUpdate._fixed422){
+    window.updateRoomField = async function(roomId, field, value, shouldRender=true){
+      // If trying to save staff into JEMAAH TANPA KATIL, redirect
+      if(field==='JEMAAH TANPA KATIL' || field==='TANPA KATIL'){
+        // Check if value contains staff ids
+        const staffIds = (window.staffList||[]).map(s=>s.id||s.airtableId);
+        const hasStaff = (Array.isArray(value) ? value.some(v=>staffIds.includes(v)) : staffIds.includes(value));
+        if(hasStaff){
+          console.warn('FIX 422: Redirecting staff from JEMAAH TANPA KATIL to STAFF TANPA KATIL');
+          field = 'STAFF TANPA KATIL';
+        }
+      }
+      return origUpdate.call(this, roomId, field, value, shouldRender);
+    };
+    window.updateRoomField._fixed422 = true;
+    console.log('FIX 422 applied');
+  }
+})();
+
+
+window.toggleBoardDropdown = window.toggleBoardDropdown || toggleBoardDropdown;
+window.closeBoardDropdown = window.closeBoardDropdown || closeBoardDropdown;
+window.toggleInsuranDropdown = window.toggleInsuranDropdown || toggleInsuranDropdown;
+window.closeInsuranDropdown = window.closeInsuranDropdown || closeInsuranDropdown;
