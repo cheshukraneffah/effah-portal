@@ -2845,3 +2845,81 @@ function removeStaffFromRoom_FINAL2(roomId, staffIdOrName){
 window.removeStaffFromRoom = removeStaffFromRoom_FINAL2;
 window.removeStaffFromRoom_FIXED = removeStaffFromRoom_FINAL2;
 window.removeStaffFromRoom_FINAL = removeStaffFromRoom_FINAL2;
+
+
+// DEBUG BOARD SAVE
+function debugBoardSave(staffId){
+  const staff = (window.staffList||[]).find(s=>s.id===staffId||s.airtableId===staffId);
+  console.log('DEBUG staff', staff);
+  const base = window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base')||localStorage.getItem('effah_base_id')||localStorage.getItem('VITE_AIRTABLE_BASE_ID');
+  const pat = window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat')||localStorage.getItem('VITE_AIRTABLE_PAT')||localStorage.getItem('airtable_pat');
+  console.log('DEBUG base', base, 'pat exists', !!pat);
+  if(!base||!pat){ alert('Base ID / PAT tak jumpa! Check localStorage effah_api_base'); return; }
+  if(!staff?.airtableId){ alert('Staff airtableId takde!'); return; }
+  const boardToSave = (staff.board||[]).filter(b=>b!=='TRAIN');
+  console.log('DEBUG saving board', boardToSave, 'to', staff.airtableId);
+  fetch(`https://api.airtable.com/v0/${base}/STAFF%20LIST%20%28ROOMING%29/${staff.airtableId}`,{
+    method:'PATCH', headers:{'Authorization':`Bearer ${pat}`,'Content-Type':'application/json'},
+    body: JSON.stringify({fields:{'BOARD BASIS': boardToSave, 'BOARD': boardToSave.join(', ')}})
+  }).then(r=>r.json().then(j=>{ console.log('DEBUG Airtable response', r.status, j); if(j.error){ alert('Airtable error: '+j.error.message); } else { alert('Board saved OK ke Airtable: '+(boardToSave.join(', ')||'- BOARD')); } })).catch(e=>{ console.error(e); alert('Fetch fail: '+e.message); });
+}
+window.debugBoardSave = debugBoardSave;
+
+// FORCE REMOVE STAFF - bypass all checks
+function forceRemoveStaffFromAllRooms(staffIdOrName){
+  const staffListLocal = window.staffList||[];
+  let staff = staffListLocal.find(s=>s.id===staffIdOrName||s.airtableId===staffIdOrName);
+  if(!staff){
+    staff = staffListLocal.find(s=> (s.name||'').toUpperCase().includes(staffIdOrName.toString().toUpperCase().split('(')[0].trim()));
+  }
+  const realId = staff ? staff.id : staffIdOrName;
+  const namePart = staff ? (staff.name||'').split('(')[0].trim().toUpperCase() : staffIdOrName.toString().toUpperCase().split('(')[0].trim();
+  console.log('FORCE REMOVE', realId, namePart);
+  let removedCount=0;
+  (window.allRoomingRecords||[]).forEach(room=>{
+    if(!room.fields) return;
+    ['STAFF / EXTRA','STAFF','STAFF LIST (ROOMING)','JEMAAH TANPA KATIL','STAFF TANPA KATIL','JEMAAH','TANPA KATIL'].forEach(key=>{
+      const val = room.fields[key];
+      if(!val) return;
+      if(Array.isArray(val)){
+        const before=val.length;
+        room.fields[key]=val.filter(v=>{
+          if(v===realId) return false;
+          if(v===staffIdOrName) return false;
+          if(typeof v==='string' && namePart && v.toUpperCase().includes(namePart)) return false;
+          return true;
+        });
+        if(before!==room.fields[key].length) removedCount++;
+      } else if(typeof val==='string'){
+        const parts=val.split(',').map(x=>x.trim()).filter(Boolean);
+        const filtered=parts.filter(p=>{
+          if(p===realId) return false;
+          if(p===staffIdOrName) return false;
+          if(namePart && p.toUpperCase().includes(namePart)) return false;
+          return true;
+        });
+        if(parts.length!==filtered.length){ room.fields[key]=filtered.join(', '); removedCount++; }
+      }
+    });
+    if(staff && staff.roomIds) staff.roomIds = staff.roomIds.filter(id=>id!==room.id);
+  });
+  if(staff){
+    staff.roomIds=[];
+    staff.roomLink=null;
+    try{ if(typeof saveStaffList==='function') saveStaffList(); }catch(e){}
+  }
+  console.log('FORCE REMOVE removed from', removedCount, 'fields');
+  if(typeof renderRoomingGrid==='function') renderRoomingGrid();
+  if(typeof renderStaffList==='function') renderStaffList();
+  if(typeof renderNamelist==='function') renderNamelist();
+  alert('Force removed '+ (staff?.name||staffIdOrName) +' dari '+removedCount+' bilik (local). Refresh kalau still ada, tu Airtable tak update.');
+}
+window.forceRemoveStaffFromAllRooms = forceRemoveStaffFromAllRooms;
+
+// Hook X buttons to use force remove if normal fails
+document.addEventListener('click', function(e){
+  const target = e.target.closest('[onclick*="removeStaffFromRoom"]');
+  if(target){
+    console.log('X clicked', target.getAttribute('onclick'));
+  }
+});
