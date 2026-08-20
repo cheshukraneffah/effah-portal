@@ -2657,10 +2657,10 @@ window.addTanpaKatilToRoom = async function(roomId, jemaahId){
 console.log('V106 LOADED');
 
 
-// V120 - FIX STAFF DRAG + DROPDOWN CROPPED + DROPDOWN CHECK STAY OLD
+// V121 - FIX ALL 4 BUGS: HOTEL DROPDOWN HILANG + BOARD NOT RESPONSIVE + REMOVE STAFF TANPA KATIL + LAYOUT SIMPLE 8 OPTIONS
 
-const PAKEJ_ORDER_V120 = ['JIMAT EKONOMI','JIMAT STANDARD','JIMAT PREMIUM','EKONOMI LITE','EKONOMI','STANDARD','PREMIUM','PREMIUM PLUS'];
-const PAKEJ_COLORS_V120 = {
+const PAKEJ_ORDER_V121 = ['JIMAT EKONOMI','JIMAT STANDARD','JIMAT PREMIUM','EKONOMI LITE','EKONOMI','STANDARD','PREMIUM','PREMIUM PLUS'];
+const PAKEJ_COLORS_V121 = {
   'JIMAT EKONOMI': '#E8E8E8',
   'JIMAT STANDARD': '#FFF8DC',
   'JIMAT PREMIUM': '#FFE4D6',
@@ -2671,15 +2671,14 @@ const PAKEJ_COLORS_V120 = {
   'PREMIUM PLUS': '#F3E8FF'
 };
 
-function closeAllDropdowns_V120(){
+function closeAllDropdowns_V121(){
   document.querySelectorAll('[id^="boardDrop-"]').forEach(el=>el.classList.add('hidden'));
   document.querySelectorAll('[id^="pakejDrop-"]').forEach(el=>el.classList.add('hidden'));
   document.querySelectorAll('[id^="hotelPakejDrop-"]').forEach(el=>el.classList.add('hidden'));
 }
 
-let jemaahTableId_V120 = null;
-
-async function debugBaseTables_V120(){
+let jemaahTableId_V121 = null;
+async function debugBaseTables_V121(){
   const base=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base');
   const pat=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
   if(!base||!pat) return;
@@ -2687,22 +2686,24 @@ async function debugBaseTables_V120(){
     const res = await fetch(`https://api.airtable.com/v0/meta/bases/${base}/tables`,{headers:{'Authorization':`Bearer ${pat}`}});
     const data = await res.json();
     if(data.tables){
-      const possible = data.tables.filter(t=>t.name.toUpperCase().includes('JEMAAH'));
-      if(possible[0]) jemaahTableId_V120 = possible[0].id;
       for(let t of data.tables){
         if(t.fields.some(f=>f.name==='BOARD BASIS')){
-          jemaahTableId_V120 = t.id;
+          jemaahTableId_V121 = t.id;
           break;
         }
       }
-      console.log('V120 JEMAAH tableId', jemaahTableId_V120);
+      if(!jemaahTableId_V121){
+        const possible = data.tables.filter(t=>t.name.toUpperCase().includes('JEMAAH'));
+        if(possible[0]) jemaahTableId_V121 = possible[0].id;
+      }
+      console.log('V121 JEMAAH tableId', jemaahTableId_V121);
     }
   }catch(e){ console.error(e); }
 }
-setTimeout(debugBaseTables_V120, 500);
+setTimeout(debugBaseTables_V121, 500);
 
-// FIX CROPPED DROPDOWN - add CSS to allow overflow visible and fixed positioning
-(function fixDropdownCropped(){
+// FIX CROPPED BUT KEEP SIMPLE ABSOLUTE (NOT FIXED) - revert to absolute to avoid break
+(function addCSS_V121(){
   const style = document.createElement('style');
   style.textContent = `
     #namelistContainer {
@@ -2710,56 +2711,45 @@ setTimeout(debugBaseTables_V120, 500);
       overflow-x: visible !important;
       max-height: calc(100vh - 220px) !important;
     }
-    #namelistContainer .grid {
-      overflow: visible !important;
-    }
-    [id^="pakejDrop-"], [id^="boardDrop-"] {
-      position: fixed !important;
+    [id^="boardDrop-"], [id^="pakejDrop-"] {
+      position: absolute !important;
       z-index: 99999 !important;
-      max-height: 300px;
+      left: 0 !important;
+      top: 100% !important;
+      margin-top: 4px;
+      max-height: 280px;
       overflow-y: auto;
-      box-shadow: 0 10px 30px rgba(0,0,0,0.2) !important;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.15) !important;
+      border-radius: 12px;
+      background: white;
+      border: 1px solid #E2E8F0;
     }
     [id^="hotelPakejDrop-"] {
       position: absolute !important;
       z-index: 99999 !important;
+      left: 0 !important;
+      top: 100% !important;
+      margin-top: 4px;
+    }
+    /* Make parent relative for absolute dropdown */
+    .grid {
+      overflow: visible !important;
     }
   `;
   document.head.appendChild(style);
-  console.log('V120 dropdown cropped fix CSS added');
 })();
 
-function positionDropdownFixed(button, dropdown){
-  if(!button || !dropdown) return;
-  const rect = button.getBoundingClientRect();
-  // Position dropdown below button, aligned left, but keep inside viewport
-  let top = rect.bottom + 5;
-  let left = rect.left;
-  // If would go off right edge, shift left
-  if(left + 200 > window.innerWidth){
-    left = window.innerWidth - 220;
-  }
-  // If would go off bottom, show above
-  if(top + 250 > window.innerHeight){
-    top = rect.top - 250;
-  }
-  dropdown.style.top = top + 'px';
-  dropdown.style.left = left + 'px';
-  dropdown.style.width = '200px';
-}
-
-function toggleBoardDropdown_V120(jId){
+// BOARD BASIS - FIX NOT RESPONSIVE
+function toggleBoardDropdown_V121(jId){
   const drop = document.getElementById('boardDrop-'+jId);
-  const btn = document.querySelector(`button[onclick*="toggleBoardDropdown_V120('${jId}')"]`);
-  if(!drop) return;
+  if(!drop){ console.error('boardDrop not found', jId); return; }
   const isHidden = drop.classList.contains('hidden');
-  closeAllDropdowns_V120();
-  if(isHidden){
-    drop.classList.remove('hidden');
-    setTimeout(()=>positionDropdownFixed(btn, drop), 10);
-  }
+  closeAllDropdowns_V121();
+  if(isHidden) drop.classList.remove('hidden');
+  else { drop.classList.add('hidden'); setTimeout(()=>{ if(typeof renderNamelist==='function') renderNamelist(); }, 10); }
+  console.log('V121 toggleBoard', jId, isHidden ? 'open' : 'close');
 }
-window.toggleBoardDropdown = toggleBoardDropdown_V120;
+window.toggleBoardDropdown = toggleBoardDropdown_V121;
 function closeBoardDropdown(jId){
   const drop = document.getElementById('boardDrop-'+jId);
   if(drop) drop.classList.add('hidden');
@@ -2767,7 +2757,7 @@ function closeBoardDropdown(jId){
 }
 window.closeBoardDropdown = closeBoardDropdown;
 
-async function toggleBoardMulti_V120(jId, boardVal){
+async function toggleBoardMulti_V121(jId, boardVal){
   try{
     const jRec = (window.allRoomingJemaah||[]).find(j=>j.id===jId);
     if(!jRec) return;
@@ -2776,313 +2766,289 @@ async function toggleBoardMulti_V120(jId, boardVal){
     if(!Array.isArray(jRec.fields['BOARD BASIS'])) jRec.fields['BOARD BASIS']=[jRec.fields['BOARD BASIS']].filter(Boolean);
     const idx = jRec.fields['BOARD BASIS'].indexOf(boardVal);
     if(idx>=0) jRec.fields['BOARD BASIS'].splice(idx,1); else jRec.fields['BOARD BASIS'].push(boardVal);
+    
     const drop = document.getElementById('boardDrop-'+jId);
-    const btn = document.querySelector(`button[onclick*="toggleBoardDropdown_V120('${jId}')"]`);
     if(drop){
       drop.querySelectorAll('input[type="checkbox"]').forEach(cb=>{
-        if((cb.getAttribute('onchange')||'').includes(boardVal)){
+        const oc = cb.getAttribute('onchange')||'';
+        if(oc.includes(boardVal)){
           cb.checked = jRec.fields['BOARD BASIS'].includes(boardVal);
         }
       });
-      drop.classList.remove('hidden');
-      if(btn) positionDropdownFixed(btn, drop);
+      drop.classList.remove('hidden'); // stay open when clicking inside
     }
-    document.querySelectorAll(`button[onclick*="toggleBoardDropdown_V120('${jId}')"]`).forEach(b=>{
+    document.querySelectorAll(`button[onclick*="toggleBoardDropdown_V121('${jId}')"]`).forEach(b=>{
       const span = b.querySelector('span.truncate');
       if(span) span.textContent = jRec.fields['BOARD BASIS'].length ? jRec.fields['BOARD BASIS'].join(', ') : '-';
     });
+    
     const base=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base');
     const pat=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
     if(base&&pat){
-      const tableRef = jemaahTableId_V120 || 'JEMAAH';
+      const tableRef = jemaahTableId_V121 || 'JEMAAH';
       const res = await fetch(`https://api.airtable.com/v0/${base}/${tableRef}/${jId}`,{
         method:'PATCH', headers:{'Authorization':`Bearer ${pat}`,'Content-Type':'application/json'},
         body: JSON.stringify({fields:{'BOARD BASIS': jRec.fields['BOARD BASIS']}, typecast: true})
       });
-      console.log('V120 board', res.status, jRec.fields['BOARD BASIS']);
+      console.log('V121 board saved', res.status, jRec.fields['BOARD BASIS']);
     }
   }catch(e){ console.error(e); }
 }
-window.toggleBoardMulti = toggleBoardMulti_V120;
+window.toggleBoardMulti = toggleBoardMulti_V121;
 
-function clearBoardMulti_V120(jId){
+function clearBoardMulti_V121(jId){
   try{
     const jRec = (window.allRoomingJemaah||[]).find(j=>j.id===jId);
     if(jRec){ if(!jRec.fields) jRec.fields={}; jRec.fields['BOARD BASIS']=[]; }
     const drop = document.getElementById('boardDrop-'+jId);
     if(drop){ drop.querySelectorAll('input[type="checkbox"]').forEach(cb=>cb.checked=false); drop.classList.remove('hidden'); }
-    document.querySelectorAll(`button[onclick*="toggleBoardDropdown_V120('${jId}')"]`).forEach(btn=>{
+    document.querySelectorAll(`button[onclick*="toggleBoardDropdown_V121('${jId}')"]`).forEach(btn=>{
       const span = btn.querySelector('span.truncate'); if(span) span.textContent='-';
     });
     const base=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base');
     const pat=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
     if(base&&pat){
-      const tableRef = jemaahTableId_V120 || 'JEMAAH';
+      const tableRef = jemaahTableId_V121 || 'JEMAAH';
       fetch(`https://api.airtable.com/v0/${base}/${tableRef}/${jId}`,{
         method:'PATCH', headers:{'Authorization':`Bearer ${pat}`,'Content-Type':'application/json'},
         body: JSON.stringify({fields:{'BOARD BASIS': []}, typecast: true})
-      }).then(r=>console.log('V120 clear board', r.status));
+      }).then(r=>console.log('V121 clear board', r.status));
     }
   }catch(e){ console.error(e); }
 }
-window.clearBoardMulti = clearBoardMulti_V120;
+window.clearBoardMulti = clearBoardMulti_V121;
 
-// PAKEJ - FIX DROPDOWN CHECK STAY OLD
-function togglePakejDropdown_V120(jId){
+// PAKEJ JEMAAH - SIMPLE LAYOUT LIKE IMAGE 2 BUT 8 OPTIONS FULL
+function togglePakejDropdown_V121(jId){
   const drop = document.getElementById('pakejDrop-'+jId);
-  const btn = document.querySelector(`button[onclick*="togglePakejDropdown_V120('${jId}')"]`);
-  if(!drop) return;
+  if(!drop){ console.error('pakejDrop not found', jId); return; }
   const isHidden = drop.classList.contains('hidden');
-  closeAllDropdowns_V120();
-  if(isHidden){
-    drop.classList.remove('hidden');
-    setTimeout(()=>positionDropdownFixed(btn, drop), 10);
-  }
+  closeAllDropdowns_V121();
+  if(isHidden) drop.classList.remove('hidden');
+  console.log('V121 togglePakej', jId, isHidden ? 'open' : 'close');
 }
-window.togglePakejDropdown = togglePakejDropdown_V120;
-function closePakejDropdown_V120(jId){
+window.togglePakejDropdown = togglePakejDropdown_V121;
+function closePakejDropdown_V121(jId){
   const drop = document.getElementById('pakejDrop-'+jId);
   if(drop) drop.classList.add('hidden');
   setTimeout(()=>{ if(typeof renderNamelist==='function') renderNamelist(); }, 10);
 }
-window.closePakejDropdown = closePakejDropdown_V120;
+window.closePakejDropdown = closePakejDropdown_V121;
 
-function selectPakej_V120(jId, pakej){
-  console.log('V120 selectPakej', jId, pakej);
+function selectPakej_V121(jId, pakej){
+  console.log('V121 selectPakej', jId, pakej);
   const jRec = (window.allRoomingJemaah||[]).find(j=>j.id===jId);
   if(jRec) jRec.fields['PAKEJ']=pakej;
   
-  // Update pill button immediately
-  const btn = document.querySelector(`button[onclick*="togglePakejDropdown_V120('${jId}')"]`);
+  const btn = document.querySelector(`button[onclick*="togglePakejDropdown_V121('${jId}')"]`);
   if(btn){
-    const color = PAKEJ_COLORS_V120[pakej] || '#FFFFFF';
+    const color = PAKEJ_COLORS_V121[pakej] || '#FFFFFF';
     btn.style.background=color; btn.style.borderColor=color;
     const span = btn.querySelector('span.truncate');
-    if(span) span.textContent=pakej;
+    if(span) span.textContent=pakej || '-';
   }
   
-  // FIX: Update dropdown checkmarks - rebuild checkmarks to reflect new selection
   const drop = document.getElementById('pakejDrop-'+jId);
   if(drop){
-    // Update all option rows
-    drop.querySelectorAll('div[onclick*="selectPakej_V120"]').forEach(div=>{
+    drop.querySelectorAll('div[onclick*="selectPakej_V121"]').forEach(div=>{
       const onclick = div.getAttribute('onclick')||'';
-      // Extract pakej name from onclick="selectPakej_V120('id','PAKEJ NAME')"
-      const match = onclick.match(/selectPakej_V120\([^,]+,'([^']+)'\)/);
+      const match = onclick.match(/selectPakej_V121\([^,]+,'([^']+)'\)/);
       if(match){
         const optPakej = match[1];
         const isSelected = optPakej===pakej;
-        // Find checkmark spans
-        const dotSpan = div.querySelector('span.w-4');
-        const rightSpan = div.querySelector('span.ml-auto');
-        if(dotSpan) dotSpan.textContent = isSelected ? '✓' : '';
-        if(rightSpan) rightSpan.textContent = isSelected ? '✓' : '×';
         if(isSelected){
-          div.classList.add('bg-slate-100','font-bold');
+          div.classList.add('bg-[#7A0C2E]','text-white','font-bold');
+          div.classList.remove('hover:bg-slate-50');
         } else {
-          div.classList.remove('bg-slate-100','font-bold');
+          div.classList.remove('bg-[#7A0C2E]','text-white','font-bold');
+          div.classList.add('hover:bg-slate-50');
         }
+      }
+      // handle clear option "-"
+      if(onclick.includes("''") && pakej===''){
+        div.classList.add('bg-[#7A0C2E]','text-white');
       }
     });
     drop.classList.remove('hidden');
-    if(btn) positionDropdownFixed(btn, drop);
   }
   
   const base=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base');
   const pat=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
   if(base&&pat&&jRec){
-    const tableRef = jemaahTableId_V120 || 'JEMAAH';
+    const tableRef = jemaahTableId_V121 || 'JEMAAH';
     fetch(`https://api.airtable.com/v0/${base}/${tableRef}/${jId}`,{
       method:'PATCH', headers:{'Authorization':`Bearer ${pat}`,'Content-Type':'application/json'},
       body: JSON.stringify({fields:{'PAKEJ': pakej}, typecast: true})
-    }).then(r=>console.log('V120 pakej saved', r.status, pakej));
+    }).then(r=>console.log('V121 pakej saved', r.status, pakej));
   }
 }
-window.selectPakej = selectPakej_V120;
-
-function clearPakej_V120(jId){
-  const jRec = (window.allRoomingJemaah||[]).find(j=>j.id===jId);
-  if(jRec) jRec.fields['PAKEJ']='';
-  setTimeout(()=>{ if(typeof renderNamelist==='function') renderNamelist(); }, 10);
-  const base=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base');
-  const pat=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
-  if(base&&pat){
-    const tableRef = jemaahTableId_V120 || 'JEMAAH';
-    fetch(`https://api.airtable.com/v0/${base}/${tableRef}/${jId}`,{
-      method:'PATCH', headers:{'Authorization':`Bearer ${pat}`,'Content-Type':'application/json'},
-      body: JSON.stringify({fields:{'PAKEJ': ''}, typecast: true})
-    });
-  }
+window.selectPakej = selectPakej_V121;
+function clearPakej_V121(jId){
+  selectPakej_V121(jId, '');
 }
-window.clearPakej = clearPakej_V120;
+window.clearPakej = clearPakej_V121;
 
-// HOTEL PAKEJ - FIX SAME BUG
-function toggleHotelPakejDropdown_V120(roomId){
+// HOTEL PAKEJ - FIX HILANG
+function toggleHotelPakejDropdown_V121(roomId){
   const drop = document.getElementById('hotelPakejDrop-'+roomId);
-  if(!drop) return;
+  if(!drop){ console.error('hotelPakejDrop not found', roomId); return; }
   const isHidden = drop.classList.contains('hidden');
-  closeAllDropdowns_V120();
+  closeAllDropdowns_V121();
   if(isHidden) drop.classList.remove('hidden');
+  console.log('V121 toggleHotelPakej', roomId, isHidden ? 'open' : 'close');
 }
-window.toggleHotelPakejDropdown = toggleHotelPakejDropdown_V120;
-function closeHotelPakejDropdown_V120(roomId){
+window.toggleHotelPakejDropdown = toggleHotelPakejDropdown_V121;
+function closeHotelPakejDropdown_V121(roomId){
   const drop = document.getElementById('hotelPakejDrop-'+roomId);
   if(drop) drop.classList.add('hidden');
   setTimeout(()=>{ if(typeof renderRoomingGrid==='function') renderRoomingGrid(); }, 10);
 }
-window.closeHotelPakejDropdown = closeHotelPakejDropdown_V120;
-
-function selectHotelPakej_V120(roomId, pakej){
-  console.log('V120 selectHotelPakej', roomId, pakej);
+window.closeHotelPakejDropdown = closeHotelPakejDropdown_V121;
+function selectHotelPakej_V121(roomId, pakej){
+  console.log('V121 selectHotelPakej', roomId, pakej);
   const room = (window.allRoomingRecords||[]).find(r=>r.id===roomId);
   if(room) room.fields['PAKEJ / HOTEL']=pakej;
+  
   const container = document.getElementById('hotelPakejContainer-'+roomId);
   const drop = document.getElementById('hotelPakejDrop-'+roomId);
   if(container){
-    const color = PAKEJ_COLORS_V120[pakej] || '#DBEAFE';
+    const color = PAKEJ_COLORS_V121[pakej] || '#DBEAFE';
     const btn = container.querySelector('button');
-    if(btn){ btn.style.background=color; btn.style.borderColor=color; const span = btn.querySelector('span'); if(span) span.textContent=pakej; }
+    if(btn){ btn.style.background=color; btn.style.borderColor=color; const span = btn.querySelector('span'); if(span) span.textContent=pakej || 'EKONOMI'; }
   }
   if(drop){
-    drop.querySelectorAll('div[onclick*="selectHotelPakej_V120"]').forEach(div=>{
+    drop.querySelectorAll('div[onclick*="selectHotelPakej_V121"]').forEach(div=>{
       const onclick = div.getAttribute('onclick')||'';
-      const match = onclick.match(/selectHotelPakej_V120\([^,]+,'([^']+)'\)/);
+      const match = onclick.match(/selectHotelPakej_V121\([^,]+,'([^']+)'\)/);
       if(match){
         const optPakej = match[1];
         const isSelected = optPakej===pakej;
-        const dotSpan = div.querySelector('span.w-4');
-        const rightSpan = div.querySelector('span.ml-auto');
-        if(dotSpan) dotSpan.textContent = isSelected ? '✓' : '';
-        if(rightSpan) rightSpan.textContent = isSelected ? '✓' : '×';
-        if(isSelected) div.classList.add('bg-slate-100','font-bold');
-        else div.classList.remove('bg-slate-100','font-bold');
+        if(isSelected){
+          div.classList.add('bg-[#7A0C2E]','text-white','font-bold');
+        } else {
+          div.classList.remove('bg-[#7A0C2E]','text-white','font-bold');
+        }
       }
     });
     drop.classList.remove('hidden');
   }
+  
   const base=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base');
   const pat=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
   if(base&&pat&&room){
     fetch(`https://api.airtable.com/v0/${base}/ROOMING%20LIST/${roomId}`,{
       method:'PATCH', headers:{'Authorization':`Bearer ${pat}`,'Content-Type':'application/json'},
       body: JSON.stringify({fields:{'PAKEJ / HOTEL': pakej}, typecast: true})
-    }).then(r=>console.log('V120 hotel pakej saved', r.status, pakej));
+    }).then(r=>console.log('V121 hotel pakej saved', r.status, pakej));
   }
 }
-window.selectHotelPakej = selectHotelPakej_V120;
-function clearHotelPakej_V120(roomId){
-  const room = (window.allRoomingRecords||[]).find(r=>r.id===roomId);
-  if(room) room.fields['PAKEJ / HOTEL']='';
-  setTimeout(()=>{ if(typeof renderRoomingGrid==='function') renderRoomingGrid(); }, 10);
-  const base=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base');
-  const pat=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
-  if(base&&pat&&room){
-    fetch(`https://api.airtable.com/v0/${base}/ROOMING%20LIST/${roomId}`,{
-      method:'PATCH', headers:{'Authorization':`Bearer ${pat}`,'Content-Type':'application/json'},
-      body: JSON.stringify({fields:{'PAKEJ / HOTEL': ''}, typecast: true})
-    });
-  }
+window.selectHotelPakej = selectHotelPakej_V121;
+function clearHotelPakej_V121(roomId){
+  selectHotelPakej_V121(roomId, 'EKONOMI');
 }
-window.clearHotelPakej = clearHotelPakej_V120;
+window.clearHotelPakej = clearHotelPakej_V121;
 
-// FIX STAFF DRAG NOT RESPONSIVE
-function fixStaffDrag(){
-  // Make staff items draggable
-  const staffContainer = document.getElementById('staffListContainer') || document.querySelector('[id*="staff"]');
-  if(!staffContainer) return;
-  
-  // Ensure staff items have drag handlers
-  document.querySelectorAll('[data-staff-id], [draggable]').forEach(el=>{
-    if(el.getAttribute('data-staff-id') || el.textContent.includes('STAFF')){
-      el.draggable = true;
-    }
-  });
-}
-
-window.dragStaff = function(event, staffId){
-  console.log('V120 dragStaff', staffId);
-  event.dataTransfer.setData('text/plain', staffId);
-  event.dataTransfer.setData('staffId', staffId);
-  event.dataTransfer.effectAllowed = 'move';
-  if(typeof dragJemaah==='function'){
-    // Reuse jemaah drag logic but for staff
-    window._draggedStaffId = staffId;
-  }
-};
-
-window.dropStaffToRoom = async function(event, roomId){
-  event.preventDefault();
-  const staffId = event.dataTransfer.getData('staffId') || event.dataTransfer.getData('text/plain') || window._draggedStaffId;
-  console.log('V120 dropStaffToRoom', staffId, roomId);
-  if(!staffId) return;
-  
+// FIX REMOVE STAFF TANPA KATIL
+window.removeStaffTanpaKatil = async function(roomId, staffId){
+  console.log('V121 removeStaffTanpaKatil', roomId, staffId);
   const base=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base');
   const pat=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
   const room = (window.allRoomingRecords||[]).find(r=>r.id===roomId);
-  const staff = (window.staffList||[]).find(s=>s.id===staffId||s.airtableId===staffId);
-  
   if(room){
-    if(!room.fields['STAFF']) room.fields['STAFF']=[];
-    if(!room.fields['STAFF'].includes(staffId)){
-      room.fields['STAFF'].push(staffId);
-    }
-    if(staff){
-      staff.roomId = roomId;
-    }
+    if(room.fields['STAFF TANPA KATIL']) room.fields['STAFF TANPA KATIL'] = room.fields['STAFF TANPA KATIL'].filter(id=>id!==staffId);
+    if(room.fields['JEMAAH TANPA KATIL']) room.fields['JEMAAH TANPA KATIL'] = room.fields['JEMAAH TANPA KATIL'].filter(id=>id!==staffId);
+    // Also check generic tanpa katil
+    if(room.fields['TANPA KATIL']) room.fields['TANPA KATIL'] = room.fields['TANPA KATIL'].filter(id=>id!==staffId);
   }
-  
-  // Save both localStorage and Airtable
   try{
-    if(window.staffList) localStorage.setItem('effah_staff_list', JSON.stringify(window.staffList));
     if(window.allRoomingRecords) localStorage.setItem('effah_rooming_records', JSON.stringify(window.allRoomingRecords));
-    if(typeof saveStaffList==='function') saveStaffList();
   }catch(e){}
   
   if(base&&pat&&room){
     const res = await fetch(`https://api.airtable.com/v0/${base}/ROOMING%20LIST/${roomId}`,{
       method:'PATCH', headers:{'Authorization':`Bearer ${pat}`,'Content-Type':'application/json'},
-      body: JSON.stringify({fields:{'STAFF': room.fields['STAFF']}, typecast: true})
+      body: JSON.stringify({fields:{
+        'STAFF TANPA KATIL': room.fields['STAFF TANPA KATIL']||[],
+        'JEMAAH TANPA KATIL': room.fields['JEMAAH TANPA KATIL']||[]
+      }, typecast: true})
     });
-    console.log('V120 staff drop Airtable', res.status);
+    console.log('V121 remove staff tanpa katil Airtable', res.status);
   }
   
   setTimeout(()=>{
     if(typeof renderRoomingGrid==='function') renderRoomingGrid();
-    if(typeof renderNamelist==='function') renderNamelist();
   }, 100);
-  
+};
+
+// Also patch existing remove functions
+const origRemoveJemaahTanpaKatil = window.removeJemaahTanpaKatil;
+window.removeJemaahTanpaKatil = async function(roomId, jId){
+  if(origRemoveJemaahTanpaKatil){
+    // Try original but also our fix
+    try{ await origRemoveJemaahTanpaKatil(roomId, jId); }catch(e){}
+  }
+  // Ensure staff tanpa katil also removed via same function
+  return window.removeStaffTanpaKatil(roomId, jId);
+};
+
+// Staff drag fix
+window.dragStaff = function(event, staffId){
+  console.log('V121 dragStaff', staffId);
+  event.dataTransfer.setData('text/plain', staffId);
+  event.dataTransfer.setData('staffId', staffId);
+  window._draggedStaffId = staffId;
+};
+window.dropStaffToRoom = async function(event, roomId){
+  event.preventDefault();
+  const staffId = event.dataTransfer.getData('staffId') || event.dataTransfer.getData('text/plain') || window._draggedStaffId;
+  console.log('V121 dropStaffToRoom', staffId, roomId);
+  if(!staffId) return;
+  const base=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base');
+  const pat=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
+  const room = (window.allRoomingRecords||[]).find(r=>r.id===roomId);
+  if(room){
+    if(!room.fields['STAFF']) room.fields['STAFF']=[];
+    if(!room.fields['STAFF'].includes(staffId)) room.fields['STAFF'].push(staffId);
+  }
+  try{
+    if(window.allRoomingRecords) localStorage.setItem('effah_rooming_records', JSON.stringify(window.allRoomingRecords));
+    if(typeof saveStaffList==='function') saveStaffList();
+  }catch(e){}
+  if(base&&pat&&room){
+    await fetch(`https://api.airtable.com/v0/${base}/ROOMING%20LIST/${roomId}`,{
+      method:'PATCH', headers:{'Authorization':`Bearer ${pat}`,'Content-Type':'application/json'},
+      body: JSON.stringify({fields:{'STAFF': room.fields['STAFF']}, typecast: true})
+    }).then(r=>console.log('V121 staff drop', r.status));
+  }
+  setTimeout(()=>{ if(typeof renderRoomingGrid==='function') renderRoomingGrid(); if(typeof renderNamelist==='function') renderNamelist(); }, 100);
   window._draggedStaffId = null;
 };
 
-// Also override drop handler for rooms to accept staff
-const origOnDrop = window.onDrop;
+const origOnDrop_V121 = window.onDrop;
 window.onDrop = async function(event, roomId){
   event.preventDefault();
   const staffId = event.dataTransfer.getData('staffId') || window._draggedStaffId;
-  const jemaahId = event.dataTransfer.getData('text/plain');
-  
+  const data = event.dataTransfer.getData('text/plain');
   if(staffId && (window.staffList||[]).some(s=>s.id===staffId||s.airtableId===staffId)){
-    // It's staff
     return window.dropStaffToRoom(event, roomId);
   } else {
-    // It's jemaah - call original
-    if(origOnDrop) return origOnDrop(event, roomId);
+    if(origOnDrop_V121) return origOnDrop_V121(event, roomId);
     if(typeof dropJemaah==='function') return dropJemaah(event, roomId);
   }
 };
 
-document.removeEventListener('click', window._v120Outside);
-window._v120Outside = function(e){
-  const isBoardBtn = e.target.closest('button[onclick*="toggleBoardDropdown_V120"]');
-  const isPakejBtn = e.target.closest('button[onclick*="togglePakejDropdown_V120"]');
-  const isHotelBtn = e.target.closest('button[onclick*="toggleHotelPakejDropdown_V120"]');
+document.removeEventListener('click', window._v121Outside);
+window._v121Outside = function(e){
+  const isBoardBtn = e.target.closest('button[onclick*="toggleBoardDropdown_V121"]');
+  const isPakejBtn = e.target.closest('button[onclick*="togglePakejDropdown_V121"]');
+  const isHotelBtn = e.target.closest('button[onclick*="toggleHotelPakejDropdown_V121"]');
   const isInsideBoard = e.target.closest('[id^="boardDrop-"]');
   const isInsidePakej = e.target.closest('[id^="pakejDrop-"]');
   const isInsideHotel = e.target.closest('[id^="hotelPakejDrop-"]');
   if(!isBoardBtn && !isPakejBtn && !isHotelBtn && !isInsideBoard && !isInsidePakej && !isInsideHotel){
     const open = document.querySelector('[id^="boardDrop-"]:not(.hidden), [id^="pakejDrop-"]:not(.hidden), [id^="hotelPakejDrop-"]:not(.hidden)');
     if(open){
-      closeAllDropdowns_V120();
+      closeAllDropdowns_V121();
       setTimeout(()=>{
         if(typeof renderNamelist==='function') renderNamelist();
         if(typeof renderRoomingGrid==='function') renderRoomingGrid();
@@ -3090,39 +3056,166 @@ window._v120Outside = function(e){
     }
   }
 };
-document.addEventListener('click', window._v120Outside);
+document.addEventListener('click', window._v121Outside);
 
-const origRenderNamelist_V120 = window.renderNamelist;
+// Override renderNamelist to use simple layout with 8 options
+const origRenderNamelist_V121 = window.renderNamelist;
 window.renderNamelist = function(){
-  if(origRenderNamelist_V120) origRenderNamelist_V120();
-  // Fix staff draggable
-  setTimeout(()=>{
-    document.querySelectorAll('#staffListContainer [draggable], [id*="staff"] [draggable]').forEach(el=>{
-      if(!el.getAttribute('ondragstart')){
-        const staffId = el.getAttribute('data-staff-id') || el.id;
-        if(staffId) el.setAttribute('ondragstart', `dragStaff(event,'${staffId}')`);
+  try{
+    const cont=document.getElementById('namelistContainer'); if(!cont) return;
+    const q=(document.getElementById('searchRoomingJemaah')?.value||'').toLowerCase();
+    const pakejFilter=(document.getElementById('filterPakejRooming')?.value||'').toUpperCase();
+    let filtered=[...allRoomingJemaah];
+    if(q) filtered=filtered.filter(r=> (typeof getJemaahName==='function'? getJemaahName(r.fields) : '').toLowerCase().includes(q));
+    if(pakejFilter) filtered=filtered.filter(r=> (r.fields['PAKEJ']||'').toUpperCase()===pakejFilter);
+    cont.innerHTML=filtered.map((r,i)=>{
+      const name=typeof getJemaahName==='function'? getJemaahName(r.fields) : '-';
+      const assignedNormalInLoc=typeof isJemaahAssignedInLocation==='function'? isJemaahAssignedInLocation(r.id, activeLocation) : false;
+      const assignedTanpaInLoc=allRoomingRecords.some(rec=> (rec.fields['LOKASI / CITY']||'MEKAH').toUpperCase()===(typeof activeLocation!=='undefined'? activeLocation : 'MEKAH').toUpperCase() && ((rec.fields['JEMAAH TANPA KATIL']||[]).includes(r.id)));
+      const assignedInLoc = assignedNormalInLoc || assignedTanpaInLoc;
+      const assignedGlobal=typeof isJemaahAssignedAny==='function'? isJemaahAssignedAny(r.id) : false;
+      const rowCls=assignedInLoc?'bg-slate-100 text-slate-500':'hover:bg-slate-50';
+      const drag=assignedInLoc?'':`draggable="true" ondragstart="dragJemaah(event,'${r.id}')" ondragend="dragEnd(event)"`;
+      let statusIcon = assignedInLoc? `<button onclick="removeJemaahFromCurrentLoc('${r.id}')" class="w-5 h-5 rounded-full bg-amber-100 text-amber-700 text-[10px]">✕</button>` : `<button onclick="quickAssign('${r.id}')" class="w-5 h-5 rounded-full border bg-slate-100 text-[10px]">+</button>`;
+      if(!assignedInLoc && assignedGlobal) statusIcon = `<button onclick="quickAssign('${r.id}')" class="w-5 h-5 rounded-full border bg-amber-100 text-[10px]">+</button>`;
+      const fbArr = r.fields['BOARD BASIS']||[];
+      const fbDisplay = fbArr.length ? fbArr.join(', ') : '-';
+      let fbCls='bg-white border-slate-200 text-slate-400';
+      if(fbArr.length>0) fbCls='bg-emerald-50 border-emerald-200 text-emerald-800';
+      const boardOptions = ['FULLBOARD','FULLBOARD (MEKAH)','BB (MEKAH)','FULLBOARD (MADINAH)','BB (MADINAH)'];
+      const boardCheckboxes = boardOptions.map(opt=>{
+        const checked=fbArr.includes(opt);
+        return `<label class="flex items-center gap-2 px-3 py-2 hover:bg-slate-50 cursor-pointer text-[11px]" onclick="event.stopPropagation()"><input type="checkbox" ${checked?'checked':''} onchange="toggleBoardMulti_V121('${r.id}','${opt}')" class="w-4 h-4 accent-[#7A0C2E]"> ${opt}</label>`;
+      }).join('');
+      const insArr = typeof getInsuranArray==='function'? getInsuranArray(r.fields) : [];
+      const insToggle = ['TAKAFUL','ETIQA','AL-KHAIRI'].map(opt=>{
+        const active = insArr.includes(opt);
+        let cls = 'bg-white text-slate-400 border-slate-200';
+        if(active){
+          if(opt==='TAKAFUL') cls='bg-emerald-500 text-white border-emerald-600';
+          else if(opt==='ETIQA') cls='bg-amber-300 text-amber-900 border-amber-400';
+          else if(opt==='AL-KHAIRI') cls='bg-blue-400 text-white border-blue-500';
+        }
+        const label = opt==='TAKAFUL'?'TAK':opt==='AL-KHAIRI'?'KHAIRI':opt;
+        return `<button onclick="toggleInsuran('${r.id}','${opt}')" class="px-1.5 py-0.5 rounded-full border text-[7px] font-bold ${cls}">${label}</button>`;
+      }).join('');
+      const pk = r.fields['PAKEJ'] || '';
+      const pkColor = PAKEJ_COLORS_V121[pk] || '#FFFFFF';
+      const pkDisplay = pk || '-';
+      // SIMPLE LAYOUT LIKE IMAGE 2 BUT 8 OPTIONS
+      const pakejOptionsHtml = ['','JIMAT EKONOMI','JIMAT STANDARD','JIMAT PREMIUM','EKONOMI LITE','EKONOMI','STANDARD','PREMIUM','PREMIUM PLUS'].map(o=>{
+        const isSel = pk===o || (o==='' && pk==='');
+        const label = o==='' ? '-' : o;
+        const bg = isSel ? 'bg-[#7A0C2E] text-white' : 'hover:bg-slate-100';
+        return `<div onclick="selectPakej_V121('${r.id}','${o}')" class="px-4 py-2 cursor-pointer text-[12px] ${bg} ${isSel?'font-bold':''}">${label}</div>`;
+      }).join('');
+      const pakejDropdown = `<div class="relative"><button onclick="event.stopPropagation(); togglePakejDropdown_V121('${r.id}')" class="w-full text-[9px] border rounded-full px-2.5 py-1.5 font-bold text-left flex items-center justify-between" style="background:${pkColor}; border-color:${pkColor}; color:#1F2937"><span class="truncate">${pkDisplay}</span><span>▼</span></button><div id="pakejDrop-${r.id}" class="hidden absolute z-[99999] w-48 bg-white border border-slate-200 rounded-xl shadow-xl overflow-hidden" onclick="event.stopPropagation()">${pakejOptionsHtml}<div class="flex justify-between gap-1 p-2 border-t bg-slate-50"><button onclick="clearPakej_V121('${r.id}'); event.stopPropagation();" class="text-[10px] px-3 py-1 rounded-full bg-white border">Clear</button><button onclick="closePakejDropdown_V121('${r.id}'); event.stopPropagation();" class="text-[10px] px-3 py-1 rounded-full bg-[#7A0C2E] text-white">OK</button></div></div></div>`;
+      const trChecked = typeof isTrainChecked==='function'? isTrainChecked(r.fields) : false;
+      return `<div ${drag} class="grid grid-cols-12 items-center px-1.5 py-1.5 text-[11px] border-b border-slate-50 ${rowCls}">
+        <div class="col-span-1 text-slate-400 text-[10px]">${String(i+1).padStart(2,'0')}</div>
+        <div class="col-span-3 font-medium truncate text-[10px] ${assignedInLoc?'text-slate-500 italic':''}" title="${name}">${name}</div>
+        <div class="col-span-2 relative">
+          <div class="relative w-full">
+            <button onclick="event.stopPropagation(); toggleBoardDropdown_V121('${r.id}')" class="text-[8px] border rounded-full px-2 py-1 font-bold ${fbCls} outline-none w-full truncate text-left flex items-center justify-between">
+              <span class="truncate">${fbDisplay}</span><span class="ml-1">▼</span>
+            </button>
+            <div id="boardDrop-${r.id}" class="hidden absolute left-0 top-full mt-1 w-[220px] bg-white border border-slate-200 rounded-xl shadow-xl z-[9999] overflow-hidden" onclick="event.stopPropagation()">
+              ${boardCheckboxes}
+              <div class="border-t border-slate-100 p-2 flex justify-between bg-slate-50">
+                <button onclick="clearBoardMulti_V121('${r.id}'); event.stopPropagation();" class="text-[10px] px-3 py-1 rounded-full bg-white border">Clear</button>
+                <button onclick="closeBoardDropdown('${r.id}'); event.stopPropagation();" class="text-[10px] px-3 py-1 rounded-full bg-[#7A0C2E] text-white">OK</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="col-span-1 text-center">
+          <input type="checkbox" ${trChecked?'checked':''} onchange="updateJemaahCheckbox('${r.id}','TRAIN',this.checked)" class="w-3.5 h-3.5 accent-[#7A0C2E] rounded">
+        </div>
+        <div class="col-span-3 flex items-center gap-0.5 flex-wrap justify-center">
+          ${insToggle}
+        </div>
+        <div class="col-span-1">
+          ${pakejDropdown}
+        </div>
+        <div class="col-span-1 flex justify-center">${statusIcon}</div>
+      </div>`;
+    }).join('');
+    setTimeout(()=>{
+      const cont = document.getElementById('namelistContainer');
+      if(cont && cont.parentElement){
+        cont.parentElement.style.position='sticky';
+        cont.parentElement.style.top='10px';
+        cont.parentElement.style.alignSelf='flex-start';
       }
-    });
-    const cont = document.getElementById('namelistContainer');
-    if(cont && cont.parentElement){
-      cont.parentElement.style.position='sticky';
-      cont.parentElement.style.top='10px';
-    }
-  }, 100);
+    }, 100);
+  }catch(e){ console.error('renderNamelist V121 error', e); }
 };
 
-const origRenderRoomingGrid_V120 = window.renderRoomingGrid;
+const origRenderRoomingGrid_V121 = window.renderRoomingGrid;
 window.renderRoomingGrid = function(){
-  if(origRenderRoomingGrid_V120) origRenderRoomingGrid_V120();
+  try{
+    if(origRenderRoomingGrid_V121) origRenderRoomingGrid_V121();
+  }catch(e){ console.error(e); }
   setTimeout(()=>{
-    document.querySelectorAll('[id^="room-"], [data-room-id]').forEach(roomEl=>{
-      roomEl.addEventListener('dragover', e=>{ e.preventDefault(); e.dataTransfer.dropEffect='move'; });
+    // Inject hotel pakej dropdowns - FIX HILANG
+    (window.allRoomingRecords||[]).forEach(room=>{
+      const container = document.getElementById('hotelPakejContainer-'+room.id);
+      if(!container){
+        // Try to find old select and replace
+        const roomEl = document.querySelector(`[data-room-id="${room.id}"]`) || document.getElementById(`room-${room.id}`);
+        if(roomEl){
+          const oldSelect = roomEl.querySelector('select');
+          if(oldSelect){
+            const newDiv = document.createElement('div');
+            newDiv.id = 'hotelPakejContainer-'+room.id;
+            oldSelect.parentNode.replaceChild(newDiv, oldSelect);
+          }
+        }
+      }
+      const cont = document.getElementById('hotelPakejContainer-'+room.id);
+      if(!cont) return;
+      const current = room.fields['PAKEJ / HOTEL'] || 'EKONOMI';
+      const color = PAKEJ_COLORS_V121[current] || '#DBEAFE';
+      const optionsHtml = ['EKONOMI','JIMAT EKONOMI','JIMAT STANDARD','JIMAT PREMIUM','EKONOMI LITE','STANDARD','PREMIUM','PREMIUM PLUS'].map(o=>{
+        const isSel = current===o;
+        const bg = isSel ? 'bg-[#7A0C2E] text-white font-bold' : 'hover:bg-slate-100';
+        return `<div onclick="selectHotelPakej_V121('${room.id}','${o}')" class="px-4 py-2 cursor-pointer text-[12px] ${bg}">${o}</div>`;
+      }).join('');
+      cont.innerHTML = `<div class="relative"><button onclick="event.stopPropagation(); toggleHotelPakejDropdown_V121('${room.id}')" class="w-full text-[11px] border rounded-full px-3 py-1.5 font-bold flex items-center justify-between" style="background:${color}; border-color:${color}"><span>${current}</span><span>▼</span></button><div id="hotelPakejDrop-${room.id}" class="hidden absolute z-[99999] w-48 bg-white border border-slate-200 rounded-xl shadow-xl overflow-hidden" onclick="event.stopPropagation()">${optionsHtml}<div class="flex justify-between gap-1 p-2 border-t bg-slate-50"><button onclick="clearHotelPakej_V121('${room.id}'); event.stopPropagation();" class="text-[10px] px-3 py-1 rounded-full bg-white border">Clear</button><button onclick="closeHotelPakejDropdown_V121('${room.id}'); event.stopPropagation();" class="text-[10px] px-3 py-1 rounded-full bg-[#7A0C2E] text-white">OK</button></div></div></div>`;
+    });
+    
+    // Fix staff tanpa katil remove buttons
+    document.querySelectorAll('[onclick*="removeJemaahTanpaKatil"], [onclick*="removeStaffTanpaKatil"]').forEach(btn=>{
+      const onclick = btn.getAttribute('onclick')||'';
+      // Ensure it calls our fixed function
+      if(onclick.includes('removeJemaahTanpaKatil') && !onclick.includes('removeStaffTanpaKatil')){
+        const match = onclick.match(/removeJemaahTanpaKatil\('([^']+)','([^']+)'\)/);
+        if(match){
+          const roomId = match[1];
+          const jId = match[2];
+          // Check if it's staff
+          const isStaff = (window.staffList||[]).some(s=>s.id===jId||s.airtableId===jId);
+          if(isStaff){
+            btn.setAttribute('onclick', `removeStaffTanpaKatil('${roomId}','${jId}')`);
+          }
+        }
+      }
+    });
+    
+    // Make rooms droppable for staff
+    document.querySelectorAll('[id^="room-"], [data-room-id], .room-card, .border-2').forEach(roomEl=>{
+      if(!roomEl.getAttribute('data-room-id') && roomEl.id.startsWith('room-')){
+        roomEl.setAttribute('data-room-id', roomEl.id.replace('room-',''));
+      }
+      roomEl.addEventListener('dragover', e=>{ e.preventDefault(); e.dataTransfer.dropEffect='move'; roomEl.classList.add('ring-2','ring-[#7A0C2E]'); });
+      roomEl.addEventListener('dragleave', e=>{ roomEl.classList.remove('ring-2','ring-[#7A0C2E]'); });
       roomEl.addEventListener('drop', e=>{
+        roomEl.classList.remove('ring-2','ring-[#7A0C2E]');
         const roomId = roomEl.getAttribute('data-room-id') || roomEl.id.replace('room-','');
         if(roomId) window.onDrop(e, roomId);
       });
     });
-  }, 100);
+  }, 150);
 };
 
-console.log('V120 FIX STAFF DRAG + DROPDOWN CROPPED + CHECK STAY OLD LOADED');
+console.log('V121 FIX ALL 4 BUGS LOADED - hotel dropdown, board responsive, staff tanpa katil, simple 8 options');
