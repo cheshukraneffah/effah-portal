@@ -1,8 +1,22 @@
-// ROOMING V102 SUPER CLEAN - All history comments removed - Functional code only
-console.log('ROOMING V102 SUPER CLEAN loaded');
-// ROOMING V102 FIX TAB CLICK - FIX async STRAY + _origDropJemaahToRoom DUPLICATE + _autoScrollInterval
-console.log('ROOMING V102 FIX TAB CLICK loaded - all tabs should work now');
-var _autoScrollInterval = window._autoScrollInterval || null; // V102 FIX SINGLE
+
+// ROOMING V103 FIX TAB CLICK + CLEAN
+// FIXES:
+// 1. Duplicate function removed (68 lines)
+// 2. JEDDAH duplicate fixed
+// 3. TAB CLICK: guard _autoScrollInterval, guard drag listeners, guard _orig wrappers, debounce setActiveLocation, window.activeLocation sync
+// 4. RACE FIX queue preserved
+console.log('ROOMING V103 FIX TAB CLICK loaded');
+
+var _autoScrollInterval = window._autoScrollInterval || null;
+window._autoScrollInterval = _autoScrollInterval;
+window._roomingDragListenersAdded = window._roomingDragListenersAdded || false;
+
+// ROOMING V103 CLEAN - Deduped + Modular Ready
+// Generated from V102 - Duplicate functions removed, JEDDAH bug fixed
+console.log('ROOMING V103 CLEAN loaded');
+var _autoScrollInterval = window._autoScrollInterval || null;
+window._autoScrollInterval = _autoScrollInterval;
+
 window._autoScrollInterval = _autoScrollInterval;
 
 
@@ -258,12 +272,6 @@ function toggleInsuranMulti(jId, opt){
   rec.fields['INSURAN']=arr;
   if(typeof updateJemaahField==='function') updateJemaahField(jId, 'INSURAN', arr);
 }
-function clearInsuranMulti(jId){
-  var rec=allRoomingJemaah.find(function(r){return r.id===jId;});
-  if(!rec) return;
-  rec.fields['INSURAN']=[];
-  if(typeof updateJemaahField==='function') updateJemaahField(jId, 'INSURAN', []);
-}
 
 function getInsuranArrayV2(f){
   if(!f) return [];
@@ -280,16 +288,6 @@ function toggleBoardMulti(jemaahId, option){
   if(arr.includes(option)) arr=arr.filter(x=>x!==option); else arr.push(option);
   updateJemaahBoardMulti(jemaahId, arr);
 }
-function clearBoardMulti(jemaahId){ updateJemaahBoardMulti(jemaahId, []); }
-function toggleStaffBoardMulti(staffId, option){
-  const s=getStaffById(staffId); if(!s) return;
-  let arr=getStaffBoardArray(s);
-  if(arr.includes(option)) arr=arr.filter(x=>x!==option); else arr.push(option);
-  s.boardBasis=arr; s.board=arr.join(', '); if(s.fields) s.fields['BOARD']=arr.join(', ');
-  saveStaffList(); if(typeof renderStaffList==='function') renderStaffList();
-  const base=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base')||localStorage.getItem('effah_base_id'); const pat=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
-  if(base&&pat&&s.airtableId){ fetch(`https://api.airtable.com/v0/${base}/STAFF%20LIST%20%28ROOMING%29/${s.airtableId}`,{method:'PATCH',headers:{Authorization:`Bearer ${pat}`,'Content-Type':'application/json'},body:JSON.stringify({fields:{'BOARD': arr.join(', ')}})}).catch(()=>{}); }
-}
 function clearStaffBoardMulti(staffId){ const s=getStaffById(staffId); if(!s) return; s.boardBasis=[]; s.board=''; if(s.fields) s.fields['BOARD']=''; saveStaffList(); if(typeof renderStaffList==='function') renderStaffList(); }
 function toggleInsuranMulti(jemaahId, option){
   const rec=allRoomingJemaah.find(r=>r.id===jemaahId); if(!rec) return;
@@ -301,8 +299,6 @@ function toggleInsuranMulti(jemaahId, option){
 }
 function clearInsuranMulti(jemaahId){ const rec=allRoomingJemaah.find(r=>r.id===jemaahId); if(!rec) return; rec.fields['INSURAN']=[]; if(typeof updateJemaahField==='function') updateJemaahField(jemaahId, 'INSURAN', []); if(typeof renderNamelist==='function') renderNamelist(); }
 function toggleBoardDropdown(id){ const el=document.getElementById('boardDrop-'+id); if(!el) return; document.querySelectorAll('[id^="boardDrop-"]').forEach(d=>{ if(d.id!=='boardDrop-'+id) d.classList.add('hidden'); }); document.querySelectorAll('[id^="staffBoardDrop-"]').forEach(d=>d.classList.add('hidden')); document.querySelectorAll('[id^="insuranDrop-"]').forEach(d=>d.classList.add('hidden')); el.classList.toggle('hidden'); }
-function closeBoardDropdown(id){ const el=document.getElementById('boardDrop-'+id); if(el) el.classList.add('hidden'); }
-function toggleStaffDropdown(id){ const el=document.getElementById('staffBoardDrop-'+id); if(!el) return; document.querySelectorAll('[id^="staffBoardDrop-"]').forEach(d=>{ if(d.id!=='staffBoardDrop-'+id) d.classList.add('hidden'); }); document.querySelectorAll('[id^="boardDrop-"]').forEach(d=>d.classList.add('hidden')); document.querySelectorAll('[id^="insuranDrop-"]').forEach(d=>d.classList.add('hidden')); el.classList.toggle('hidden'); }
 function closeStaffDropdown(id){ const el=document.getElementById('staffBoardDrop-'+id); if(el) el.classList.add('hidden'); }
 function toggleInsuranDropdown(id){ const el=document.getElementById('insuranDrop-'+id); if(!el) return; document.querySelectorAll('[id^="insuranDrop-"]').forEach(d=>{ if(d.id!=='insuranDrop-'+id) d.classList.add('hidden'); }); document.querySelectorAll('[id^="boardDrop-"]').forEach(d=>d.classList.add('hidden')); document.querySelectorAll('[id^="staffBoardDrop-"]').forEach(d=>d.classList.add('hidden')); el.classList.toggle('hidden'); }
 function closeInsuranDropdown(id){ const el=document.getElementById('insuranDrop-'+id); if(el) el.classList.add('hidden'); }
@@ -497,8 +493,6 @@ function saveRoomOrder(ids){ localStorage.setItem(getRoomOrderKey(), JSON.string
 var draggedRoomId = window.draggedRoomId || null;
 function handleRoomDragStart(e, roomId){ draggedRoomId=roomId; e.dataTransfer.effectAllowed='move'; e.target.closest('[data-room-id]')?.classList.add('opacity-50'); }
 function handleRoomDragEnd(e){ e.target.closest('[data-room-id]')?.classList.remove('opacity-50'); draggedRoomId=null; }
-function allowDropRoom(e){ e.preventDefault(); e.currentTarget.classList.add('ring-2','ring-[#7A0C2E]/30'); }
-function handleRoomDragLeave(e){ e.currentTarget.classList.remove('ring-2','ring-[#7A0C2E]/30'); }
 async function dropRoomReorder(e, targetRoomId){
   e.preventDefault(); e.currentTarget.classList.remove('ring-2','ring-[#7A0C2E]/30');
   if(!draggedRoomId || draggedRoomId===targetRoomId) return;
@@ -652,29 +646,39 @@ function renderRoomingOverview(rooms){
 
 function renderLocationTabs(){
   const container=document.getElementById('locationTabs'); if(!container) return;
-  const base=['MEKAH','MADINAH','TAIF']; 
-  const all=[...base,...customLocations.filter(l=>!base.includes(l))];
-  // collect all distinct locations from records
-  const allLocFromRecords = new Set();
-  allRoomingRecords.forEach(r=>{ const l=(r.fields['LOKASI / CITY']||'').trim().toUpperCase(); if(l) allLocFromRecords.add(l); });
-  allLocFromRecords.forEach(l=>{ if(!all.includes(l)) all.push(l); });
-  const counts={}; all.forEach(l=>counts[l]=0); 
-  allRoomingRecords.forEach(r=>{ 
-    let l=(r.fields['LOKASI / CITY']||'').trim().toUpperCase(); 
-    if(!l) l='MEKAH'; // default
-    if(counts[l]!==undefined) counts[l]++; 
-    else { counts[l]=1; if(!all.includes(l)) all.push(l); } 
-  });
-  let html=all.map(loc=>{
-    const label=loc; // V24.6 no emoji
-    const c=counts[loc]||0; const active=loc===activeLocation; const isCustom=!['MEKAH','MADINAH','TAIF'].includes(loc);
-    const delBtn=isCustom?`<button onclick="event.stopPropagation(); deleteCustomLocation('${loc}')" class="ml-1 w-4 h-4 rounded-full bg-white/20 hover:bg-red-500 hover:text-white flex items-center justify-center text-[9px]">✕</button>`:'';
-    const wrapCls=active?'bg-[#7A0C2E] rounded-full':'bg-white rounded-full border border-slate-200';
-    return `<div class="inline-flex items-center ${wrapCls}"><button onclick="setActiveLocation('${loc}')" class="px-2.5 py-1 rounded-full text-[11px] font-bold ${active?'text-white':'text-slate-700'}">${label} (${c})</button>${delBtn}</div>`;
-  }).join('');
-  html+=`<button onclick="openAddLocationModal()" class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-slate-100 border border-slate-200 text-slate-600 hover:bg-slate-200">+ Lokasi</button>`;
-  container.innerHTML=html;
+  // Prevent re-entry during rapid clicks
+  if(container.dataset.rendering==='1') return;
+  container.dataset.rendering='1';
+  try {
+    const base=['MEKAH','MADINAH','TAIF']; 
+    const all=[...base,...(window.customLocations||customLocations||[]).filter(l=>!base.includes(l))];
+    const allLocFromRecords = new Set();
+    (window.allRoomingRecords||allRoomingRecords||[]).forEach(r=>{ const l=(r.fields['LOKASI / CITY']||'').trim().toUpperCase(); if(l) allLocFromRecords.add(l); });
+    allLocFromRecords.forEach(l=>{ if(!all.includes(l)) all.push(l); });
+    const counts={}; all.forEach(l=>counts[l]=0); 
+    (window.allRoomingRecords||allRoomingRecords||[]).forEach(r=>{ 
+      let l=(r.fields['LOKASI / CITY']||'').trim().toUpperCase(); 
+      if(!l) l='MEKAH';
+      if(counts[l]!==undefined) counts[l]++; 
+      else { counts[l]=1; if(!all.includes(l)) all.push(l); } 
+    });
+    let html=all.map(loc=>{
+      const label=loc;
+      const c=counts[loc]||0; 
+      const active=loc===(window.activeLocation||activeLocation); 
+      const isCustom=!['MEKAH','MADINAH','TAIF'].includes(loc);
+      const delBtn=isCustom?`<button type="button" onclick="event.stopPropagation(); deleteCustomLocation('${loc}')" class="ml-1 w-4 h-4 rounded-full bg-white/20 hover:bg-red-500 hover:text-white flex items-center justify-center text-[9px]">✕</button>`:''; 
+      const wrapCls=active?'bg-[#7A0C2E] rounded-full':'bg-white rounded-full border border-slate-200';
+      return `<div class="inline-flex items-center ${wrapCls}"><button type="button" data-loc="${loc}" onclick="window.setActiveLocation('${loc}')" class="px-2.5 py-1 rounded-full text-[11px] font-bold ${active?'text-white':'text-slate-700'}">${label} (${c})</button>${delBtn}</div>`;
+    }).join('');
+    html+=`<button type="button" onclick="openAddLocationModal()" class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-slate-100 border border-slate-200 text-slate-600 hover:bg-slate-200">+ Lokasi</button>`;
+    container.innerHTML=html;
+  } finally {
+    setTimeout(()=>{ container.dataset.rendering='0'; }, 100);
+  }
 }
+window.renderLocationTabs = renderLocationTabs;
+
 async function fetchRoomingData(){
   try{
     showRoomingLoading(); 
@@ -1119,8 +1123,28 @@ function renderStaffList(){
 
 
 
-function setActiveLocation(loc){ activeLocation=loc.toUpperCase(); localStorage.setItem('effah_active_location',activeLocation); const el=document.getElementById('copyTargetLoc'); if(el) el.textContent=activeLocation; renderLocationTabs(); renderRoomingGrid(); renderNamelist(); renderStaffList(); }
-function _stopAutoScroll(){ if(_autoScrollInterval){ clearInterval(_autoScrollInterval); _autoScrollInterval=null; } }
+function setActiveLocation(loc){
+  if(!loc) return;
+  const newLoc = loc.toString().toUpperCase();
+  if(window._switchingLocation) return; // debounce
+  window._switchingLocation = true;
+  try {
+    activeLocation = newLoc;
+    window.activeLocation = newLoc;
+    localStorage.setItem('effah_active_location', newLoc);
+    const el=document.getElementById('copyTargetLoc'); if(el) el.textContent=newLoc;
+    if(typeof renderLocationTabs==='function') renderLocationTabs();
+    if(typeof renderRoomingGrid==='function') renderRoomingGrid();
+    if(typeof renderNamelist==='function') renderNamelist();
+    if(typeof renderStaffList==='function') renderStaffList();
+    console.log('Location switched to', newLoc);
+  } finally {
+    setTimeout(()=>{ window._switchingLocation = false; }, 300);
+  }
+}
+window.setActiveLocation = setActiveLocation; // ensure global
+
+function _stopAutoScroll(){ if(_autoScrollInterval){ clearInterval(_autoScrollInterval); _autoScrollInterval=null; window._autoScrollInterval=null; } if(window._autoScrollInterval){ clearInterval(window._autoScrollInterval); window._autoScrollInterval=null; } }
 function _startAutoScroll(){
   if(_autoScrollInterval) return;
   _autoScrollInterval=setInterval(()=>{
@@ -1147,8 +1171,13 @@ function _startAutoScroll(){
   }, 30);
 }
 function allowDrop(e){ e.preventDefault(); window._lastDragY=e.clientY; _startAutoScroll(); }
-document.addEventListener('dragover', (e)=>{ window._lastDragY=e.clientY; _startAutoScroll(); });
-document.addEventListener('dragend', ()=>{ _stopAutoScroll(); });
+if(!window._roomingDragListenersAdded){
+  document.addEventListener('dragover', (e)=>{ window._lastDragY=e.clientY; _startAutoScroll(); });
+  document.addEventListener('dragend', ()=>{ _stopAutoScroll(); });
+  document.addEventListener('drop', ()=>{ _stopAutoScroll(); });
+  window._roomingDragListenersAdded = true;
+  console.log('Drag listeners added once');
+}
 document.addEventListener('drop', ()=>{ _stopAutoScroll(); });
 function dragJemaah(e,jId){ if(isJemaahAssignedInLocation(jId, activeLocation)) return; e.dataTransfer.setData('text/plain',jId); const r=e.currentTarget; if(r) setTimeout(()=>r.style.opacity='0.3',0); }
 function dragEnd(e){ e.currentTarget.style.opacity='1'; }
@@ -1158,14 +1187,6 @@ function dragRoom(e,roomId){
   e.dataTransfer.effectAllowed='move';
   const el=e.currentTarget.closest('[data-room-id]');
   if(el) setTimeout(()=>el.style.opacity='0.4',0);
-}
-function dragStaff(e, staffId){
-  e.dataTransfer.setData('text/plain', staffId);
-  e.dataTransfer.setData('application/x-staff-id', staffId);
-  e.dataTransfer.effectAllowed='move';
-  window._draggedStaffId=staffId;
-  if(e.target) e.target.style.opacity='0.5';
-  console.log('dragStaff', staffId);
 }
 function dropStaffToRoom(e, roomId, isTanpaKatil){
   e.preventDefault();
@@ -1281,18 +1302,6 @@ function removeStaffTanpaKatilFromRoom(roomId, staffId){
     if(base&&pat){
       fetch(`https://api.airtable.com/v0/${base}/ROOMING%20LIST/${roomId}`,{method:'PATCH',headers:{Authorization:`Bearer ${pat}`,'Content-Type':'application/json'},body:JSON.stringify({fields:{'JEMAAH TANPA KATIL': room.fields['JEMAAH TANPA KATIL']||[], 'STAFF LIST (ROOMING)': room.fields['STAFF LIST (ROOMING)']||[], 'STAFF TANPA KATIL': list}})}).catch(()=>{});
     }
-  }
-}
-function removeTanpaKatilFromRoom(roomId, jId){
-  const room=allRoomingRecords.find(r=>r.id===roomId);
-  if(!room) return;
-  const current=room.fields['JEMAAH TANPA KATIL']||[];
-  const newList=current.filter(id=>id!==jId);
-  room.fields['JEMAAH TANPA KATIL']=newList;
-  renderRoomingGrid();
-  const base=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base')||localStorage.getItem('effah_base_id'); const pat=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
-  if(base&&pat){
-    fetch(`https://api.airtable.com/v0/${base}/ROOMING%20LIST/${roomId}`,{method:'PATCH',headers:{Authorization:`Bearer ${pat}`,'Content-Type':'application/json'},body:JSON.stringify({fields:{'JEMAAH TANPA KATIL': newList}})}).catch(()=>{});
   }
 }
 
@@ -1629,22 +1638,6 @@ function openTanpaKatilModal(roomId){
 }
 
 
-function filterTanpaKatilList(q){
-  const list = document.getElementById('tanpaKatilOptions');
-  if(!list || !window._tanpaKatilAvailable) return;
-  const low = (q||'').toLowerCase().trim();
-  const roomId = window._tanpaKatilRoomId;
-  let filtered = window._tanpaKatilAvailable;
-  if(low){
-    filtered = window._tanpaKatilAvailable.filter(j=>{
-      const name = (getJemaahName(j.fields)||'').toLowerCase();
-      const raw = (j.fields['NAMA JEMAAH']||j.fields['NAMA']||'').toLowerCase();
-      return name.includes(low) || raw.includes(low);
-    });
-  }
-  console.log('filter tanpa katil q=', low, 'available', window._tanpaKatilAvailable.length, 'filtered', filtered.length, 'names', filtered.map(j=>getJemaahName(j.fields)));
-  list.innerHTML = filtered.map((j, idx)=>`<button onclick="addTanpaKatilToRoom('${roomId}','${j.id}'); document.getElementById('tanpaKatilSelectorModal').remove()" style="width:100%;text-align:left;padding:8px 10px;border:1px solid #eee;border-radius:10px;margin-bottom:4px;font-size:11px;background:#fff" class="hover:bg-amber-50">${idx+1}. ${getJemaahName(j.fields)}</button>`).join('') || '<div style="padding:8px;text-align:center;color:#999;font-size:11px">Tiada carian ditemui ('+low+') - ada '+window._tanpaKatilAvailable.length+' calon<br>'+window._tanpaKatilAvailable.map(j=>getJemaahName(j.fields)).join(', ')+'</div>';
-}
 
 
 async function addTanpaKatilToRoom(roomId, jId){
@@ -1676,18 +1669,6 @@ function filterTanpaKatilList(q){
   });
 }
 
-async function removeTanpaKatilFromRoom(roomId, jId){
-  const rec=allRoomingRecords.find(r=>r.id===roomId);
-  if(!rec) return;
-  const cur = rec.fields['JEMAAH TANPA KATIL'] || rec.fields['INFANT'] || [];
-  const newVal=cur.filter(x=>x!==jId);
-  rec.fields['JEMAAH TANPA KATIL']=newVal;
-  renderRoomingGrid();
-  renderNamelist();
-  const b=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base')||localStorage.getItem('effah_base_id');
-  const p=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
-  try{ await fetch(`https://api.airtable.com/v0/${b}/ROOMING%20LIST/${roomId}`,{method:'PATCH',headers:{Authorization:`Bearer ${p}`,'Content-Type':'application/json'},body:JSON.stringify({fields:{'JEMAAH TANPA KATIL':newVal}})}); }catch(e){}
-}
 
 function updateNewRoomIdFromCap(){ const cap=parseInt(document.getElementById('newRoomCap').value)||4; const el=document.getElementById('newRoomId'); if(el) el.value=generateRoomIdFromCap(cap); }
 function changeNewRoomCap(d){ const i=document.getElementById('newRoomCap'); let v=parseInt(i.value)||4; v=Math.max(1,Math.min(8,v+d)); i.value=v; updateNewRoomIdFromCap(); }
@@ -2561,11 +2542,11 @@ function isStaffAssignedInLocation(staffId, loc){
   return false;
 }
 
-function isStaffAssignedAny(staffId){ for(const loc of ['MEKAH','MADINAH','TAIF','JEDDAH','JEDDAH','MUMTAZ']){ if(isStaffAssignedInLocation(staffId, loc)) return true; } return false; }
+function isStaffAssignedAny(staffId){ for(const loc of ['MEKAH','MADINAH','TAIF','JEDDAH','MUMTAZ']){ if(isStaffAssignedInLocation(staffId, loc)) return true; } return false; }
 
 
 // FIX REALTIME GREY FOR STAFF TANPA KATIL
-const _origUpdateRoomField = window.updateRoomField;
+if(window._roomingPatched_updateRoomField) { console.log('updateRoomField already patched, skip'); } else { window._roomingPatched_updateRoomField = true; const _origUpdateRoomField = window.updateRoomField;
 window.updateRoomField = async function(roomId, field, value, shouldRender=true){
   // Update local cache instantly
   const rec = (window.allRoomingRecords||[]).find(r=>r.id===roomId||r.airtableId===roomId);
@@ -2592,14 +2573,15 @@ window.updateRoomField = async function(roomId, field, value, shouldRender=true)
 };
 
 // Also patch drop handlers for tanpa katil to trigger instant render
-const _origDropStaff = window.dropStaff;
+if(!window._roomingPatched_dropStaff){ window._roomingPatched_dropStaff=true; const _origDropStaff = window.dropStaff;
 window.dropStaff = function(e, roomId, isTanpaKatil=false){
   if(_origDropStaff) {
     const res = _origDropStaff(e, roomId, isTanpaKatil);
     setTimeout(()=>{ if(typeof renderStaffList==='function') renderStaffList(); if(typeof renderRoomingGrid==='function') renderRoomingGrid(); }, 100);
     return res;
   }
-};
+}; } // end guard dropStaff
+
 
 // Patch remove from tanpa katil
 const _origRemoveStaffFromTanpa = window.removeStaffFromTanpaKatil || window.removeJemaahFromTanpaKatil;
@@ -2612,7 +2594,7 @@ function instantRefreshAfterRemove(){
 }
 
 // Hook all remove functions
-['removeStaffFromRoom','removeStaffFromTanpaKatil','removeJemaahFromTanpaKatil','removeJemaahFromRoom'].forEach(fnName=>{
+if(!window._roomingPatched_remove){ window._roomingPatched_remove=true; ['removeStaffFromRoom','removeStaffFromTanpaKatil','removeJemaahFromTanpaKatil','removeJemaahFromRoom'].forEach(fnName=>{
   const orig = window[fnName];
   if(orig){
     window[fnName] = function(){
