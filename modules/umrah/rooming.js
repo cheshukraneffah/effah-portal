@@ -2705,3 +2705,38 @@ window.toggleBoardDropdown = window.toggleBoardDropdown || toggleBoardDropdown;
 window.closeBoardDropdown = window.closeBoardDropdown || closeBoardDropdown;
 window.toggleInsuranDropdown = window.toggleInsuranDropdown || toggleInsuranDropdown;
 window.closeInsuranDropdown = window.closeInsuranDropdown || closeInsuranDropdown;
+
+
+function handleRoomDragLeave(e){
+  try {
+    const el = e.currentTarget || e.target;
+    if(el && el.classList) el.classList.remove('drag-over','ring-2','ring-[#7A0C2E]','bg-amber-50');
+  } catch(err){}
+  _stopAutoScroll();
+}
+function handleRoomDragEnter(e){
+  try { e.preventDefault(); const el=e.currentTarget; if(el&&el.classList) el.classList.add('drag-over'); } catch(err){}
+  window._lastDragY=e.clientY;
+  _startAutoScroll();
+}
+function allowDropRoom(e){
+  try { e.preventDefault(); } catch(err){}
+  window._lastDragY=e.clientY;
+  _startAutoScroll();
+  const el=e.currentTarget;
+  if(el && el.classList) el.classList.add('drag-over','ring-2');
+}
+function leaveDropRoom(e){
+  handleRoomDragLeave(e);
+}
+function dropRoomReorder(e, roomId){
+  // placeholder - if reordering logic exists, keep
+  if(typeof window.dropRoomReorderOriginal==='function') return window.dropRoomReorderOriginal(e, roomId);
+}
+window.handleRoomDragLeave = handleRoomDragLeave;
+window.handleRoomDragEnter = handleRoomDragEnter;
+window.allowDropRoom = allowDropRoom;
+window.leaveDropRoom = leaveDropRoom;
+window.dropRoomReorder = dropRoomReorder;
+console.log('Drag room handlers injected');
+
