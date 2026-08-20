@@ -275,7 +275,26 @@ function toggleBoardMulti(jemaahId, option){
   if(arr.includes(option)) arr=arr.filter(x=>x!==option); else arr.push(option);
   updateJemaahBoardMulti(jemaahId, arr);
 }
-function clearStaffBoardMulti(staffId){ const s=getStaffById(staffId); if(!s) return; s.boardBasis=[]; s.board=''; if(s.fields) s.fields['BOARD']=''; saveStaffList(); if(typeof renderStaffList==='function') renderStaffList(); }
+function clearStaffBoardMulti(staffId){ 
+  const s=getStaffById(staffId); if(!s) return; 
+  s.boardBasis=[]; s.board=[]; s.boardBasis=''; 
+  if(s.fields) { s.fields['BOARD']=''; s.fields['BOARD BASIS']=''; }
+  if(s.train) { /* keep train if needed? clear only board */ }
+  saveStaffList(); 
+  if(typeof renderStaffList==='function') renderStaffList(); 
+  if(typeof renderRoomingGrid==='function') renderRoomingGrid();
+  const base = window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base')||localStorage.getItem('effah_base_id');
+  const pat = window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
+  if(base&&pat&&s.airtableId){
+    console.log('Clearing BOARD BASIS for', s.name, '-> null');
+    fetch(`https://api.airtable.com/v0/${base}/STAFF%20LIST%20%28ROOMING%29/${s.airtableId}`,{
+      method:'PATCH', headers:{'Authorization':`Bearer ${pat}`,'Content-Type':'application/json'},
+      body: JSON.stringify({fields:{'BOARD BASIS': null}})
+    }).then(r=>r.json()).then(d=>{ console.log('Clear board result', d); if(d.error) alert('Clear failed: '+JSON.stringify(d.error)); }).catch(e=>{ console.error(e); alert('Clear error '+e.message); });
+  }
+}
+window.clearStaffBoardMulti = clearStaffBoardMulti;
+
 function toggleInsuranMulti(jemaahId, option){
   const rec=allRoomingJemaah.find(r=>r.id===jemaahId); if(!rec) return;
   let arr=getInsuranArrayV2(rec.fields);
@@ -916,9 +935,9 @@ function renderNamelist(){
         </select>
       </div>
       
-      <div class="col-span-1 flex items-center gap-0.5">
-        <select onchange="updateJemaahField('${r.id}','STATUS VISA',this.value)" class="text-[7px] border border-slate-200 rounded-full px-1 py-0.5 bg-white max-w-[70px] truncate font-bold text-[7px] ${getVisaClass(getVisaVal(r.fields))}" title="STATUS VISA">
-          <option value="" ${getVisaVal(r.fields)===''?'selected':''}>-</option>
+            <div class="col-span-1 flex items-center justify-center">
+        <select onchange="updateJemaahField('${r.id}','STATUS VISA',this.value)" class="text-[8px] border border-slate-300 rounded-full px-2 py-1 bg-white w-full max-w-[80px] truncate font-bold ${getVisaClass(getVisaVal(r.fields))}" title="STATUS VISA - ${getVisaVal(r.fields)||'-'}">
+          <option value="" ${getVisaVal(r.fields)===''?'selected':''}>- VISA</option>
           <option value="TOURIST" ${getVisaVal(r.fields)==='TOURIST'?'selected':''}>TOURIST</option>
           <option value="TOURIST (VALID)" ${getVisaVal(r.fields)==='TOURIST (VALID)'?'selected':''}>TOURIST (VALID)</option>
           <option value="UMRAH" ${getVisaVal(r.fields)==='UMRAH'?'selected':''}>UMRAH</option>
@@ -1508,6 +1527,23 @@ if(!window._boardDropListener){ window._boardDropListener=true; document.addEven
 function clearBoardMulti(jemaahId){
   updateJemaahBoardMulti(jemaahId, []);
 }
+function clearBoardMulti_FIXED(jemaahId){
+  const rec = allRoomingJemaah.find(r=>r.id===jemaahId);
+  if(!rec) return;
+  rec.fields['BOARD'] = '';
+  rec.fields['BOARD BASIS'] = '';
+  if(typeof renderNamelist==='function') renderNamelist();
+  const base = window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base')||localStorage.getItem('effah_base_id');
+  const pat = window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
+  if(base&&pat){
+    fetch(`https://api.airtable.com/v0/${base}/DATA%20JEMAAH%20UMRAH/${jemaahId}`,{
+      method:'PATCH', headers:{'Authorization':`Bearer ${pat}`,'Content-Type':'application/json'},
+      body: JSON.stringify({fields:{'BOARD': null, 'BOARD BASIS': null}})
+    }).then(r=>r.json()).then(d=>console.log('Clear jemaah board', d)).catch(e=>console.error(e));
+  }
+}
+window.clearBoardMulti = clearBoardMulti_FIXED;
+
 
 async function updateJemaahCheckbox(jemaahId, field, checked){
   const base=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base')||localStorage.getItem('effah_base_id'); const pat=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
@@ -1816,7 +1852,7 @@ function generateRoomingPrint(orientation){ orientation = orientation || 'landsc
         }).join('');
       }
       
-      return `<tr><td style="border:1px solid #ddd;padding:3px 6px;text-align:center">${i+1}</td><td style="border:1px solid #ddd;padding:3px 6px;font-weight:600">${name}</td><td style="border:1px solid #ddd;padding:3px 6px;text-align:center">${fbBadge}</td><td style="border:1px solid #ddd;padding:3px 6px;text-align:center">${train}</td><td style="border:1px solid #ddd;padding:3px 6px;text-align:center">${pakej}</td><td style="border:1px solid #ddd;padding:3px 6px;text-align:center">${insHtml}</td></tr>`;
+      return `<tr><td style="border:1px solid #ddd;padding:3px 6px;text-align:center">${i+1}</td><td style="border:1px solid #ddd;padding:3px 6px;font-weight:600">${name}</td><td style="border:1px solid #ddd;padding:3px 6px;text-align:center">${fbBadge}</td><td style="border:1px solid #ddd;padding:3px 6px;text-align:center">${train}</td><td style="border:1px solid #ddd;padding:3px 6px;text-align:center">${pakej}</td><td style="border:1px solid #ddd;padding:3px 6px;text-align:center">${insHtml}</td><td style="border:1px solid #ddd;padding:3px 6px;text-align:center;font-size:8px;font-weight:bold">${getVisaVal(f)||'-'}</td></tr>`;
     }).join('');
     // --- STAFF IN NAMELIST (S1, S2...) ---
     const allStaffForPrint = [];
@@ -2144,7 +2180,7 @@ function generateRoomingPrint(orientation){ orientation = orientation || 'landsc
     const namelistOverviewHTML = '<div style="margin-top:12px;border:1px solid #000;padding:8px 10px;background:#f9fafb"><div style="font-weight:bold;font-size:10px;margin-bottom:6px">RINGKASAN NAMELIST</div><div style="display:flex;gap:20px;font-size:9px;flex-wrap:wrap"><div><b>Bilangan Speedtrain:</b> ' + trainCount + ' orang</div><div><b>Bilangan Insuran:</b> ' + totalInsuranUnique + ' orang</div><div><b>Total Jemaah:</b> ' + allRoomingJemaah.length + ' orang</div><div><b>Total Staff:</b> ' + staffCountPrint + ' orang</div><div><b>Grand Total:</b> ' + (allRoomingJemaah.length + staffCountPrint) + ' ( ' + allRoomingJemaah.length + ' Jemaah + ' + staffCountPrint + ' Staff )</div></div></div>';
 
     const html=`<html><head><title>Rooming ${tripName} - ${orientation}</title><style>body{font-family:Arial,Helvetica,sans-serif;font-size:10px;margin:12px;color:#000}table{border-collapse:collapse;width:100%}th,td{border:1px solid #000;padding:4px 6px;font-size:9px}th{background:#7A0C2E;color:#fff;font-weight:bold;text-transform:uppercase}.header{display:flex;justify-content:space-between;font-weight:bold;font-size:12px;border-bottom:2px solid #000;padding-bottom:6px;margin-bottom:8px}.page-break{page-break-before:always}.namelist-page{max-width:900px;margin:0 auto}.location-page{max-width:100%}@media print{@page{size:A4 ${orientation};margin:${orientation==='portrait' ? '8mm' : '10mm'}}body{-webkit-print-color-adjust:exact;print-color-adjust:exact}.page-break{page-break-before:always}}</style></head><body>
-      <div class="namelist-page"><div class="header"><span>NAMELIST ${tripName}</span><span>Total: ${allRoomingJemaah.length} Jemaah + ${combinedStaff.length} Staff</span></div><div style="font-size:9px;margin-bottom:8px"><b>Trip:</b> ${tripName} | <b>Tarikh Cetak:</b> ${new Date().toLocaleDateString('ms-MY')} | <b>Orientasi:</b> ${orientation.toUpperCase()}</div><table style="table-layout:fixed"><colgroup><col style="width:32px"><col style="width:44%"><col style="width:110px"><col style="width:52px"><col style="width:62px"><col style="width:90px"></colgroup><tr><th>NO</th><th style="text-align:left">NAMA JEMAAH</th><th>BOARD</th><th>TRAIN</th><th>PAKEJ</th><th>INSURAN</th></tr>${namelistRows}</table>${namelistOverviewHTML}</div>
+      <div class="namelist-page"><div class="header"><span>NAMELIST ${tripName}</span><span>Total: ${allRoomingJemaah.length} Jemaah + ${combinedStaff.length} Staff</span></div><div style="font-size:9px;margin-bottom:8px"><b>Trip:</b> ${tripName} | <b>Tarikh Cetak:</b> ${new Date().toLocaleDateString('ms-MY')} | <b>Orientasi:</b> ${orientation.toUpperCase()}</div><table style="table-layout:fixed"><colgroup><col style="width:28px"><col style="width:38%"><col style="width:90px"><col style="width:45px"><col style="width:55px"><col style="width:70px"><col style="width:70px"></colgroup><tr><th>NO</th><th style="text-align:left">NAMA JEMAAH</th><th>BOARD</th><th>TRAIN</th><th>PAKEJ</th><th>INSURAN</th><th>VISA</th></tr>${namelistRows}</table>${namelistOverviewHTML}</div>
       ${locationPages||'<div style="page-break-before:always"><div style="border:1px dashed #000;padding:20px;text-align:center">Tiada bilik untuk trip ini</div></div>'}
       <script>window.onload=function(){setTimeout(()=>window.print(),600)}; window.onafterprint=function(){window.close();}; setTimeout(()=>{try{window.close();}catch(e){}},3500);<\/script>
     </body></html>`;
