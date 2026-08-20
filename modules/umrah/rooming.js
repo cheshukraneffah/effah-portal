@@ -2562,3 +2562,65 @@ function isStaffAssignedInLocation(staffId, loc){
 }
 
 function isStaffAssignedAny(staffId){ for(const loc of ['MEKAH','MADINAH','TAIF','JEDDAH','JEDDAH','MUMTAZ']){ if(isStaffAssignedInLocation(staffId, loc)) return true; } return false; }
+
+
+// FIX REALTIME GREY FOR STAFF TANPA KATIL
+const _origUpdateRoomField = window.updateRoomField;
+window.updateRoomField = async function(roomId, field, value, shouldRender=true){
+  // Update local cache instantly
+  const rec = (window.allRoomingRecords||[]).find(r=>r.id===roomId||r.airtableId===roomId);
+  if(rec){
+    if(!rec.fields) rec.fields={};
+    rec.fields[field]=value;
+    // If staff assigned to tanpa katil, also ensure staffList roomIds updated
+    if(field==='JEMAAH TANPA KATIL' || field==='STAFF / EXTRA' || field==='STAFF' || field==='STAFF TANPA KATIL' || field==='TANPA KATIL'){
+      // Trigger instant grey
+      if(typeof renderStaffList==='function') setTimeout(()=>renderStaffList(), 50);
+      if(typeof renderNamelist==='function') setTimeout(()=>renderNamelist(), 50);
+    }
+  }
+  if(_origUpdateRoomField) return _origUpdateRoomField(roomId, field, value, shouldRender);
+  // Fallback fetch
+  const base = window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base');
+  const pat = window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
+  if(base&&pat){
+    fetch(`https://api.airtable.com/v0/${base}/ROOMING%20LIST/${roomId}`,{
+      method:'PATCH', headers:{'Authorization':'Bearer '+pat,'Content-Type':'application/json'},
+      body: JSON.stringify({fields:{[field]: value}})
+    }).then(()=>{ if(shouldRender){ renderRoomingGrid(); renderStaffList(); renderNamelist(); } }).catch(()=>{});
+  }
+};
+
+// Also patch drop handlers for tanpa katil to trigger instant render
+const _origDropStaff = window.dropStaff;
+window.dropStaff = function(e, roomId, isTanpaKatil=false){
+  if(_origDropStaff) {
+    const res = _origDropStaff(e, roomId, isTanpaKatil);
+    setTimeout(()=>{ if(typeof renderStaffList==='function') renderStaffList(); if(typeof renderRoomingGrid==='function') renderRoomingGrid(); }, 100);
+    return res;
+  }
+};
+
+// Patch remove from tanpa katil
+const _origRemoveStaffFromTanpa = window.removeStaffFromTanpaKatil || window.removeJemaahFromTanpaKatil;
+function instantRefreshAfterRemove(){
+  setTimeout(()=>{ 
+    if(typeof renderStaffList==='function') renderStaffList(); 
+    if(typeof renderNamelist==='function') renderNamelist();
+    if(typeof renderRoomingGrid==='function') renderRoomingGrid();
+  }, 100);
+}
+
+// Hook all remove functions
+['removeStaffFromRoom','removeStaffFromTanpaKatil','removeJemaahFromTanpaKatil','removeJemaahFromRoom'].forEach(fnName=>{
+  const orig = window[fnName];
+  if(orig){
+    window[fnName] = function(){
+      const res = orig.apply(this, arguments);
+      instantRefreshAfterRemove();
+      return res;
+    };
+  }
+});
+
+console.log('REALTIME GREY FIX FOR STAFF TANPA KATIL ACTIVE');
