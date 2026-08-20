@@ -898,8 +898,8 @@ function renderNamelist(){
       <div class="col-span-3 flex items-center gap-0.5 flex-wrap justify-center">
         ${insToggle}
       </div>
-      <div class="col-span-1 flex items-center gap-0.5" id="pakejCellWrapper-${r.id}">
-        <div id="pakejCell-${r.id}" class="w-full"></div><select style="display:none" onchange="updateJemaahField('${r.id}','PAKEJ',this.value)" class="text-[9px] border border-slate-200 rounded-full px-2 py-1 bg-white">
+      <div class="col-span-1 flex items-center gap-0.5">
+        <select onchange="updateJemaahField('${r.id}','PAKEJ',this.value)" class="text-[9px] border border-slate-200 rounded-full px-2 py-1 bg-white">
           <option value="-" ${pk==='-'?'selected':''}>-</option>
           <option value="JIMAT STANDARD" ${pk==='JIMAT STANDARD'?'selected':''}>JIMAT STANDARD</option>
           <option value="JIMAT PREMIUM" ${pk==='JIMAT PREMIUM'?'selected':''}>JIMAT PREMIUM</option>
@@ -1065,7 +1065,7 @@ const emptyCount=Math.max(0,cap-count); const emptySlots=Array.from({length:empt
         <button onclick="deleteRoom('${rec.id}','${roomId}')" class="w-6 h-6 rounded-full bg-slate-50 hover:bg-red-50 border text-[10px] shrink-0"><i class="fa-solid fa-trash"></i></button>
       </div>
       <div class="flex items-center gap-1.5 text-[10px]">
-        <div class="flex items-center gap-1 px-2.5 py-1 bg-slate-50 rounded-full border"><div id="hotelPakejContainer-${rec.id}" data-pakej="${pakej}" class="hotelPakejWrapper"></div><select style="display:none" onchange="updateRoomField('${rec.id}','PAKEJ / HOTEL',this.value)" class="text-[10px] border border-slate-200 rounded-full px-2 py-1 bg-white font-bold">
+        <div class="flex items-center gap-1 px-2.5 py-1 bg-slate-50 rounded-full border"><select onchange="updateRoomField('${rec.id}','PAKEJ / HOTEL',this.value)" class="text-[10px] border border-slate-200 rounded-full px-2 py-1 bg-white font-bold">
           <option value="JIMAT STANDARD" ${pakej==='JIMAT STANDARD'?'selected':''}>JIMAT STANDARD</option>
           <option value="JIMAT PREMIUM" ${pakej==='JIMAT PREMIUM'?'selected':''}>JIMAT PREMIUM</option>
           <option value="EKONOMI LITE" ${pakej==='EKONOMI LITE'?'selected':''}>EKONOMI LITE</option>
@@ -2657,341 +2657,160 @@ window.addTanpaKatilToRoom = async function(roomId, jemaahId){
 console.log('V106 LOADED');
 
 
-// V108 - BOARD BASIS MULTIPLE SELECT STAY OPEN + FIX 403 handling
+// V109 MINIMAL FIX - BOARD MULTIPLE SELECT STAY OPEN, NO CRASH
 
-const PAKEJ_ORDER_V108 = ['JIMAT EKONOMI','JIMAT STANDARD','JIMAT PREMIUM','EKONOMI LITE','EKONOMI','STANDARD','PREMIUM','PREMIUM PLUS'];
-const PAKEJ_COLORS_V108 = {
-  'JIMAT EKONOMI': '#E8E8E8',
-  'JIMAT STANDARD': '#FFF8DC',
-  'JIMAT PREMIUM': '#FFE4D6',
-  'EKONOMI LITE': '#FFD6E7',
-  'EKONOMI': '#DBEAFE',
-  'STANDARD': '#D1FAE5',
-  'PREMIUM': '#BFDBFE',
-  'PREMIUM PLUS': '#F3E8FF'
-};
-
-function closeAllDropdowns_V108(){
+function closeAllDropdowns_V109(){
   document.querySelectorAll('[id^="boardDrop-"]').forEach(el=>el.classList.add('hidden'));
+}
+
+function toggleBoardDropdown_V109(jId){
+  const drop = document.getElementById('boardDrop-'+jId);
+  if(!drop) return;
+  const isHidden = drop.classList.contains('hidden');
+  document.querySelectorAll('[id^="boardDrop-"]').forEach(el=>{ if(el.id!==`boardDrop-${jId}`) el.classList.add('hidden'); });
   document.querySelectorAll('[id^="pakejDrop-"]').forEach(el=>el.classList.add('hidden'));
   document.querySelectorAll('[id^="hotelPakejDrop-"]').forEach(el=>el.classList.add('hidden'));
-  document.querySelectorAll('[id^="insuranDrop-"]').forEach(el=>el.classList.add('hidden'));
-  document.querySelectorAll('[id^="staffBoardDrop-"]').forEach(el=>el.classList.add('hidden'));
+  if(isHidden) drop.classList.remove('hidden');
+  else {
+    drop.classList.add('hidden');
+    // Save on close
+    if(typeof renderNamelist==='function') setTimeout(()=>renderNamelist(), 10);
+  }
 }
-
-// BOARD - MULTIPLE SELECT WITHOUT RE-RENDER
-function toggleBoardDropdown_V108(jId){
-  const drop = document.getElementById('boardDrop-'+jId);
-  const isHidden = drop ? drop.classList.contains('hidden') : true;
-  closeAllDropdowns_V108();
-  if(drop && isHidden) drop.classList.remove('hidden');
-}
-window.toggleBoardDropdown = toggleBoardDropdown_V108;
+window.toggleBoardDropdown = toggleBoardDropdown_V109;
 
 function closeBoardDropdown(jId){
   const drop = document.getElementById('boardDrop-'+jId);
   if(drop) drop.classList.add('hidden');
-  // Only render when closing
-  renderNamelist();
+  if(typeof renderNamelist==='function') setTimeout(()=>renderNamelist(), 10);
 }
 window.closeBoardDropdown = closeBoardDropdown;
 
-function toggleBoardMulti_V108(jId, boardVal){
-  const jRec = (window.allRoomingJemaah||[]).find(j=>j.id===jId);
-  if(jRec){
-    if(!jRec.fields['BOARD BASIS']) jRec.fields['BOARD BASIS']=[];
-    if(!Array.isArray(jRec.fields['BOARD BASIS'])) jRec.fields['BOARD BASIS']=[jRec.fields['BOARD BASIS']].filter(Boolean);
-    const idx = jRec.fields['BOARD BASIS'].indexOf(boardVal);
-    if(idx>=0) jRec.fields['BOARD BASIS'].splice(idx,1); else jRec.fields['BOARD BASIS'].push(boardVal);
-    // Update checkbox UI without re-rendering whole list
-    const drop = document.getElementById('boardDrop-'+jId);
-    if(drop){
-      // Update the checkboxes checked state
-      const checkboxes = drop.querySelectorAll('input[type="checkbox"]');
-      checkboxes.forEach(cb=>{
-        const val = cb.getAttribute('onchange')?.match(/'([^']+)'/g)?.[1]?.replace(/'/g,'');
-        // Simpler: check if boardVal is in array
-        if(cb.getAttribute('onchange')?.includes(boardVal)){
-          cb.checked = jRec.fields['BOARD BASIS'].includes(boardVal);
+// Board multi - stay open, no re-render until OK or outside
+function toggleBoardMulti_V109(jId, boardVal){
+  try{
+    const jRec = (window.allRoomingJemaah||[]).find(j=>j.id===jId);
+    if(jRec){
+      if(!jRec.fields) jRec.fields={};
+      if(!jRec.fields['BOARD BASIS']) jRec.fields['BOARD BASIS']=[];
+      if(!Array.isArray(jRec.fields['BOARD BASIS'])) jRec.fields['BOARD BASIS']=[jRec.fields['BOARD BASIS']].filter(Boolean);
+      const idx = jRec.fields['BOARD BASIS'].indexOf(boardVal);
+      if(idx>=0) jRec.fields['BOARD BASIS'].splice(idx,1); else jRec.fields['BOARD BASIS'].push(boardVal);
+      
+      // Update UI without full re-render - just checkbox and button
+      const drop = document.getElementById('boardDrop-'+jId);
+      if(drop){
+        // Find checkbox for this value and update
+        const labels = drop.querySelectorAll('label');
+        labels.forEach(label=>{
+          const input = label.querySelector('input');
+          if(!input) return;
+          const onchange = input.getAttribute('onchange')||'';
+          if(onchange.includes(boardVal)){
+            input.checked = jRec.fields['BOARD BASIS'].includes(boardVal);
+          }
+        });
+        drop.classList.remove('hidden'); // stay open
+      }
+      // Update button text in place
+      const allButtons = document.querySelectorAll(`button[onclick*="toggleBoardDropdown_V109('${jId}')"], button[onclick*="toggleBoardDropdown('${jId}')"]`);
+      allButtons.forEach(btn=>{
+        const span = btn.querySelector('span.truncate');
+        if(span){
+          const display = jRec.fields['BOARD BASIS'].length ? jRec.fields['BOARD BASIS'].join(', ') : '-';
+          span.textContent = display;
         }
       });
-      // Update button text
-      const btn = document.querySelector(`button[onclick*="toggleBoardDropdown_V108('${jId}')"]`);
-      if(btn){
-        const display = jRec.fields['BOARD BASIS'].length ? jRec.fields['BOARD BASIS'].join(', ') : '-';
-        btn.querySelector('span.truncate').textContent = display;
-        // Update color
-        let cls = 'bg-white border-slate-200';
-        if(jRec.fields['BOARD BASIS'].some(x=>x.includes('MEKAH'))) cls='bg-orange-100 border-orange-200 text-orange-800';
-        else if(jRec.fields['BOARD BASIS'].some(x=>x.includes('MADINAH'))) cls='bg-blue-100 border-blue-200 text-blue-800';
-        else if(jRec.fields['BOARD BASIS'].includes('FULLBOARD')) cls='bg-emerald-100 border-emerald-200 text-emerald-800';
-        btn.className = `text-[8px] border rounded-full px-2 py-1 font-bold outline-none w-full truncate text-left flex items-center justify-between ${cls}`;
+      
+      // PATCH to Airtable in background
+      const base=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base');
+      const pat=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
+      if(base&&pat){
+        fetch(`https://api.airtable.com/v0/${base}/JEMAAH/${jId}`,{
+          method:'PATCH', headers:{'Authorization':`Bearer ${pat}`,'Content-Type':'application/json'},
+          body: JSON.stringify({fields:{'BOARD BASIS': jRec.fields['BOARD BASIS']}})
+        }).then(r=>{
+          console.log('V109 board toggle', r.status, jRec.fields['BOARD BASIS']);
+          if(r.status===403) console.error('403 Forbidden - PAT no write to JEMAAH');
+        }).catch(e=>console.error(e));
       }
+    } else {
+      // Staff
+      const sRec = (window.staffList||[]).find(s=>s.id===jId||s.airtableId===jId);
+      if(sRec){
+        if(!sRec.board) sRec.board=[];
+        const idx = sRec.board.indexOf(boardVal);
+        if(idx>=0) sRec.board.splice(idx,1); else sRec.board.push(boardVal);
+        sRec.boardBasis = sRec.board.filter(b=>b!=='TRAIN');
+        try{ localStorage.setItem('effah_staff_board_'+jId, JSON.stringify(sRec.board)); }catch(e){}
+        const drop = document.getElementById('boardDrop-'+jId);
+        if(drop) drop.classList.remove('hidden');
+        const base=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base');
+        const pat=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
+        if(base&&pat&&sRec.airtableId){
+          fetch(`https://api.airtable.com/v0/${base}/STAFF%20LIST%20%28ROOMING%29/${sRec.airtableId}`,{
+            method:'PATCH', headers:{'Authorization':`Bearer ${pat}`,'Content-Type':'application/json'},
+            body: JSON.stringify({fields:{'BOARD BASIS': sRec.boardBasis}})
+          }).then(r=>console.log('V109 staff board', r.status, sRec.boardBasis));
+        }
+      }
+    }
+  }catch(e){
+    console.error('V109 toggleBoardMulti error', e);
+  }
+}
+window.toggleBoardMulti = toggleBoardMulti_V109;
+
+function clearBoardMulti_V109(jId){
+  try{
+    const jRec = (window.allRoomingJemaah||[]).find(j=>j.id===jId);
+    if(jRec){
+      if(!jRec.fields) jRec.fields={};
+      jRec.fields['BOARD BASIS']=[];
+    }
+    const sRec = (window.staffList||[]).find(s=>s.id===jId||s.airtableId===jId);
+    if(sRec){
+      sRec.board = sRec.train ? ['TRAIN'] : [];
+      sRec.boardBasis = [];
+      try{ localStorage.setItem('effah_staff_board_'+jId, JSON.stringify(sRec.board)); }catch(e){}
+      if(typeof saveStaffList==='function') try{saveStaffList();}catch(e){}
+    }
+    const drop = document.getElementById('boardDrop-'+jId);
+    if(drop){
+      drop.querySelectorAll('input[type="checkbox"]').forEach(cb=>cb.checked=false);
       drop.classList.remove('hidden'); // stay open
     }
-    // PATCH to Airtable - background
+    document.querySelectorAll(`button[onclick*="${jId}"]`).forEach(btn=>{
+      const span = btn.querySelector('span.truncate');
+      if(span && btn.innerHTML.includes('BOARD')) span.textContent='-';
+    });
     const base=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base');
     const pat=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
     if(base&&pat){
-      fetch(`https://api.airtable.com/v0/${base}/JEMAAH/${jId}`,{
+      const idToPatch = jRec ? jId : (sRec?.airtableId||jId);
+      const table = jRec ? 'JEMAAH' : 'STAFF%20LIST%20%28ROOMING%29';
+      fetch(`https://api.airtable.com/v0/${base}/${table}/${idToPatch}`,{
         method:'PATCH', headers:{'Authorization':`Bearer ${pat}`,'Content-Type':'application/json'},
-        body: JSON.stringify({fields:{'BOARD BASIS': jRec.fields['BOARD BASIS']}})
-      }).then(async r=>{
-        console.log('V108 board toggle', r.status, jRec.fields['BOARD BASIS']);
-        if(r.status===403){
-          const j = await r.json();
-          console.error('403 Forbidden BOARD BASIS - token takde write permission ke table JEMAAH. Check PAT scope data.records:write');
-          alert('BOARD BASIS tak save ke Airtable: 403 Forbidden. Token PAT takde permission write. Board still 2 locally, tapi lepas refresh hilang. Sila update PAT scope.');
-        }
-      });
+        body: JSON.stringify({fields:{'BOARD BASIS': []}})
+      }).then(r=>console.log('V109 clear board', r.status));
     }
-  } else {
-    // Staff
-    const sRec = (window.staffList||[]).find(s=>s.id===jId||s.airtableId===jId);
-    if(sRec){
-      if(!sRec.board) sRec.board=[];
-      const idx = sRec.board.indexOf(boardVal);
-      if(idx>=0) sRec.board.splice(idx,1); else sRec.board.push(boardVal);
-      sRec.boardBasis = sRec.board.filter(b=>b!=='TRAIN');
-      try{ localStorage.setItem('effah_staff_board_'+jId, JSON.stringify(sRec.board)); }catch(e){}
-      const drop = document.getElementById('boardDrop-'+jId);
-      if(drop) drop.classList.remove('hidden');
-      const base=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base');
-      const pat=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
-      if(base&&pat&&sRec.airtableId){
-        fetch(`https://api.airtable.com/v0/${base}/STAFF%20LIST%20%28ROOMING%29/${sRec.airtableId}`,{
-          method:'PATCH', headers:{'Authorization':`Bearer ${pat}`,'Content-Type':'application/json'},
-          body: JSON.stringify({fields:{'BOARD BASIS': sRec.boardBasis}})
-        }).then(r=>console.log('V108 staff board', r.status, sRec.boardBasis));
-      }
-    }
-  }
+  }catch(e){ console.error(e); }
 }
-window.toggleBoardMulti = toggleBoardMulti_V108;
+window.clearBoardMulti = clearBoardMulti_V109;
 
-function clearBoardMulti_V108(jId){
-  const jRec = (window.allRoomingJemaah||[]).find(j=>j.id===jId);
-  if(jRec) jRec.fields['BOARD BASIS']=[];
-  const sRec = (window.staffList||[]).find(s=>s.id===jId||s.airtableId===jId);
-  if(sRec){
-    sRec.board = sRec.train ? ['TRAIN'] : [];
-    sRec.boardBasis = [];
-    try{ localStorage.setItem('effah_staff_board_'+jId, JSON.stringify(sRec.board)); }catch(e){}
-    if(typeof saveStaffList==='function') try{saveStaffList();}catch(e){}
-  }
-  // Update UI without full re-render first
-  const drop = document.getElementById('boardDrop-'+jId);
-  if(drop){
-    drop.querySelectorAll('input[type="checkbox"]').forEach(cb=>cb.checked=false);
-    drop.classList.remove('hidden'); // stay open
-  }
-  const btn = document.querySelector(`button[onclick*="toggleBoardDropdown_V108('${jId}')"]`);
-  if(btn){
-    btn.querySelector('span.truncate').textContent='-';
-    btn.className='text-[8px] border rounded-full px-2 py-1 font-bold bg-white border-slate-200 border-dashed text-slate-400 outline-none w-full truncate text-left flex items-center justify-between';
-  }
-  const base=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base');
-  const pat=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
-  if(base&&pat){
-    const idToPatch = jRec ? jId : (sRec?.airtableId||jId);
-    const table = jRec ? 'JEMAAH' : 'STAFF%20LIST%20%28ROOMING%29';
-    fetch(`https://api.airtable.com/v0/${base}/${table}/${idToPatch}`,{
-      method:'PATCH', headers:{'Authorization':`Bearer ${pat}`,'Content-Type':'application/json'},
-      body: JSON.stringify({fields:{'BOARD BASIS': []}})
-    }).then(r=>console.log('V108 clear board', r.status));
-  }
-  // Don't re-render immediately, stay open
-}
-window.clearBoardMulti = clearBoardMulti_V108;
-
-// PAKEJ - keep same as V107 but with stay open
-function togglePakejDropdown_V108(jId){
-  const drop = document.getElementById('pakejDrop-'+jId);
-  const isHidden = drop ? drop.classList.contains('hidden') : true;
-  closeAllDropdowns_V108();
-  if(drop && isHidden) drop.classList.remove('hidden');
-}
-window.togglePakejDropdown = togglePakejDropdown_V108;
-function closePakejDropdown_V108(jId){
-  const drop = document.getElementById('pakejDrop-'+jId);
-  if(drop) drop.classList.add('hidden');
-  renderNamelist();
-}
-window.closePakejDropdown = closePakejDropdown_V108;
-function selectPakej_V108(jId, pakej){
-  const jRec = (window.allRoomingJemaah||[]).find(j=>j.id===jId);
-  if(jRec) jRec.fields['PAKEJ']=pakej;
-  const drop = document.getElementById('pakejDrop-'+jId);
-  const wasOpen = drop && !drop.classList.contains('hidden');
-  renderNamelist();
-  const newDrop = document.getElementById('pakejDrop-'+jId);
-  if(newDrop && wasOpen) newDrop.classList.remove('hidden');
-  const base=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base');
-  const pat=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
-  if(base&&pat&&jRec){
-    fetch(`https://api.airtable.com/v0/${base}/JEMAAH/${jId}`,{
-      method:'PATCH', headers:{'Authorization':`Bearer ${pat}`,'Content-Type':'application/json'},
-      body: JSON.stringify({fields:{'PAKEJ': pakej}})
-    }).then(r=>console.log('pakej saved', r.status));
-  }
-}
-window.selectPakej = selectPakej_V108;
-function clearPakej_V108(jId){
-  const jRec = (window.allRoomingJemaah||[]).find(j=>j.id===jId);
-  if(jRec) jRec.fields['PAKEJ']='';
-  renderNamelist();
-  const base=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base');
-  const pat=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
-  if(base&&pat){
-    fetch(`https://api.airtable.com/v0/${base}/JEMAAH/${jId}`,{
-      method:'PATCH', headers:{'Authorization':`Bearer ${pat}`,'Content-Type':'application/json'},
-      body: JSON.stringify({fields:{'PAKEJ': ''}})
-    });
-  }
-}
-window.clearPakej = clearPakej_V108;
-
-// HOTEL PAKEJ
-function toggleHotelPakejDropdown_V108(roomId){
-  const drop = document.getElementById('hotelPakejDrop-'+roomId);
-  const isHidden = drop ? drop.classList.contains('hidden') : true;
-  closeAllDropdowns_V108();
-  if(drop && isHidden) drop.classList.remove('hidden');
-}
-window.toggleHotelPakejDropdown = toggleHotelPakejDropdown_V108;
-function closeHotelPakejDropdown_V108(roomId){
-  const drop = document.getElementById('hotelPakejDrop-'+roomId);
-  if(drop) drop.classList.add('hidden');
-  renderRoomingGrid();
-}
-window.closeHotelPakejDropdown = closeHotelPakejDropdown_V108;
-function selectHotelPakej_V108(roomId, pakej){
-  const room = (window.allRoomingRecords||[]).find(r=>r.id===roomId);
-  if(room) room.fields['PAKEJ / HOTEL']=pakej;
-  const drop = document.getElementById('hotelPakejDrop-'+roomId);
-  const wasOpen = drop && !drop.classList.contains('hidden');
-  renderRoomingGrid();
-  const newDrop = document.getElementById('hotelPakejDrop-'+roomId);
-  if(newDrop && wasOpen) newDrop.classList.remove('hidden');
-  const base=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base');
-  const pat=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
-  if(base&&pat&&room){
-    fetch(`https://api.airtable.com/v0/${base}/ROOMING%20LIST/${roomId}`,{
-      method:'PATCH', headers:{'Authorization':`Bearer ${pat}`,'Content-Type':'application/json'},
-      body: JSON.stringify({fields:{'PAKEJ / HOTEL': pakej}})
-    }).then(r=>console.log('hotel pakej saved', r.status));
-  }
-}
-window.selectHotelPakej = selectHotelPakej_V108;
-
-// Outside click
-document.removeEventListener('click', window._v108Handler);
-window._v108Handler = function(e){
-  const isBtn = e.target.closest('button[onclick*="toggleBoardDropdown"]') || e.target.closest('button[onclick*="togglePakejDropdown"]') || e.target.closest('button[onclick*="toggleHotelPakejDropdown"]') || e.target.closest('button[onclick*="toggleInsuranDropdown"]');
-  const isInside = e.target.closest('[id^="boardDrop-"]') || e.target.closest('[id^="pakejDrop-"]') || e.target.closest('[id^="hotelPakejDrop-"]') || e.target.closest('[id^="insuranDrop-"]');
+// Outside click - close and then render
+document.removeEventListener('click', window._v109Outside);
+window._v109Outside = function(e){
+  const isBtn = e.target.closest('button[onclick*="toggleBoardDropdown"]');
+  const isInside = e.target.closest('[id^="boardDrop-"]');
   if(!isBtn && !isInside){
-    // Close all and render to save
-    const openBoard = document.querySelector('[id^="boardDrop-"]:not(.hidden)');
-    if(openBoard){
-      const jId = openBoard.id.replace('boardDrop-','');
-      closeBoardDropdown(jId);
-    } else {
-      closeAllDropdowns_V108();
+    const open = document.querySelector('[id^="boardDrop-"]:not(.hidden)');
+    if(open){
+      open.classList.add('hidden');
+      if(typeof renderNamelist==='function') setTimeout(()=>renderNamelist(), 10);
     }
   }
 };
-document.addEventListener('click', window._v108Handler);
+document.addEventListener('click', window._v109Outside);
 
-// Override renderNamelist to use new logic
-const origRenderNamelist_V108 = window.renderNamelist;
-window.renderNamelist = function(){
-  const cont=document.getElementById('namelistContainer'); if(!cont) return;
-  const q=(document.getElementById('searchRoomingJemaah')?.value||'').toLowerCase();
-  const pakejFilter=(document.getElementById('filterPakejRooming')?.value||'').toUpperCase();
-  let filtered=[...allRoomingJemaah];
-  if(q) filtered=filtered.filter(r=> (typeof getJemaahName==='function'? getJemaahName(r.fields) : '').toLowerCase().includes(q));
-  if(pakejFilter) filtered=filtered.filter(r=> (r.fields['PAKEJ']||'').toUpperCase()===pakejFilter);
-  if(typeof roomingSortActive!=='undefined' && roomingSortActive){
-    filtered.sort((a,b)=>{
-      const nameA=(typeof getJemaahName==='function'? getJemaahName(a.fields) : '').toUpperCase();
-      const nameB=(typeof getJemaahName==='function'? getJemaahName(b.fields) : '').toUpperCase();
-      if((typeof roomingSortDir!=='undefined'? roomingSortDir : 'asc')==='asc') return nameA.localeCompare(nameB);
-      else return nameB.localeCompare(nameA);
-    });
-  }
-  cont.innerHTML=filtered.map((r,i)=>{
-    const name=typeof getJemaahName==='function'? getJemaahName(r.fields) : '-';
-    const assignedNormalInLoc=typeof isJemaahAssignedInLocation==='function'? isJemaahAssignedInLocation(r.id, activeLocation) : false;
-    const assignedTanpaInLoc=allRoomingRecords.some(rec=> (rec.fields['LOKASI / CITY']||'MEKAH').toUpperCase()===(typeof activeLocation!=='undefined'? activeLocation : 'MEKAH').toUpperCase() && ((rec.fields['JEMAAH TANPA KATIL']||[]).includes(r.id)));
-    const assignedInLoc = assignedNormalInLoc || assignedTanpaInLoc;
-    const assignedGlobal=typeof isJemaahAssignedAny==='function'? isJemaahAssignedAny(r.id) : false;
-    const rowCls=assignedInLoc?'bg-slate-100 text-slate-500':'hover:bg-slate-50';
-    const drag=assignedInLoc?'':`draggable="true" ondragstart="dragJemaah(event,'${r.id}')" ondragend="dragEnd(event)"`;
-    let statusIcon = assignedInLoc? `<button onclick="removeJemaahFromCurrentLoc('${r.id}')" class="w-5 h-5 rounded-full bg-amber-100 text-amber-700 text-[10px]">✕</button>` : `<button onclick="quickAssign('${r.id}')" class="w-5 h-5 rounded-full border bg-slate-100 text-[10px]">+</button>`;
-    if(!assignedInLoc && assignedGlobal) statusIcon = `<button onclick="quickAssign('${r.id}')" class="w-5 h-5 rounded-full border bg-amber-100 text-[10px]">+</button>`;
-    const fbArr = typeof getBoardArray==='function'? getBoardArray(r.fields) : [];
-    const fbDisplay = fbArr.length ? fbArr.join(', ') : '-';
-    let fbCls='bg-white border-slate-200';
-    if(fbArr.some(x=>x.includes('MEKAH'))) fbCls='bg-orange-100 border-orange-200 text-orange-800';
-    else if(fbArr.some(x=>x.includes('MADINAH'))) fbCls='bg-blue-100 border-blue-200 text-blue-800';
-    else if(fbArr.includes('FULLBOARD')) fbCls='bg-emerald-100 border-emerald-200 text-emerald-800';
-    else if(fbArr.length===0) fbCls='bg-white border-dashed border-slate-300 text-slate-400';
-    const boardOptions = ['FULLBOARD','FULLBOARD (MEKAH)','BB (MEKAH)','FULLBOARD (MADINAH)','BB (MADINAH)'];
-    const boardCheckboxes = boardOptions.map(opt=>{
-      const checked=fbArr.includes(opt);
-      return `<label class="flex items-center gap-1.5 px-2 py-1 hover:bg-slate-50 rounded text-[10px] cursor-pointer" onclick="event.stopPropagation()"><input type="checkbox" ${checked?'checked':''} onchange="toggleBoardMulti_V108('${r.id}','${opt}')" class="w-3 h-3 accent-[#7A0C2E]"> ${opt}</label>`;
-    }).join('');
-    const insArr = typeof getInsuranArray==='function'? getInsuranArray(r.fields) : [];
-    const insToggle = ['TAKAFUL','ETIQA','AL-KHAIRI'].map(opt=>{
-      const active = insArr.includes(opt);
-      let cls = 'bg-white text-slate-400 border-slate-200';
-      if(active){
-        if(opt==='TAKAFUL') cls='bg-emerald-500 text-white border-emerald-600';
-        else if(opt==='ETIQA') cls='bg-amber-300 text-amber-900 border-amber-400';
-        else if(opt==='AL-KHAIRI') cls='bg-blue-400 text-white border-blue-500';
-      }
-      const label = opt==='TAKAFUL'?'TAK':opt==='AL-KHAIRI'?'KHAIRI':opt;
-      return `<button onclick="toggleInsuran('${r.id}','${opt}')" class="px-1 py-0.5 rounded-full border text-[7px] font-bold ${cls}">${label}</button>`;
-    }).join('');
-    const pk = r.fields['PAKEJ'] || '';
-    const pkColor = PAKEJ_COLORS_V108[pk] || '#FFFFFF';
-    const pkDisplay = pk || 'EKONOMI';
-    const pakejDropdown = `<div class="relative"><button onclick="event.stopPropagation(); togglePakejDropdown_V108('${r.id}')" class="w-full text-[9px] border rounded-full px-2.5 py-1.5 font-bold text-left flex items-center justify-between" style="background:${pkColor}; border-color:${pkColor}; color:#1F2937"><span class="truncate">${pkDisplay}</span><span>▼</span></button><div id="pakejDrop-${r.id}" class="hidden absolute z-[9999] mt-1 w-48 bg-white border border-slate-300 rounded-xl shadow-2xl p-1" onclick="event.stopPropagation()">${PAKEJ_ORDER_V108.map(o=>{
-      const c = PAKEJ_COLORS_V108[o];
-      const isSel = pk===o;
-      return `<div onclick="selectPakej_V108('${r.id}','${o}')" class="flex items-center gap-2 px-2.5 py-1.5 hover:bg-slate-50 cursor-pointer text-[11px] rounded-lg ${isSel?'bg-slate-100 font-bold':''}"><span class="w-4 h-4 rounded-full flex items-center justify-center text-[9px] border" style="background:${c}; border-color:${c}">${isSel?'✓':''}</span> ${o} <span class="ml-auto text-slate-400">×</span></div>`;
-    }).join('')}<div class="flex justify-between gap-1 mt-1 pt-1 border-t bg-white"><button onclick="clearPakej_V108('${r.id}')" class="text-[9px] px-3 py-1 rounded-full bg-slate-100">Clear</button><button onclick="closePakejDropdown_V108('${r.id}')" class="text-[9px] px-3 py-1 rounded-full bg-[#7A0C2E] text-white">OK</button></div></div></div>`;
-    const trChecked = typeof isTrainChecked==='function'? isTrainChecked(r.fields) : false;
-    return `<div ${drag} class="grid grid-cols-12 items-center px-1.5 py-1.5 text-[11px] border-b border-slate-50 ${rowCls}">
-      <div class="col-span-1 text-slate-400 text-[10px]">${String(i+1).padStart(2,'0')}</div>
-      <div class="col-span-3 font-medium truncate text-[10px] ${assignedInLoc?'text-slate-500 italic':''}" title="${name}">${name}</div>
-      <div class="col-span-2 flex items-center gap-0.5 relative">
-        <div class="relative w-full">
-          <button onclick="event.stopPropagation(); toggleBoardDropdown_V108('${r.id}')" class="text-[8px] border rounded-full px-2 py-1 font-bold ${fbCls} outline-none w-full truncate text-left flex items-center justify-between bg-white" style="opacity:1;">
-            <span class="truncate">${fbDisplay}</span><span class="ml-1">▼</span>
-          </button>
-          <div id="boardDrop-${r.id}" class="hidden absolute left-0 top-full mt-1 w-[190px] bg-white border border-slate-200 rounded-xl shadow-xl z-[9999] p-1" onclick="event.stopPropagation()">
-            ${boardCheckboxes}
-            <div class="border-t border-slate-100 mt-1 pt-1 flex justify-between">
-              <button onclick="clearBoardMulti_V108('${r.id}')" class="text-[8px] px-2 py-0.5 rounded-full bg-slate-100">Clear</button>
-              <button onclick="closeBoardDropdown('${r.id}')" class="text-[8px] px-2 py-0.5 rounded-full bg-[#7A0C2E] text-white">OK</button>
-            </div>
-            <div class="text-[7px] text-slate-400 px-2 mt-1">Boleh pilih 2: BB (MEKAH) + FB (MADINAH)</div>
-          </div>
-        </div>
-      </div>
-      <div class="col-span-1 text-center">
-        <input type="checkbox" ${trChecked?'checked':''} onchange="updateJemaahCheckbox('${r.id}','TRAIN',this.checked)" class="w-3.5 h-3.5 accent-[#7A0C2E] rounded">
-      </div>
-      <div class="col-span-3 flex items-center gap-0.5 flex-wrap justify-center">
-        ${insToggle}
-      </div>
-      <div class="col-span-1 flex items-center gap-0.5">
-        ${pakejDropdown}
-      </div>
-      <div class="col-span-1 flex justify-center">${statusIcon}</div>
-    </div>`;
-  }).join('');
-};
-
-console.log('V108 BOARD MULTIPLE SELECT STAY OPEN LOADED');
+console.log('V109 MINIMAL BOARD MULTIPLE SELECT LOADED - no M_I D crash');
