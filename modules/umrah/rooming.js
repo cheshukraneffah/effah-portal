@@ -415,7 +415,7 @@ function renderRoomingHTML(){
               <i class="fa-solid fa-magnifying-glass absolute left-2.5 top-2.5 text-slate-400 text-[10px]"></i>
               <input id="searchRoomingJemaah" onkeyup="filterRoomingNamelist()" placeholder="Cari nama jemaah..." class="w-full text-[11px] pl-7 pr-2.5 py-2 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:outline-none">
             </div>
-            <select id="filterPakejRooming" onchange="filterRoomingNamelist()" class="text-[11px] border border-slate-200 rounded-xl px-2.5 py-2 bg-white font-medium"><option value="">Semua Pakej</option><option value="JIMAT EKONOMI">JIMAT EKONOMI</option><option value="JIMAT EKONOMI">JIMAT EKONOMI</option><option value="JIMAT EKONOMI">JIMAT EKONOMI</option><option value="JIMAT STANDARD">JIMAT STANDARD</option><option value="JIMAT PREMIUM">JIMAT PREMIUM</option><option value="EKONOMI LITE">EKONOMI LITE</option><option value="EKONOMI">EKONOMI</option><option value="STANDARD">STANDARD</option><option value="PREMIUM">PREMIUM</option><option value="PREMIUM PLUS">PREMIUM PLUS</option></select>
+            <select id="filterPakejRooming" onchange="filterRoomingNamelist()" class="text-[11px] border border-slate-200 rounded-xl px-2.5 py-2 bg-white font-medium"><option value="">Semua Pakej</option><option value="JIMAT EKONOMI">JIMAT EKONOMI</option><option value="JIMAT STANDARD">JIMAT STANDARD</option><option value="JIMAT PREMIUM">JIMAT PREMIUM</option><option value="EKONOMI LITE">EKONOMI LITE</option><option value="EKONOMI">EKONOMI</option><option value="STANDARD">STANDARD</option><option value="PREMIUM">PREMIUM</option><option value="PREMIUM PLUS">PREMIUM PLUS</option></select>
           </div>
         </div>
         <div class="px-2.5 py-1.5 bg-slate-50/70 border-b border-slate-200 grid grid-cols-12 text-[9px] font-bold text-slate-500 tracking-wider">
@@ -476,7 +476,7 @@ function renderRoomingHTML(){
           <p class="text-[9px] text-slate-400 mt-0.5">Dijana automatik: B + Kapasiti</p>
         </div>
         <select id="newRoomLokasi" class="w-full p-2 border border-slate-200 rounded-xl bg-white text-[11px]"><option value="MEKAH">MEKAH</option><option value="MADINAH">MADINAH</option><option value="TAIF">TAIF</option><option value="JEDDAH">JEDDAH</option></select>
-        <select id="newRoomPakej" class="w-full p-2 border border-slate-200 rounded-xl bg-white text-[11px] font-bold"><option value="JIMAT EKONOMI">JIMAT EKONOMI</option><option value="JIMAT EKONOMI">JIMAT EKONOMI</option><option value="JIMAT EKONOMI">JIMAT EKONOMI</option><option value="JIMAT STANDARD">JIMAT STANDARD</option><option value="JIMAT PREMIUM">JIMAT PREMIUM</option><option value="EKONOMI LITE">EKONOMI LITE</option><option value="EKONOMI">EKONOMI</option><option value="STANDARD">STANDARD</option><option value="PREMIUM">PREMIUM</option><option value="PREMIUM PLUS">PREMIUM PLUS</option></select>
+        <select id="newRoomPakej" class="w-full p-2 border border-slate-200 rounded-xl bg-white text-[11px] font-bold"><option value="JIMAT EKONOMI">JIMAT EKONOMI</option><option value="JIMAT STANDARD">JIMAT STANDARD</option><option value="JIMAT PREMIUM">JIMAT PREMIUM</option><option value="EKONOMI LITE">EKONOMI LITE</option><option value="EKONOMI">EKONOMI</option><option value="STANDARD">STANDARD</option><option value="PREMIUM">PREMIUM</option><option value="PREMIUM PLUS">PREMIUM PLUS</option></select>
         <input id="newRoomHotel" placeholder="Nama Hotel" class="w-full p-2 border border-slate-200 rounded-xl bg-white text-[11px]">
         <div class="flex gap-2 items-center">
           <input id="newRoomCap" type="number" value="4" min="1" max="8" oninput="updateNewRoomIdFromCap()" class="flex-1 p-2 border border-slate-200 rounded-xl font-bold bg-white text-[11px]">
@@ -1111,7 +1111,7 @@ const emptyCount=Math.max(0,cap-count); const emptySlots=Array.from({length:empt
       </div>
       <div class="flex items-center gap-1.5 text-[10px]">
         <div class="flex items-center gap-1 px-2.5 py-1 bg-slate-50 rounded-full border"><select onchange="updateRoomField('${rec.id}','PAKEJ / HOTEL',this.value)" class="text-[10px] border border-slate-200 rounded-full px-2 py-1 bg-white font-bold">
-          <option value="JIMAT EKONOMI" ${pakej==='JIMAT EKONOMI'?'selected':''}>JIMAT EKONOMI</option><option value="JIMAT EKONOMI" ${pakej==='JIMAT EKONOMI'?'selected':''}>JIMAT EKONOMI</option><option value="JIMAT STANDARD" ${pakej==='JIMAT STANDARD'?'selected':''}>JIMAT STANDARD</option>
+          <option value="JIMAT EKONOMI">JIMAT EKONOMI</option><option value="JIMAT STANDARD" ${pakej==='JIMAT STANDARD'?'selected':''}>JIMAT STANDARD</option>
           <option value="JIMAT PREMIUM" ${pakej==='JIMAT PREMIUM'?'selected':''}>JIMAT PREMIUM</option>
           <option value="EKONOMI LITE" ${pakej==='EKONOMI LITE'?'selected':''}>EKONOMI LITE</option>
           <option value="EKONOMI" ${pakej==='EKONOMI'?'selected':''}>EKONOMI</option>
@@ -2172,9 +2172,57 @@ function generateRoomingPrint(orientation){ orientation = orientation || 'landsc
     const trainJemaah = allRoomingJemaah.filter(j=> { try{ return isTrainChecked(j.fields); }catch(e){ return !!j.fields['TRAIN']; } }).length;
     const trainStaff = (typeof staffList!=='undefined' ? staffList.filter(s=> !!(s.train||s.fields?.TRAIN)).length : 0);
     const trainCount = trainJemaah + trainStaff;
-    const insuranUnique = allRoomingJemaah.filter(j=> { try{ return getInsuranArray(j.fields).length>0; }catch(e){ const v=j.fields['INSURAN']; return Array.isArray(v) ? v.length>0 : !!v; } }).length;
-    const totalInsuranUnique = insuranUnique;
-    const namelistOverviewHTML = '<div style="margin-top:12px;border:1px solid #000;padding:8px 10px;background:#f9fafb"><div style="font-weight:bold;font-size:10px;margin-bottom:6px">RINGKASAN NAMELIST</div><div style="display:flex;gap:20px;font-size:9px"><div><b>Bilangan Speedtrain:</b> ' + trainCount + ' orang</div><div><b>Bilangan Insuran:</b> ' + totalInsuranUnique + ' orang</div><div><b>Total Jemaah:</b> ' + allRoomingJemaah.length + '</div></div></div>';
+    const insuranUniqueJ = allRoomingJemaah.filter(j=> { try{ return getInsuranArray(j.fields).length>0; }catch(e){ const v=j.fields['INSURAN']; return Array.isArray(v) ? v.length>0 : !!v; } }).length;
+    const insuranUniqueS = allRoomingStaff ? allRoomingStaff.filter(s=>{ try{ return (s.fields['INSURAN'] && s.fields['INSURAN'].length>0) || (typeof getInsuranArray==='function' && getInsuranArray(s.fields).length>0); }catch(e){return false;}}).length : 0;
+    const insuranUnique = insuranUniqueJ;
+    const totalInsuranUnique = insuranUniqueJ + insuranUniqueS;
+    // totalInsuranUnique already calculated above including staff
+    
+    // TRIP OVERVIEW - count including staff for train total staff
+    const totalStaffCount = allRoomingStaff ? allRoomingStaff.length : 0;
+    const totalJemaahOnly = allRoomingJemaah.filter(j=>{ const n=(j.fields['NAMA JEMAAH']||'').toString(); return !n.includes('(EFFAH)') && !j.id.includes('staff'); }).length || allRoomingJemaah.length;
+    // Visa breakdown
+    const visaCounts = {};
+    allRoomingJemaah.forEach(j=>{
+      const v=(j.fields['STATUS VISA']||j.fields['VISA']||'').toString().trim().toUpperCase();
+      if(v && v!=='-' && v!=='- VISA'){
+        const key=v;
+        visaCounts[key]=(visaCounts[key]||0)+1;
+      }
+    });
+    // Also count staff visas if any
+    if(allRoomingStaff){
+      allRoomingStaff.forEach(s=>{
+        const v=(s.fields['STATUS VISA']||s.fields['VISA']||'').toString().trim().toUpperCase();
+        if(v && v!=='-' && v!=='- VISA'){
+          visaCounts[v]=(visaCounts[v]||0)+1;
+        }
+      });
+    }
+    let visaHtml = '';
+    if(Object.keys(visaCounts).length>0){
+      visaHtml = Object.entries(visaCounts).map(([k,v])=>`${k} ${v}`).join(' &nbsp; ');
+    }else{
+      visaHtml = 'TOURIST 0 TOURIST VALID 0 UMRAH 0 UMRAH (VALID) 0 IQAMA (VALID) 0';
+      // Use actual counts if available, else show example format requested
+      // Build from actual data
+      const wanted = ['TOURIST','TOURIST VALID','TOURIST (VALID)','UMRAH','UMRAH (VALID)','IQAMA (VALID)'];
+      // Try to map
+      visaHtml = wanted.map(w=>{ 
+        let c=0;
+        for(let key in visaCounts){ if(key.includes(w.replace(' (VALID)','').replace(' VALID','')) || key===w) c+=visaCounts[key]; }
+        // More accurate: count exact or partial
+        return `${w} ${visaCounts[w]||visaCounts[w.replace(' (VALID)','')]||0}`;
+      }).join(' &nbsp; ');
+      // If all zero, show format user requested as example but with real counts
+      visaHtml = `TOURIST ${visaCounts['TOURIST']||0} TOURIST VALID ${visaCounts['TOURIST (VALID)']||visaCounts['TOURIST VALID']||0} UMRAH ${visaCounts['UMRAH']||0} UMRAH (VALID) ${visaCounts['UMRAH (VALID)']||0} IQAMA (VALID) ${visaCounts['IQAMA (VALID)']||0}`;
+    }
+    // Train counts - total staff for train
+    const trainJemaahCount = allRoomingJemaah.filter(j=>{ try{return !!j.fields['TRAIN'];}catch(e){return false;}}).length;
+    const trainStaffCount = allRoomingStaff ? allRoomingStaff.filter(s=>{ try{return !!s.fields['TRAIN']||!!s.fields['SPEEDTRAIN']||!!s.fields['TRAIN STAFF'];}catch(e){return false;}}).length : 0;
+    const totalTrainWithStaff = trainJemaahCount + trainStaffCount;
+
+    const namelistOverviewHTML = '<div style="margin-top:12px;border:1px solid #000;padding:8px 10px;background:#f9fafb"><div style="font-weight:bold;font-size:10px;margin-bottom:6px">TRIP OVERVIEW</div><div style="display:flex;flex-wrap:wrap;gap:20px;font-size:9px"><div><b>Bilangan Speedtrain:</b> ' + totalTrainWithStaff + ' orang (Jemaah: ' + trainJemaahCount + ' + Staff: ' + trainStaffCount + ')</div><div><b>Bilangan Insuran:</b> ' + totalInsuranUnique + ' orang</div><div><b>Visa:</b> ' + visaHtml + '</div><div><b>Total Jemaah:</b> ' + totalJemaahOnly + '</div><div><b>Total Staff:</b> ' + totalStaffCount + '</div></div></div>';
 
     const html=`<html><head><title>Rooming ${tripName} - ${orientation}</title><style>body{font-family:Arial,Helvetica,sans-serif;font-size:10px;margin:12px;color:#000}table{border-collapse:collapse;width:100%}th,td{border:1px solid #000;padding:4px 6px;font-size:9px}th{background:#7A0C2E;color:#fff;font-weight:bold;text-transform:uppercase}.header{display:flex;justify-content:space-between;font-weight:bold;font-size:12px;border-bottom:2px solid #000;padding-bottom:6px;margin-bottom:8px}.page-break{page-break-before:always}.namelist-page{max-width:900px;margin:0 auto}.location-page{max-width:100%}@media print{@page{size:A4 ${orientation};margin:${orientation==='portrait' ? '8mm' : '10mm'}}body{-webkit-print-color-adjust:exact;print-color-adjust:exact}.page-break{page-break-before:always}}</style></head><body>
       <div class="namelist-page"><div class="header"><span>NAMELIST ${tripName}</span><span>Total: ${allRoomingJemaah.length} Jemaah + ${combinedStaff.length} Staff</span></div><div style="font-size:9px;margin-bottom:8px"><b>Trip:</b> ${tripName} | <b>Tarikh Cetak:</b> ${new Date().toLocaleDateString('ms-MY')} | <b>Orientasi:</b> ${orientation.toUpperCase()}</div><table style="table-layout:fixed"><colgroup><col style="width:28px"><col style="width:34%"><col style="width:85px"><col style="width:40px"><col style="width:55px"><col style="width:60px"><col style="width:65px"></colgroup><tr><th>NO</th><th style="text-align:left">NAMA JEMAAH</th><th>BOARD</th><th>TRAIN</th><th>PAKEJ</th><th>INSURAN</th><th>VISA</th></tr>${namelistRows}</table>${namelistOverviewHTML}</div>
