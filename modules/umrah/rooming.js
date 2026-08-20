@@ -1085,8 +1085,7 @@ function renderStaffList(){
   const cont=document.getElementById('staffListContainer'); const badge=document.getElementById('staffTotalBadge'); if(!cont) return; if(badge) badge.textContent=staffList.length+' Staff';
   if(staffList.length===0){ cont.innerHTML='<div class="p-2.5 text-center text-[11px] text-slate-400">Tiada staff / extra</div>'; return; }
   cont.innerHTML=staffList.map((s,idx)=>{
-    const assignedNormal = isStaffAssignedInLocation(s.id, activeLocation);
-    const assignedInLoc = assignedNormal;
+    const assignedInLoc = isStaffAssignedInLocation(s.id, activeLocation);
     const cls=assignedInLoc?'bg-slate-100 text-slate-400 border-slate-200':'bg-white hover:bg-slate-50 cursor-grab border-slate-200'; // V102 FIX GHOST - no opacity
     const drag=assignedInLoc?'':`draggable="true" ondragstart="dragStaff(event,'${s.id}')" ondragend="dragStaffEnd(event)"`;
     const boardArr=(typeof getStaffBoardArray==='function'? getStaffBoardArray(s) : []);
@@ -2531,28 +2530,35 @@ function updateStaffBoardSingle_FIXED(staffId, value){
 window.updateStaffBoardSingle = updateStaffBoardSingle_FIXED;
 
 
+
+
+
+
 function isStaffAssignedInLocation(staffId, loc){
   loc = (loc||activeLocation||'MEKAH').toString().toUpperCase();
-  // Check all rooming records for this location, any assignment type
+  const staffObj = (window.staffList||[]).find(x=>x.id===staffId||x.airtableId===staffId);
+  const staffName = (staffObj?.name||staffObj?.fields?.['NAMA']||'').toString().toUpperCase();
   for(const rec of (window.allRoomingRecords||[])){
     const recLoc = (rec.fields['LOKASI / CITY']||'MEKAH').toString().toUpperCase();
     if(recLoc!==loc) continue;
     const staffExtra = rec.fields['STAFF / EXTRA']||[];
-    const staff = rec.fields['STAFF']||[];
+    const staffArr = rec.fields['STAFF']||[];
     const tanpa = rec.fields['JEMAAH TANPA KATIL']||[];
     const staffTanpa = rec.fields['STAFF TANPA KATIL']||[];
-    if(staffExtra.includes(staffId) || staff.includes(staffId) || tanpa.includes(staffId) || staffTanpa.includes(staffId)){
-      return true;
+    const tanpaKatil2 = rec.fields['TANPA KATIL']||[];
+    const infant = rec.fields['INFANT']||[];
+    const allLists = [...staffExtra, ...staffArr, ...tanpa, ...staffTanpa, ...tanpaKatil2, ...infant];
+    if(allLists.includes(staffId)) return true;
+    // Fallback check by name - Airtable sometimes stores name
+    if(staffName){
+      for(const idOrName of allLists){
+        if(typeof idOrName==='string' && idOrName.toUpperCase().includes(staffName.split('(')[0].trim())) return true;
+      }
     }
-    // Also check if staffList entry has roomIds that include this rec (legacy)
-    const s = (window.staffList||[]).find(x=>x.id===staffId||x.airtableId===staffId);
-    if(s && s.roomIds && s.roomIds.includes(rec.id)) return true;
+    // Check legacy roomIds
+    if(staffObj && staffObj.roomIds && staffObj.roomIds.includes(rec.id)) return true;
   }
   return false;
 }
-function isStaffAssignedAny(staffId){
-  for(const loc of ['MEKAH','MADINAH','TAIF','JEDDAH']){
-    if(isStaffAssignedInLocation(staffId, loc)) return true;
-  }
-  return false;
-}
+
+function isStaffAssignedAny(staffId){ for(const loc of ['MEKAH','MADINAH','TAIF','JEDDAH','JEDDAH','MUMTAZ']){ if(isStaffAssignedInLocation(staffId, loc)) return true; } return false; }
