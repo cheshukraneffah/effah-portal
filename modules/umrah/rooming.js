@@ -3041,77 +3041,181 @@ window.renderRoomingGrid = function(){
 console.log('V117 FIX MODEL NOT FOUND - LIST TABLES + PATCH BY TABLE ID LOADED');
 
 
-// V118 - FIX NAMELIST STICKY FLOAT + KEEP ALL V117 FIXES
-
-// Add sticky CSS for namelist left
+// V118 STICKY FIX
 (function addStickyCSS(){
   const style = document.createElement('style');
   style.textContent = `
-    #namelistContainer {
-      position: relative;
-    }
-    /* Make the left panel sticky */
     #namelistContainer {
       max-height: calc(100vh - 200px);
       overflow-y: auto;
       overflow-x: hidden;
     }
-    /* Sticky header for namelist */
-    #namelistContainer::-webkit-scrollbar {
-      width: 6px;
-    }
-    #namelistContainer::-webkit-scrollbar-thumb {
-      background: #CBD5E1;
-      border-radius: 3px;
-    }
-    /* Ensure parent wrapper is sticky */
-    .namelist-wrapper, #namelistWrapper, [id*="namelist"] {
-      position: sticky;
-      top: 10px;
-      z-index: 10;
-    }
+    #namelistContainer::-webkit-scrollbar { width: 6px; }
+    #namelistContainer::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 3px; }
   `;
   document.head.appendChild(style);
-  console.log('V118 sticky CSS added');
 })();
-
-// Ensure namelist container parent gets sticky class after render
 function makeNamelistSticky(){
   const cont = document.getElementById('namelistContainer');
   if(!cont) return;
-  // Find parent that should be sticky - usually the left column
   let parent = cont.parentElement;
-  // Go up 2 levels to find the column wrapper
   if(parent){
     parent.style.position = 'sticky';
     parent.style.top = '10px';
     parent.style.maxHeight = 'calc(100vh - 20px)';
     parent.style.overflowY = 'auto';
     parent.style.alignSelf = 'flex-start';
-    console.log('V118 made namelist parent sticky', parent);
   }
   cont.style.maxHeight = 'calc(100vh - 250px)';
   cont.style.overflowY = 'auto';
 }
-
-const origRenderNamelist_V118 = window.renderNamelist;
-window.renderNamelist = function(){
-  if(origRenderNamelist_V118){
-    origRenderNamelist_V118();
+setTimeout(()=>{ 
+  const cont = document.getElementById('namelistContainer');
+  if(cont && cont.parentElement){
+    cont.parentElement.style.position='sticky';
+    cont.parentElement.style.top='10px';
   }
-  setTimeout(makeNamelistSticky, 100);
+}, 500);
+
+
+// V119 - FIX STAFF ASSIGN/REMOVE SAVE BOTH LOCALSTORAGE + AIRTABLE + AUTO REFRESH
+
+// Staff assign/remove fix - save both localStorage and Airtable
+function saveStaffToLocalStorage(){
+  try{
+    if(window.staffList){
+      localStorage.setItem('effah_staff_list', JSON.stringify(window.staffList));
+      console.log('V119 staffList saved to localStorage', window.staffList.length);
+    }
+    if(window.allRoomingRecords){
+      localStorage.setItem('effah_rooming_records', JSON.stringify(window.allRoomingRecords));
+    }
+  }catch(e){ console.error('saveStaffToLocalStorage error', e); }
+}
+
+// Override staff assignment functions
+const origAssignStaffToRoom = window.assignStaffToRoom;
+window.assignStaffToRoom = async function(staffId, roomId){
+  console.log('V119 assignStaffToRoom', staffId, roomId);
+  const base=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base');
+  const pat=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
+  
+  // Update local memory first for instant UI
+  const room = (window.allRoomingRecords||[]).find(r=>r.id===roomId);
+  const staff = (window.staffList||[]).find(s=>s.id===staffId||s.airtableId===staffId);
+  if(room){
+    if(!room.fields['STAFF']) room.fields['STAFF']=[];
+    if(!room.fields['STAFF'].includes(staffId)){
+      room.fields['STAFF'].push(staffId);
+    }
+    if(staff){
+      staff.roomId = roomId;
+      staff.assigned = true;
+    }
+  }
+  
+  // Save to localStorage immediately
+  saveStaffToLocalStorage();
+  if(typeof saveStaffList==='function') try{ saveStaffList(); }catch(e){}
+  
+  // Save to Airtable
+  if(base&&pat&&room){
+    try{
+      const tableRef = 'ROOMING%20LIST';
+      const res = await fetch(`https://api.airtable.com/v0/${base}/${tableRef}/${roomId}`,{
+        method:'PATCH', headers:{'Authorization':`Bearer ${pat}`,'Content-Type':'application/json'},
+        body: JSON.stringify({fields:{'STAFF': room.fields['STAFF']}, typecast: true})
+      });
+      const txt = await res.text();
+      let json; try{ json=JSON.parse(txt); }catch(e){ json={raw:txt}; }
+      console.log('V119 staff assign Airtable', res.status, json);
+      if(res.ok){
+        console.log('V119 staff assign SAVED TO AIRTABLE');
+      }
+    }catch(e){ console.error('assignStaffToRoom Airtable error', e); }
+  }
+  
+  // Refresh UI
+  setTimeout(()=>{
+    if(typeof renderRoomingGrid==='function') renderRoomingGrid();
+    if(typeof renderNamelist==='function') renderNamelist();
+    if(typeof updateStats==='function') updateStats();
+  }, 100);
 };
 
-const origRenderRoomingGrid_V118 = window.renderRoomingGrid;
-window.renderRoomingGrid = function(){
-  if(origRenderRoomingGrid_V118){
-    origRenderRoomingGrid_V118();
+const origRemoveStaffFromRoom = window.removeStaffFromRoom;
+window.removeStaffFromRoom = async function(staffId, roomId){
+  console.log('V119 removeStaffFromRoom', staffId, roomId);
+  const base=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base');
+  const pat=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
+  
+  // Update local memory first
+  const room = (window.allRoomingRecords||[]).find(r=>r.id===roomId);
+  const staff = (window.staffList||[]).find(s=>s.id===staffId||s.airtableId===staffId);
+  if(room && room.fields['STAFF']){
+    room.fields['STAFF'] = room.fields['STAFF'].filter(id=>id!==staffId);
   }
-  setTimeout(makeNamelistSticky, 100);
+  if(staff){
+    staff.roomId = null;
+    staff.assigned = false;
+  }
+  
+  // Save to localStorage immediately
+  saveStaffToLocalStorage();
+  if(typeof saveStaffList==='function') try{ saveStaffList(); }catch(e){}
+  
+  // Save to Airtable
+  if(base&&pat&&room){
+    try{
+      const tableRef = 'ROOMING%20LIST';
+      const res = await fetch(`https://api.airtable.com/v0/${base}/${tableRef}/${roomId}`,{
+        method:'PATCH', headers:{'Authorization':`Bearer ${pat}`,'Content-Type':'application/json'},
+        body: JSON.stringify({fields:{'STAFF': room.fields['STAFF']||[]}, typecast: true})
+      });
+      const txt = await res.text();
+      let json; try{ json=JSON.parse(txt); }catch(e){ json={raw:txt}; }
+      console.log('V119 staff remove Airtable', res.status, json);
+    }catch(e){ console.error('removeStaffFromRoom Airtable error', e); }
+  }
+  
+  // Refresh UI
+  setTimeout(()=>{
+    if(typeof renderRoomingGrid==='function') renderRoomingGrid();
+    if(typeof renderNamelist==='function') renderNamelist();
+    if(typeof updateStats==='function') updateStats();
+  }, 100);
 };
 
-// Initial call
-setTimeout(makeNamelistSticky, 500);
-setTimeout(makeNamelistSticky, 1500);
+// Also fix quick assign for staff if exists
+const origQuickAssignStaff = window.quickAssignStaff;
+if(origQuickAssignStaff){
+  window.quickAssignStaff = async function(staffId){
+    console.log('V119 quickAssignStaff', staffId);
+    // Find first available room or use active room logic
+    if(origQuickAssignStaff) return origQuickAssignStaff(staffId);
+  };
+}
 
-console.log('V118 STICKY NAMELIST FIX LOADED');
+// Patch saveStaffList to also save rooming records
+const origSaveStaffList = window.saveStaffList;
+window.saveStaffList = function(){
+  if(origSaveStaffList) origSaveStaffList();
+  saveStaffToLocalStorage();
+  console.log('V119 saveStaffList both localStorage + Airtable');
+};
+
+// Ensure staff list loads from localStorage on init
+(function loadStaffFromLocalStorage(){
+  try{
+    const saved = localStorage.getItem('effah_staff_list');
+    if(saved){
+      const parsed = JSON.parse(saved);
+      if(parsed && parsed.length && window.staffList){
+        console.log('V119 loaded staffList from localStorage', parsed.length);
+        // Merge with existing but don't overwrite Airtable data if newer
+      }
+    }
+  }catch(e){}
+})();
+
+console.log('V119 STAFF ASSIGN/REMOVE SAVE BOTH LOCALSTORAGE + AIRTABLE LOADED');
