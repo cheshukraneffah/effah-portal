@@ -771,11 +771,9 @@ function isJemaahAssignedInLocation(jId, location){
   const loc = (location||activeLocation).toUpperCase();
   return allRoomingRecords.some(r=> (r.fields['LOKASI / CITY']||'MEKAH').toUpperCase()===loc && (r.fields['JEMAAH']||[]).includes(jId));
 }
-function isStaffAssignedInLocation(staffId, location){
-  const s=staffList.find(x=>x.id===staffId||x.airtableId===staffId); if(!s) return false;
-  if(!s.roomIds || s.roomIds.length===0) return false;
-  const loc = (location||activeLocation).toUpperCase();
-  return allRoomingRecords.some(r=> (r.fields['LOKASI / CITY']||'MEKAH').toUpperCase()===loc && s.roomIds.includes(r.id));
+function isStaffAssignedInLocation(staffId, loc){
+  loc = (loc||activeLocation||'MEKAH').toUpperCase();
+  return allRoomingRecords.some(rec=> (rec.fields['LOKASI / CITY']||'MEKAH').toUpperCase()===loc && ( ((rec.fields['STAFF / EXTRA']||[]).includes(staffId)) || ((rec.fields['STAFF']||[]).includes(staffId)) || ((rec.fields['JEMAAH TANPA KATIL']||[]).includes(staffId)) ) );
 }
 function getStaffForRoom(roomId){
   const tanpaLocal = (typeof getStaffTanpaKatilForRoom==='function'? getStaffTanpaKatilForRoom(roomId) : []);
@@ -1090,7 +1088,9 @@ function renderStaffList(){
   const cont=document.getElementById('staffListContainer'); const badge=document.getElementById('staffTotalBadge'); if(!cont) return; if(badge) badge.textContent=staffList.length+' Staff';
   if(staffList.length===0){ cont.innerHTML='<div class="p-2.5 text-center text-[11px] text-slate-400">Tiada staff / extra</div>'; return; }
   cont.innerHTML=staffList.map((s,idx)=>{
-    const assignedInLoc=isStaffAssignedInLocation(s.id, activeLocation);
+    const assignedNormal = isStaffAssignedInLocation(s.id, activeLocation);
+    const assignedTanpa = allRoomingRecords.some(rec=> (rec.fields['LOKASI / CITY']||'MEKAH').toUpperCase()===activeLocation.toUpperCase() && ((rec.fields['JEMAAH TANPA KATIL']||[]).includes(s.id) || (rec.fields['STAFF TANPA KATIL']||[]).includes(s.id) || (rec.fields['STAFF']||[]).includes(s.id) && (rec.fields['JEMAAH TANPA KATIL']||[]).includes(s.id)));
+    const assignedInLoc = assignedNormal || assignedTanpa;
     const cls=assignedInLoc?'bg-slate-100 text-slate-400 border-slate-200':'bg-white hover:bg-slate-50 cursor-grab border-slate-200'; // V102 FIX GHOST - no opacity
     const drag=assignedInLoc?'':`draggable="true" ondragstart="dragStaff(event,'${s.id}')" ondragend="dragStaffEnd(event)"`;
     const boardArr=(typeof getStaffBoardArray==='function'? getStaffBoardArray(s) : []);
