@@ -771,12 +771,7 @@ function isJemaahAssignedInLocation(jId, location){
   const loc = (location||activeLocation).toUpperCase();
   return allRoomingRecords.some(r=> (r.fields['LOKASI / CITY']||'MEKAH').toUpperCase()===loc && (r.fields['JEMAAH']||[]).includes(jId));
 }
-function isStaffAssignedInLocation(staffId, location){
-  const s=staffList.find(x=>x.id===staffId||x.airtableId===staffId); if(!s) return false;
-  if(!s.roomIds || s.roomIds.length===0) return false;
-  const loc = (location||activeLocation).toUpperCase();
-  return allRoomingRecords.some(r=> (r.fields['LOKASI / CITY']||'MEKAH').toUpperCase()===loc && s.roomIds.includes(r.id));
-}
+
 function getStaffForRoom(roomId){
   const tanpaLocal = (typeof getStaffTanpaKatilForRoom==='function'? getStaffTanpaKatilForRoom(roomId) : []);
   const room = allRoomingRecords.find(r=>r.id===roomId);
@@ -898,8 +893,8 @@ function renderNamelist(){
       <div class="col-span-3 flex items-center gap-0.5 flex-wrap justify-center">
         ${insToggle}
       </div>
-      <div class="col-span-1 flex items-center gap-0.5" id="pakejCellWrapper-${r.id}">
-        <div id="pakejCell-${r.id}" class="w-full"></div><select style="display:none" onchange="updateJemaahField('${r.id}','PAKEJ',this.value)" class="text-[9px] border border-slate-200 rounded-full px-2 py-1 bg-white">
+      <div class="col-span-1 flex items-center gap-0.5">
+        <select onchange="updateJemaahField('${r.id}','PAKEJ',this.value)" class="text-[9px] border border-slate-200 rounded-full px-2 py-1 bg-white">
           <option value="-" ${pk==='-'?'selected':''}>-</option>
           <option value="JIMAT STANDARD" ${pk==='JIMAT STANDARD'?'selected':''}>JIMAT STANDARD</option>
           <option value="JIMAT PREMIUM" ${pk==='JIMAT PREMIUM'?'selected':''}>JIMAT PREMIUM</option>
@@ -1065,7 +1060,7 @@ const emptyCount=Math.max(0,cap-count); const emptySlots=Array.from({length:empt
         <button onclick="deleteRoom('${rec.id}','${roomId}')" class="w-6 h-6 rounded-full bg-slate-50 hover:bg-red-50 border text-[10px] shrink-0"><i class="fa-solid fa-trash"></i></button>
       </div>
       <div class="flex items-center gap-1.5 text-[10px]">
-        <div class="flex items-center gap-1 px-2.5 py-1 bg-slate-50 rounded-full border"><div id="hotelPakejContainer-${rec.id}" data-pakej="${pakej}" class="hotelPakejWrapper"></div><select style="display:none" onchange="updateRoomField('${rec.id}','PAKEJ / HOTEL',this.value)" class="text-[10px] border border-slate-200 rounded-full px-2 py-1 bg-white font-bold">
+        <div class="flex items-center gap-1 px-2.5 py-1 bg-slate-50 rounded-full border"><select onchange="updateRoomField('${rec.id}','PAKEJ / HOTEL',this.value)" class="text-[10px] border border-slate-200 rounded-full px-2 py-1 bg-white font-bold">
           <option value="JIMAT STANDARD" ${pakej==='JIMAT STANDARD'?'selected':''}>JIMAT STANDARD</option>
           <option value="JIMAT PREMIUM" ${pakej==='JIMAT PREMIUM'?'selected':''}>JIMAT PREMIUM</option>
           <option value="EKONOMI LITE" ${pakej==='EKONOMI LITE'?'selected':''}>EKONOMI LITE</option>
@@ -1090,7 +1085,7 @@ function renderStaffList(){
   const cont=document.getElementById('staffListContainer'); const badge=document.getElementById('staffTotalBadge'); if(!cont) return; if(badge) badge.textContent=staffList.length+' Staff';
   if(staffList.length===0){ cont.innerHTML='<div class="p-2.5 text-center text-[11px] text-slate-400">Tiada staff / extra</div>'; return; }
   cont.innerHTML=staffList.map((s,idx)=>{
-    const assignedInLoc=isStaffAssignedInLocation(s.id, activeLocation);
+    const assignedInLoc = isStaffAssignedInLocation(s.id, activeLocation);
     const cls=assignedInLoc?'bg-slate-100 text-slate-400 border-slate-200':'bg-white hover:bg-slate-50 cursor-grab border-slate-200'; // V102 FIX GHOST - no opacity
     const drag=assignedInLoc?'':`draggable="true" ondragstart="dragStaff(event,'${s.id}')" ondragend="dragStaffEnd(event)"`;
     const boardArr=(typeof getStaffBoardArray==='function'? getStaffBoardArray(s) : []);
@@ -1817,8 +1812,10 @@ function generateRoomingPrint(orientation){ orientation = orientation || 'landsc
     const tripId = window.selectedTripRecord?.id || localStorage.getItem('effah_active_trip_id') || '';
     
     // NAMELIST ROWS - keep existing logic but ensure board badge shows actual value
-    let combinedStaff = [...staffList];
-    let namelistRows = allRoomingJemaah.map((r,i)=>{
+    let combinedStaff = [...staffList].sort((a,b)=>{ try{ const na=(getJemaahName(a.fields)||a.fields['NAMA']||'').toString().toUpperCase(); const nb=(getJemaahName(b.fields)||b.fields['NAMA']||'').toString().toUpperCase(); return na.localeCompare(nb); }catch(e){ return 0; } });
+    // FIX SORT A-Z untuk print
+    let sortedJemaahForPrint = [...allRoomingJemaah].sort((a,b)=>{ try{ const na=(getJemaahName(a.fields)||a.fields['NAMA JEMAAH']||a.fields['NAMA']||'').toString().toUpperCase(); const nb=(getJemaahName(b.fields)||b.fields['NAMA JEMAAH']||b.fields['NAMA']||'').toString().toUpperCase(); return na.localeCompare(nb); }catch(e){ return 0; } });
+    let namelistRows = sortedJemaahForPrint.map((r,i)=>{
       const f=r.fields;
       const name=getJemaahName(f);
       const fbArr=getBoardArray(f);
@@ -2488,505 +2485,142 @@ window.removeStaffFromRoom = removeStaffFromRoom_FIXED;
 console.log('V102 RACE FIX loaded - queue per staff');
 
 
-// V106 SKIP STAFF SIDE
-async function removeStaffFromRoom_V106(roomId, staffIdOrName){
-  const room = (window.allRoomingRecords||[]).find(r=>r.id===roomId);
-  let staff = (window.staffList||[]).find(s=>s.id===staffIdOrName||s.airtableId===staffIdOrName);
-  if(!staff){
-    const np = staffIdOrName.toString().toUpperCase().split('(')[0].trim();
-    staff = (window.staffList||[]).find(s=> (s.name||'').toUpperCase().includes(np));
-  }
-  const namePart = staff ? (staff.name||'').split('(')[0].trim().toUpperCase() : staffIdOrName.toString().toUpperCase().split('(')[0].trim();
-  if(room && room.fields){
-    ['STAFF / EXTRA','STAFF TANPA KATIL'].forEach(key=>{
-      const val = room.fields[key];
-      if(!val) return;
-      if(Array.isArray(val)){
-        room.fields[key]=val.filter(v=>{ if(typeof v==='string' && namePart && v.toUpperCase().includes(namePart)) return false; return v!==staffIdOrName && v!==staff?.id && v!==staff?.airtableId; });
-      } else if(typeof val==='string'){
-        room.fields[key]=val.split(',').map(x=>x.trim()).filter(p=>!p.toUpperCase().includes(namePart)).join(', ');
-      }
-    });
-  }
-  if(staff && staff.roomIds) staff.roomIds = staff.roomIds.filter(id=>id!==roomId);
-  renderRoomingGrid(); renderStaffList();
-  const base=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base');
-  const pat=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
-  if(base&&pat&&room){
-    await fetch(`https://api.airtable.com/v0/${base}/ROOMING%20LIST/${roomId}`,{
-      method:'PATCH', headers:{'Authorization':`Bearer ${pat}`,'Content-Type':'application/json'},
-      body: JSON.stringify({fields:{'STAFF / EXTRA': room.fields['STAFF / EXTRA']||'', 'STAFF TANPA KATIL': room.fields['STAFF TANPA KATIL']||[]}})
-    }).then(r=>console.log('V106 remove room', r.status));
-  }
-  console.log('V106 skip staff ROOMING LIST patch to avoid 422');
-}
-window.removeStaffFromRoom = removeStaffFromRoom_V106;
-window.removeStaff = (r,s)=>removeStaffFromRoom_V106(r,s);
-async function removeStaffTanpaKatilFromRoom_V106(roomId, staffIdOrName){
-  const room = (window.allRoomingRecords||[]).find(r=>r.id===roomId);
-  let staff = (window.staffList||[]).find(s=>s.id===staffIdOrName||s.airtableId===staffIdOrName);
-  if(!staff){
-    const np = staffIdOrName.toString().toUpperCase().split('(')[0].trim();
-    staff = (window.staffList||[]).find(s=> (s.name||'').toUpperCase().includes(np));
-  }
-  const aid = staff ? staff.airtableId : staffIdOrName;
-  if(room && room.fields && Array.isArray(room.fields['STAFF TANPA KATIL'])){
-    room.fields['STAFF TANPA KATIL']=room.fields['STAFF TANPA KATIL'].filter(v=> v!==aid && v!==staffIdOrName && v!==staff?.id);
-  }
-  if(staff && staff.roomIds) staff.roomIds = staff.roomIds.filter(id=>id!==roomId);
-  renderRoomingGrid(); renderStaffList();
-  const base=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base');
-  const pat=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
-  if(base&&pat&&room){
-    await fetch(`https://api.airtable.com/v0/${base}/ROOMING%20LIST/${roomId}`,{
-      method:'PATCH', headers:{'Authorization':`Bearer ${pat}`,'Content-Type':'application/json'},
-      body: JSON.stringify({fields:{'STAFF TANPA KATIL': room.fields['STAFF TANPA KATIL']||[]}})
-    }).then(r=>console.log('V106 remove tanpa', r.status));
-  }
-}
-window.removeStaffTanpaKatilFromRoom = removeStaffTanpaKatilFromRoom_V106;
-window.removeTanpaKatilFromRoom = async function(roomId, jId){
-  const room = (window.allRoomingRecords||[]).find(r=>r.id===roomId);
-  if(room && room.fields && Array.isArray(room.fields['JEMAAH TANPA KATIL'])){
-    room.fields['JEMAAH TANPA KATIL']=room.fields['JEMAAH TANPA KATIL'].filter(id=>id!==jId);
-  }
-  renderRoomingGrid(); renderNamelist(); renderStaffList();
-  const base=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base');
-  const pat=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
-  if(base&&pat&&room){
-    await fetch(`https://api.airtable.com/v0/${base}/ROOMING%20LIST/${roomId}`,{
-      method:'PATCH', headers:{'Authorization':`Bearer ${pat}`,'Content-Type':'application/json'},
-      body: JSON.stringify({fields:{'JEMAAH TANPA KATIL': room.fields['JEMAAH TANPA KATIL']||[]}})
-    });
-  }
-};
-async function clearStaffBoard_V106(staffId){
-  const staff = (window.staffList||[]).find(s=>s.id===staffId||s.airtableId===staffId);
-  if(!staff) return;
-  staff.board = staff.train ? ['TRAIN'] : [];
-  staff.boardBasis = [];
-  try{ localStorage.setItem('effah_staff_board_'+staffId, JSON.stringify(staff.board)); }catch(e){}
-  if(typeof saveStaffList==='function') try{saveStaffList();}catch(e){}
-  renderStaffList();
-  const base=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base');
-  const pat=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
-  if(base&&pat&&staff.airtableId){
-    const res = await fetch(`https://api.airtable.com/v0/${base}/STAFF%20LIST%20%28ROOMING%29/${staff.airtableId}`,{
-      method:'PATCH', headers:{'Authorization':`Bearer ${pat}`,'Content-Type':'application/json'},
-      body: JSON.stringify({fields:{'BOARD BASIS': []}})
-    });
-    console.log('V106 board cleared', res.status);
-  }
-}
-window.clearBoardMulti = clearStaffBoard_V106;
-window.clearStaffBoardMulti = clearStaffBoard_V106;
-async function updateStaffBoard_V106(staffId, value){
-  const staff = (window.staffList||[]).find(s=>s.id===staffId||s.airtableId===staffId);
-  if(!staff) return;
-  if(value==='-'||value.startsWith('-')) staff.board = staff.train ? ['TRAIN'] : [];
-  else staff.board = staff.train ? [value,'TRAIN'] : [value];
-  staff.boardBasis = staff.board.filter(b=>b!=='TRAIN');
-  try{ localStorage.setItem('effah_staff_board_'+staffId, JSON.stringify(staff.board)); }catch(e){}
-  if(typeof saveStaffList==='function') try{saveStaffList();}catch(e){}
-  renderStaffList();
-  const base=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base');
-  const pat=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
-  if(base&&pat&&staff.airtableId){
-    const boardToSave = staff.board.filter(b=>b!=='TRAIN');
-    await fetch(`https://api.airtable.com/v0/${base}/STAFF%20LIST%20%28ROOMING%29/${staff.airtableId}`,{
-      method:'PATCH', headers:{'Authorization':`Bearer ${pat}`,'Content-Type':'application/json'},
-      body: JSON.stringify({fields:{'BOARD BASIS': boardToSave}})
-    }).then(r=>console.log('V106 board update', r.status, boardToSave));
-  }
-}
-window.updateStaffBoardSingle = updateStaffBoard_V106;
-window.toggleStaffBoardMulti = async function(staffId, boardVal){
+function toggleStaffBoardMulti_FIXED(staffId, boardVal){
   const staff = (window.staffList||[]).find(s=>s.id===staffId||s.airtableId===staffId);
   if(!staff) return;
   if(!staff.board) staff.board=[];
+  if(!Array.isArray(staff.board)) staff.board = staff.board ? [staff.board] : [];
   const idx = staff.board.indexOf(boardVal);
   if(idx>=0) staff.board.splice(idx,1); else staff.board.push(boardVal);
-  staff.boardBasis = staff.board.filter(b=>b!=='TRAIN');
-  try{ localStorage.setItem('effah_staff_board_'+staffId, JSON.stringify(staff.board)); }catch(e){}
-  renderStaffList();
-  const base=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base');
-  const pat=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
+  const isTrain = staff.board.includes('TRAIN') || !!staff.train;
+  staff.train = isTrain;
+  if(typeof saveStaffList==='function') try{saveStaffList();}catch(e){}
+  if(typeof renderStaffList==='function') renderStaffList();
+  if(typeof renderRoomingGrid==='function') renderRoomingGrid();
+  const base = window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base');
+  const pat = window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
   if(base&&pat&&staff.airtableId){
     const boardToSave = staff.board.filter(b=>b!=='TRAIN');
-    await fetch(`https://api.airtable.com/v0/${base}/STAFF%20LIST%20%28ROOMING%29/${staff.airtableId}`,{
-      method:'PATCH', headers:{'Authorization':`Bearer ${pat}`,'Content-Type':'application/json'},
+    fetch('https://api.airtable.com/v0/'+base+'/STAFF%20LIST%20%28ROOMING%29/'+staff.airtableId,{
+      method:'PATCH', headers:{'Authorization':'Bearer '+pat,'Content-Type':'application/json'},
+      body: JSON.stringify({fields:{'BOARD BASIS': boardToSave, 'TRAIN': isTrain}})
+    }).then(r=>r.json()).then(d=>console.log('STAFF BOARD saved')).catch(()=>{});
+  }
+}
+window.toggleStaffBoardMulti = toggleStaffBoardMulti_FIXED;
+
+function updateStaffBoardSingle_FIXED(staffId, value){
+  const staff = (window.staffList||[]).find(s=>s.id===staffId||s.airtableId===staffId);
+  if(!staff) return;
+  const hasTrain = (staff.board||[]).includes('TRAIN') || !!staff.train;
+  if(value==='-'||value==='') staff.board = hasTrain ? ['TRAIN'] : [];
+  else staff.board = hasTrain ? [value,'TRAIN'] : [value];
+  if(typeof saveStaffList==='function') try{saveStaffList();}catch(e){}
+  if(typeof renderStaffList==='function') renderStaffList();
+  const base = window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base');
+  const pat = window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
+  if(base&&pat&&staff.airtableId){
+    const boardToSave = (staff.board||[]).filter(b=>b!=='TRAIN');
+    fetch('https://api.airtable.com/v0/'+base+'/STAFF%20LIST%20%28ROOMING%29/'+staff.airtableId,{
+      method:'PATCH', headers:{'Authorization':'Bearer '+pat,'Content-Type':'application/json'},
       body: JSON.stringify({fields:{'BOARD BASIS': boardToSave}})
-    }).then(r=>console.log('V106 toggle', r.status, boardToSave));
+    }).then(r=>r.json()).then(d=>console.log('STAFF BOARD single saved '+value)).catch(()=>{});
   }
-};
-async function addStaffTanpaKatil_V106(roomId, staffId){
-  const room = (window.allRoomingRecords||[]).find(r=>r.id===roomId);
-  let staff = (window.staffList||[]).find(s=>s.id===staffId||s.airtableId===staffId);
-  const aid = staff ? staff.airtableId : staffId;
-  if(!room) return;
-  if(!room.fields['STAFF TANPA KATIL']) room.fields['STAFF TANPA KATIL']=[];
-  if(!room.fields['STAFF TANPA KATIL'].includes(aid)) room.fields['STAFF TANPA KATIL'].push(aid);
-  renderRoomingGrid(); renderStaffList();
-  const base=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base');
-  const pat=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
+}
+window.updateStaffBoardSingle = updateStaffBoardSingle_FIXED;
+
+
+
+
+
+
+function isStaffAssignedInLocation(staffId, loc){
+  loc = (loc||activeLocation||'MEKAH').toString().toUpperCase();
+  const staffObj = (window.staffList||[]).find(x=>x.id===staffId||x.airtableId===staffId);
+  const staffName = (staffObj?.name||staffObj?.fields?.['NAMA']||'').toString().toUpperCase();
+  for(const rec of (window.allRoomingRecords||[])){
+    const recLoc = (rec.fields['LOKASI / CITY']||'MEKAH').toString().toUpperCase();
+    if(recLoc!==loc) continue;
+    const staffExtra = rec.fields['STAFF / EXTRA']||[];
+    const staffArr = rec.fields['STAFF']||[];
+    const tanpa = rec.fields['JEMAAH TANPA KATIL']||[];
+    const staffTanpa = rec.fields['STAFF TANPA KATIL']||[];
+    const tanpaKatil2 = rec.fields['TANPA KATIL']||[];
+    const infant = rec.fields['INFANT']||[];
+    const allLists = [...staffExtra, ...staffArr, ...tanpa, ...staffTanpa, ...tanpaKatil2, ...infant];
+    if(allLists.includes(staffId)) return true;
+    // Fallback check by name - Airtable sometimes stores name
+    if(staffName){
+      for(const idOrName of allLists){
+        if(typeof idOrName==='string' && idOrName.toUpperCase().includes(staffName.split('(')[0].trim())) return true;
+      }
+    }
+    // Check legacy roomIds
+    if(staffObj && staffObj.roomIds && staffObj.roomIds.includes(rec.id)) return true;
+  }
+  return false;
+}
+
+function isStaffAssignedAny(staffId){ for(const loc of ['MEKAH','MADINAH','TAIF','JEDDAH','JEDDAH','MUMTAZ']){ if(isStaffAssignedInLocation(staffId, loc)) return true; } return false; }
+
+
+// FIX REALTIME GREY FOR STAFF TANPA KATIL
+const _origUpdateRoomField = window.updateRoomField;
+window.updateRoomField = async function(roomId, field, value, shouldRender=true){
+  // Update local cache instantly
+  const rec = (window.allRoomingRecords||[]).find(r=>r.id===roomId||r.airtableId===roomId);
+  if(rec){
+    if(!rec.fields) rec.fields={};
+    rec.fields[field]=value;
+    // If staff assigned to tanpa katil, also ensure staffList roomIds updated
+    if(field==='JEMAAH TANPA KATIL' || field==='STAFF / EXTRA' || field==='STAFF' || field==='STAFF TANPA KATIL' || field==='TANPA KATIL'){
+      // Trigger instant grey
+      if(typeof renderStaffList==='function') setTimeout(()=>renderStaffList(), 50);
+      if(typeof renderNamelist==='function') setTimeout(()=>renderNamelist(), 50);
+    }
+  }
+  if(_origUpdateRoomField) return _origUpdateRoomField(roomId, field, value, shouldRender);
+  // Fallback fetch
+  const base = window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base');
+  const pat = window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
   if(base&&pat){
-    await fetch(`https://api.airtable.com/v0/${base}/ROOMING%20LIST/${roomId}`,{
-      method:'PATCH', headers:{'Authorization':`Bearer ${pat}`,'Content-Type':'application/json'},
-      body: JSON.stringify({fields:{'STAFF TANPA KATIL': room.fields['STAFF TANPA KATIL']}})
-    }).then(r=>console.log('V106 assign tanpa', r.status));
-  }
-}
-window.addTanpaKatilToRoom = async function(roomId, jemaahId){
-  const isStaff = (window.staffList||[]).some(s=>s.id===jemaahId||s.airtableId===jemaahId);
-  if(isStaff) return addStaffTanpaKatil_V106(roomId, jemaahId);
-  const room = (window.allRoomingRecords||[]).find(r=>r.id===roomId);
-  if(room){
-    if(!room.fields['JEMAAH TANPA KATIL']) room.fields['JEMAAH TANPA KATIL']=[];
-    if(!room.fields['JEMAAH TANPA KATIL'].includes(jemaahId)) room.fields['JEMAAH TANPA KATIL'].push(jemaahId);
-    renderRoomingGrid(); renderNamelist();
-    const base=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base');
-    const pat=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
-    if(base&&pat){
-      await fetch(`https://api.airtable.com/v0/${base}/ROOMING%20LIST/${roomId}`,{
-        method:'PATCH', headers:{'Authorization':`Bearer ${pat}`,'Content-Type':'application/json'},
-        body: JSON.stringify({fields:{'JEMAAH TANPA KATIL': room.fields['JEMAAH TANPA KATIL']}})
-      });
-    }
-  }
-};
-console.log('V106 LOADED');
-
-
-// V124 - FIX REMOVE STAFF TANPA KATIL PAKAI TABLE ID + REMOVE DEBUG BOX
-
-const PAKEJ_ORDER_V124 = ['JIMAT EKONOMI','JIMAT STANDARD','JIMAT PREMIUM','EKONOMI LITE','EKONOMI','STANDARD','PREMIUM','PREMIUM PLUS'];
-const PAKEJ_COLORS_V124 = {
-  'JIMAT EKONOMI': '#E8E8E8',
-  'JIMAT STANDARD': '#FFF8DC',
-  'JIMAT PREMIUM': '#FFE4D6',
-  'EKONOMI LITE': '#FFD6E7',
-  'EKONOMI': '#DBEAFE',
-  'STANDARD': '#D1FAE5',
-  'PREMIUM': '#BFDBFE',
-  'PREMIUM PLUS': '#F3E8FF'
-};
-
-function closeAllDropdowns_V124(){
-  document.querySelectorAll('[id^="boardDrop-"]').forEach(el=>el.classList.add('hidden'));
-  document.querySelectorAll('[id^="pakejDrop-"]').forEach(el=>el.classList.add('hidden'));
-  document.querySelectorAll('[id^="hotelPakejDrop-"]').forEach(el=>el.classList.add('hidden'));
-}
-
-let jemaahTableId_V124 = null;
-let roomingTableId_V124 = null;
-
-async function debugTables_V124(){
-  const base=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base');
-  const pat=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
-  if(!base||!pat) return;
-  try{
-    const res = await fetch(`https://api.airtable.com/v0/meta/bases/${base}/tables`,{headers:{'Authorization':`Bearer ${pat}`}});
-    const data = await res.json();
-    if(data.tables){
-      for(let t of data.tables){
-        if(t.name.toUpperCase().includes('ROOMING')) roomingTableId_V124 = t.id;
-        if(t.fields.some(f=>f.name==='BOARD BASIS')) jemaahTableId_V124 = t.id;
-      }
-      if(!jemaahTableId_V124){
-        const possible = data.tables.filter(t=>t.name.toUpperCase().includes('JEMAAH'));
-        if(possible[0]) jemaahTableId_V124 = possible[0].id;
-      }
-      console.log('V124 tableIds - JEMAAH:', jemaahTableId_V124, 'ROOMING:', roomingTableId_V124);
-    }
-  }catch(e){ console.error(e); }
-}
-setTimeout(debugTables_V124, 500);
-
-(function addCSS_V124(){
-  const style = document.createElement('style');
-  style.textContent = `
-    #namelistContainer { overflow-y: auto !important; overflow-x: visible !important; max-height: calc(100vh - 220px) !important; }
-    [id^="boardDrop-"], [id^="pakejDrop-"] { position: absolute !important; z-index: 99999 !important; left: 0 !important; top: 100% !important; margin-top: 4px; max-height: 280px; overflow-y: auto; box-shadow: 0 10px 30px rgba(0,0,0,0.15) !important; border-radius: 12px; background: white; border: 1px solid #E2E8F0; }
-    [id^="hotelPakejDrop-"] { position: absolute !important; z-index: 99999 !important; left: 0 !important; top: 100% !important; margin-top: 4px; }
-    .grid { overflow: visible !important; }
-  `;
-  document.head.appendChild(style);
-})();
-
-function toggleBoardDropdown_V124(jId){
-  const drop = document.getElementById('boardDrop-'+jId);
-  if(!drop) return;
-  const isHidden = drop.classList.contains('hidden');
-  closeAllDropdowns_V124();
-  if(isHidden) drop.classList.remove('hidden');
-  else { drop.classList.add('hidden'); setTimeout(()=>{ if(typeof renderNamelist==='function') renderNamelist(); }, 10); }
-}
-window.toggleBoardDropdown = toggleBoardDropdown_V124;
-function closeBoardDropdown(jId){ const drop = document.getElementById('boardDrop-'+jId); if(drop) drop.classList.add('hidden'); setTimeout(()=>{ if(typeof renderNamelist==='function') renderNamelist(); }, 10); }
-window.closeBoardDropdown = closeBoardDropdown;
-async function toggleBoardMulti_V124(jId, boardVal){
-  try{
-    const jRec = (window.allRoomingJemaah||[]).find(j=>j.id===jId);
-    if(!jRec) return;
-    if(!jRec.fields) jRec.fields={};
-    if(!jRec.fields['BOARD BASIS']) jRec.fields['BOARD BASIS']=[];
-    if(!Array.isArray(jRec.fields['BOARD BASIS'])) jRec.fields['BOARD BASIS']=[jRec.fields['BOARD BASIS']].filter(Boolean);
-    const idx = jRec.fields['BOARD BASIS'].indexOf(boardVal);
-    if(idx>=0) jRec.fields['BOARD BASIS'].splice(idx,1); else jRec.fields['BOARD BASIS'].push(boardVal);
-    const drop = document.getElementById('boardDrop-'+jId);
-    if(drop){ drop.querySelectorAll('input[type="checkbox"]').forEach(cb=>{ if((cb.getAttribute('onchange')||'').includes(boardVal)){ cb.checked = jRec.fields['BOARD BASIS'].includes(boardVal); } }); drop.classList.remove('hidden'); }
-    document.querySelectorAll(`button[onclick*="toggleBoardDropdown_V124('${jId}')"]`).forEach(b=>{ const span = b.querySelector('span.truncate'); if(span) span.textContent = jRec.fields['BOARD BASIS'].length ? jRec.fields['BOARD BASIS'].join(', ') : '-'; });
-    const base=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base'); const pat=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
-    if(base&&pat){ const tableRef = jemaahTableId_V124 || 'JEMAAH'; await fetch(`https://api.airtable.com/v0/${base}/${tableRef}/${jId}`,{method:'PATCH', headers:{'Authorization':`Bearer ${pat}`,'Content-Type':'application/json'}, body: JSON.stringify({fields:{'BOARD BASIS': jRec.fields['BOARD BASIS']}, typecast: true})}); }
-  }catch(e){ console.error(e); }
-}
-window.toggleBoardMulti = toggleBoardMulti_V124;
-function clearBoardMulti_V124(jId){
-  try{
-    const jRec = (window.allRoomingJemaah||[]).find(j=>j.id===jId); if(jRec){ if(!jRec.fields) jRec.fields={}; jRec.fields['BOARD BASIS']=[]; }
-    const drop = document.getElementById('boardDrop-'+jId); if(drop){ drop.querySelectorAll('input[type="checkbox"]').forEach(cb=>cb.checked=false); drop.classList.remove('hidden'); }
-    document.querySelectorAll(`button[onclick*="toggleBoardDropdown_V124('${jId}')"]`).forEach(btn=>{ const span = btn.querySelector('span.truncate'); if(span) span.textContent='-'; });
-    const base=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base'); const pat=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
-    if(base&&pat){ const tableRef = jemaahTableId_V124 || 'JEMAAH'; fetch(`https://api.airtable.com/v0/${base}/${tableRef}/${jId}`,{method:'PATCH', headers:{'Authorization':`Bearer ${pat}`,'Content-Type':'application/json'}, body: JSON.stringify({fields:{'BOARD BASIS': []}, typecast: true})}); }
-  }catch(e){ console.error(e); }
-}
-window.clearBoardMulti = clearBoardMulti_V124;
-
-function togglePakejDropdown_V124(jId){
-  const drop = document.getElementById('pakejDrop-'+jId); if(!drop) return;
-  const isHidden = drop.classList.contains('hidden'); closeAllDropdowns_V124(); if(isHidden) drop.classList.remove('hidden');
-}
-window.togglePakejDropdown = togglePakejDropdown_V124;
-function closePakejDropdown_V124(jId){ const drop = document.getElementById('pakejDrop-'+jId); if(drop) drop.classList.add('hidden'); setTimeout(()=>{ if(typeof renderNamelist==='function') renderNamelist(); }, 10); }
-window.closePakejDropdown = closePakejDropdown_V124;
-function selectPakej_V124(jId, pakej){
-  const jRec = (window.allRoomingJemaah||[]).find(j=>j.id===jId); if(jRec) jRec.fields['PAKEJ']=pakej;
-  const btn = document.querySelector(`button[onclick*="togglePakejDropdown_V124('${jId}')"]`);
-  if(btn){ const color = PAKEJ_COLORS_V124[pakej] || '#FFFFFF'; btn.style.background=color; btn.style.borderColor=color; const span = btn.querySelector('span.truncate'); if(span) span.textContent=pakej || '-'; }
-  const drop = document.getElementById('pakejDrop-'+jId);
-  if(drop){ drop.querySelectorAll('div[onclick*="selectPakej_V124"]').forEach(div=>{ const onclick = div.getAttribute('onclick')||''; const match = onclick.match(/selectPakej_V124\([^,]+,'([^']+)'\)/); if(match){ const optPakej = match[1]; const isSelected = optPakej===pakej; if(isSelected){ div.classList.add('bg-[#7A0C2E]','text-white','font-bold'); } else { div.classList.remove('bg-[#7A0C2E]','text-white','font-bold'); } } if(onclick.includes("''") && pakej===''){ div.classList.add('bg-[#7A0C2E]','text-white'); } }); drop.classList.remove('hidden'); }
-  const base=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base'); const pat=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
-  if(base&&pat&&jRec){ const tableRef = jemaahTableId_V124 || 'JEMAAH'; fetch(`https://api.airtable.com/v0/${base}/${tableRef}/${jId}`,{method:'PATCH', headers:{'Authorization':`Bearer ${pat}`,'Content-Type':'application/json'}, body: JSON.stringify({fields:{'PAKEJ': pakej}, typecast: true})}).then(r=>console.log('V124 pakej', r.status)); }
-}
-window.selectPakej = selectPakej_V124;
-function clearPakej_V124(jId){ selectPakej_V124(jId, ''); }
-window.clearPakej = clearPakej_V124;
-
-function toggleHotelPakejDropdown_V124(roomId){
-  const drop = document.getElementById('hotelPakejDrop-'+roomId); if(!drop) return;
-  const isHidden = drop.classList.contains('hidden'); closeAllDropdowns_V124(); if(isHidden) drop.classList.remove('hidden');
-}
-window.toggleHotelPakejDropdown = toggleHotelPakejDropdown_V124;
-function closeHotelPakejDropdown_V124(roomId){ const drop = document.getElementById('hotelPakejDrop-'+roomId); if(drop) drop.classList.add('hidden'); setTimeout(()=>{ if(typeof renderRoomingGrid==='function') renderRoomingGrid(); }, 10); }
-window.closeHotelPakejDropdown = closeHotelPakejDropdown_V124;
-function selectHotelPakej_V124(roomId, pakej){
-  const room = (window.allRoomingRecords||[]).find(r=>r.id===roomId); if(room) room.fields['PAKEJ / HOTEL']=pakej;
-  const container = document.getElementById('hotelPakejContainer-'+roomId); const drop = document.getElementById('hotelPakejDrop-'+roomId);
-  if(container){ const color = PAKEJ_COLORS_V124[pakej] || '#DBEAFE'; const btn = container.querySelector('button'); if(btn){ btn.style.background=color; btn.style.borderColor=color; const span = btn.querySelector('span'); if(span) span.textContent=pakej || 'EKONOMI'; } }
-  if(drop){ drop.querySelectorAll('div[onclick*="selectHotelPakej_V124"]').forEach(div=>{ const onclick = div.getAttribute('onclick')||''; const match = onclick.match(/selectHotelPakej_V124\([^,]+,'([^']+)'\)/); if(match){ const optPakej = match[1]; const isSelected = optPakej===pakej; if(isSelected){ div.classList.add('bg-[#7A0C2E]','text-white','font-bold'); } else { div.classList.remove('bg-[#7A0C2E]','text-white','font-bold'); } } }); drop.classList.remove('hidden'); }
-  const base=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base'); const pat=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
-  if(base&&pat&&room){ const tableRef = roomingTableId_V124 || 'ROOMING%20LIST'; fetch(`https://api.airtable.com/v0/${base}/${tableRef}/${roomId}`,{method:'PATCH', headers:{'Authorization':`Bearer ${pat}`,'Content-Type':'application/json'}, body: JSON.stringify({fields:{'PAKEJ / HOTEL': pakej}, typecast: true})}).then(r=>console.log('V124 hotel', r.status)); }
-}
-window.selectHotelPakej = selectHotelPakej_V124;
-function clearHotelPakej_V124(roomId){ selectHotelPakej_V124(roomId, 'EKONOMI'); }
-window.clearHotelPakej = clearHotelPakej_V124;
-
-// V124 CORE FIX - REMOVE STAFF TANPA KATIL PAKAI TABLE ID
-window.removeJemaahTanpaKatil = async function(roomId, jId){
-  console.log('V124 remove tanpa katil', roomId, jId);
-  const base=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base');
-  const pat=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
-  const room = (window.allRoomingRecords||[]).find(r=>r.id===roomId);
-  if(!room){ console.error('Room not found', roomId); return; }
-  
-  // Find actual staff ID for SHARIFAH if jId is generic
-  let actualId = jId;
-  if(jId.includes('SHARIFAH') || jId.toLowerCase().includes('sharifah') || jId.length < 10){
-    // jId might be name or short, find real ID
-    const staff = (window.staffList||[]).find(s=>{
-      const name = (s.fields?.['NAMA']||s.fields?.['NAMA STAFF']||'').toUpperCase();
-      return name.includes('SHARIFAH');
-    });
-    if(staff) actualId = staff.id || staff.airtableId;
-    console.log('Resolved SHARIFAH actualId', actualId, 'from', jId);
-  }
-  
-  // Remove from all possible fields
-  const fieldsToClean = ['JEMAAH TANPA KATIL','STAFF TANPA KATIL','TANPA KATIL','JEMAAH TANPA KATIL / INFANT','STAFF TANPA KATIL / INFANT'];
-  let patchFields = {};
-  
-  for(let fieldName of fieldsToClean){
-    if(room.fields[fieldName] && Array.isArray(room.fields[fieldName])){
-      const before = room.fields[fieldName].length;
-      room.fields[fieldName] = room.fields[fieldName].filter(id=>{
-        if(id===jId || id===actualId) return false;
-        // Also check if ID corresponds to SHARIFAH
-        const s = (window.staffList||[]).find(st=>st.id===id||st.airtableId===id);
-        if(s){
-          const sName = (s.fields?.['NAMA']||s.fields?.['NAMA STAFF']||'').toUpperCase();
-          if(sName.includes('SHARIFAH')) return false;
-        }
-        return true;
-      });
-      if(room.fields[fieldName].length !== before){
-        patchFields[fieldName] = room.fields[fieldName];
-        console.log(`Removed from ${fieldName}: ${before} -> ${room.fields[fieldName].length}`);
-      }
-    }
-  }
-  
-  // Save localStorage immediately
-  try{ localStorage.setItem('effah_rooming_records', JSON.stringify(window.allRoomingRecords)); }catch(e){}
-  
-  // PATCH Airtable using TABLE ID (not name) to avoid MODEL_NOT_FOUND
-  if(base&&pat && Object.keys(patchFields).length>0){
-    const tableRef = roomingTableId_V124 || 'ROOMING%20LIST';
-    console.log('PATCH Airtable', tableRef, roomId, patchFields);
-    try{
-      const res = await fetch(`https://api.airtable.com/v0/${base}/${tableRef}/${roomId}`,{
-        method:'PATCH', headers:{'Authorization':`Bearer ${pat}`,'Content-Type':'application/json'},
-        body: JSON.stringify({fields: patchFields, typecast: true})
-      });
-      const txt = await res.text();
-      let json; try{ json=JSON.parse(txt); }catch(e){ json={raw:txt}; }
-      console.log('V124 PATCH result', res.status, json);
-      if(!res.ok){
-        console.error('PATCH failed', json);
-      } else {
-        console.log('V124 REMOVE SUCCESS');
-      }
-    }catch(e){ console.error('PATCH error', e); }
-  } else {
-    console.log('No fields to patch or no base/pat', patchFields);
-  }
-  
-  setTimeout(()=>{ if(typeof renderRoomingGrid==='function') renderRoomingGrid(); }, 200);
-};
-
-window.removeStaffTanpaKatil = window.removeJemaahTanpaKatil;
-
-window.removeStaffFromRoom = async function(roomId, staffId){
-  const room = (window.allRoomingRecords||[]).find(r=>r.id===roomId);
-  if(room){
-    const isTanpa = (room.fields['STAFF TANPA KATIL']||[]).includes(staffId) || (room.fields['JEMAAH TANPA KATIL']||[]).includes(staffId);
-    if(isTanpa) return window.removeJemaahTanpaKatil(roomId, staffId);
-    if(room.fields['STAFF']) room.fields['STAFF'] = room.fields['STAFF'].filter(id=>id!==staffId);
-    try{ localStorage.setItem('effah_rooming_records', JSON.stringify(window.allRoomingRecords)); }catch(e){}
-    const base=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base');
-    const pat=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
-    if(base&&pat){
-      const tableRef = roomingTableId_V124 || 'ROOMING%20LIST';
-      await fetch(`https://api.airtable.com/v0/${base}/${tableRef}/${roomId}`,{
-        method:'PATCH', headers:{'Authorization':`Bearer ${pat}`,'Content-Type':'application/json'},
-        body: JSON.stringify({fields:{'STAFF': room.fields['STAFF']||[]}, typecast: true})
-      });
-    }
-    setTimeout(()=>{ if(typeof renderRoomingGrid==='function') renderRoomingGrid(); }, 100);
+    fetch(`https://api.airtable.com/v0/${base}/ROOMING%20LIST/${roomId}`,{
+      method:'PATCH', headers:{'Authorization':'Bearer '+pat,'Content-Type':'application/json'},
+      body: JSON.stringify({fields:{[field]: value}})
+    }).then(()=>{ if(shouldRender){ renderRoomingGrid(); renderStaffList(); renderNamelist(); } }).catch(()=>{});
   }
 };
 
-// Staff drag
-window.dragStaff = function(event, staffId){ event.dataTransfer.setData('text/plain', staffId); event.dataTransfer.setData('staffId', staffId); window._draggedStaffId = staffId; };
-window.dropStaffToRoom = async function(event, roomId){
-  event.preventDefault();
-  const staffId = event.dataTransfer.getData('staffId') || event.dataTransfer.getData('text/plain') || window._draggedStaffId;
-  if(!staffId) return;
-  const base=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base'); const pat=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
-  const room = (window.allRoomingRecords||[]).find(r=>r.id===roomId);
-  if(room){ if(!room.fields['STAFF']) room.fields['STAFF']=[]; if(!room.fields['STAFF'].includes(staffId)) room.fields['STAFF'].push(staffId); }
-  try{ if(window.allRoomingRecords) localStorage.setItem('effah_rooming_records', JSON.stringify(window.allRoomingRecords)); }catch(e){}
-  if(base&&pat&&room){ const tableRef = roomingTableId_V124 || 'ROOMING%20LIST'; await fetch(`https://api.airtable.com/v0/${base}/${tableRef}/${roomId}`,{method:'PATCH', headers:{'Authorization':`Bearer ${pat}`,'Content-Type':'application/json'}, body: JSON.stringify({fields:{'STAFF': room.fields['STAFF']}, typecast: true})}); }
-  setTimeout(()=>{ if(typeof renderRoomingGrid==='function') renderRoomingGrid(); if(typeof renderNamelist==='function') renderNamelist(); }, 100);
-  window._draggedStaffId = null;
-};
-const origOnDrop_V124 = window.onDrop;
-window.onDrop = async function(event, roomId){
-  event.preventDefault();
-  const staffId = event.dataTransfer.getData('staffId') || window._draggedStaffId;
-  if(staffId && (window.staffList||[]).some(s=>s.id===staffId||s.airtableId===staffId)){ return window.dropStaffToRoom(event, roomId); }
-  else { if(origOnDrop_V124) return origOnDrop_V124(event, roomId); if(typeof dropJemaah==='function') return dropJemaah(event, roomId); }
-};
-
-document.removeEventListener('click', window._v124Outside);
-window._v124Outside = function(e){
-  const isBoardBtn = e.target.closest('button[onclick*="toggleBoardDropdown_V124"]');
-  const isPakejBtn = e.target.closest('button[onclick*="togglePakejDropdown_V124"]');
-  const isHotelBtn = e.target.closest('button[onclick*="toggleHotelPakejDropdown_V124"]');
-  const isInsideBoard = e.target.closest('[id^="boardDrop-"]');
-  const isInsidePakej = e.target.closest('[id^="pakejDrop-"]');
-  const isInsideHotel = e.target.closest('[id^="hotelPakejDrop-"]');
-  if(!isBoardBtn && !isPakejBtn && !isHotelBtn && !isInsideBoard && !isInsidePakej && !isInsideHotel){
-    const open = document.querySelector('[id^="boardDrop-"]:not(.hidden), [id^="pakejDrop-"]:not(.hidden), [id^="hotelPakejDrop-"]:not(.hidden)');
-    if(open){ closeAllDropdowns_V124(); setTimeout(()=>{ if(typeof renderNamelist==='function') renderNamelist(); if(typeof renderRoomingGrid==='function') renderRoomingGrid(); }, 10); }
+// Also patch drop handlers for tanpa katil to trigger instant render
+const _origDropStaff = window.dropStaff;
+window.dropStaff = function(e, roomId, isTanpaKatil=false){
+  if(_origDropStaff) {
+    const res = _origDropStaff(e, roomId, isTanpaKatil);
+    setTimeout(()=>{ if(typeof renderStaffList==='function') renderStaffList(); if(typeof renderRoomingGrid==='function') renderRoomingGrid(); }, 100);
+    return res;
   }
 };
-document.addEventListener('click', window._v124Outside);
 
-const origRenderNamelist_V124 = window.renderNamelist;
-window.renderNamelist = function(){
-  try{
-    const cont=document.getElementById('namelistContainer'); if(!cont) return;
-    const q=(document.getElementById('searchRoomingJemaah')?.value||'').toLowerCase();
-    const pakejFilter=(document.getElementById('filterPakejRooming')?.value||'').toUpperCase();
-    let filtered=[...allRoomingJemaah];
-    if(q) filtered=filtered.filter(r=> (typeof getJemaahName==='function'? getJemaahName(r.fields) : '').toLowerCase().includes(q));
-    if(pakejFilter) filtered=filtered.filter(r=> (r.fields['PAKEJ']||'').toUpperCase()===pakejFilter);
-    cont.innerHTML=filtered.map((r,i)=>{
-      const name=typeof getJemaahName==='function'? getJemaahName(r.fields) : '-';
-      const assignedNormalInLoc=typeof isJemaahAssignedInLocation==='function'? isJemaahAssignedInLocation(r.id, activeLocation) : false;
-      const assignedTanpaInLoc=allRoomingRecords.some(rec=> (rec.fields['LOKASI / CITY']||'MEKAH').toUpperCase()===(typeof activeLocation!=='undefined'? activeLocation : 'MEKAH').toUpperCase() && ((rec.fields['JEMAAH TANPA KATIL']||[]).includes(r.id)));
-      const assignedInLoc = assignedNormalInLoc || assignedTanpaInLoc;
-      const assignedGlobal=typeof isJemaahAssignedAny==='function'? isJemaahAssignedAny(r.id) : false;
-      const rowCls=assignedInLoc?'bg-slate-100 text-slate-500':'hover:bg-slate-50';
-      const drag=assignedInLoc?'':`draggable="true" ondragstart="dragJemaah(event,'${r.id}')" ondragend="dragEnd(event)"`;
-      let statusIcon = assignedInLoc? `<button onclick="removeJemaahFromCurrentLoc('${r.id}')" class="w-5 h-5 rounded-full bg-amber-100 text-amber-700 text-[10px]">✕</button>` : `<button onclick="quickAssign('${r.id}')" class="w-5 h-5 rounded-full border bg-slate-100 text-[10px]">+</button>`;
-      if(!assignedInLoc && assignedGlobal) statusIcon = `<button onclick="quickAssign('${r.id}')" class="w-5 h-5 rounded-full border bg-amber-100 text-[10px]">+</button>`;
-      const fbArr = r.fields['BOARD BASIS']||[];
-      const fbDisplay = fbArr.length ? fbArr.join(', ') : '-';
-      let fbCls='bg-white border-slate-200 text-slate-400';
-      if(fbArr.length>0) fbCls='bg-emerald-50 border-emerald-200 text-emerald-800';
-      const boardOptions = ['FULLBOARD','FULLBOARD (MEKAH)','BB (MEKAH)','FULLBOARD (MADINAH)','BB (MADINAH)'];
-      const boardCheckboxes = boardOptions.map(opt=>{
-        const checked=fbArr.includes(opt);
-        return `<label class="flex items-center gap-2 px-3 py-2 hover:bg-slate-50 cursor-pointer text-[11px]" onclick="event.stopPropagation()"><input type="checkbox" ${checked?'checked':''} onchange="toggleBoardMulti_V124('${r.id}','${opt}')" class="w-4 h-4 accent-[#7A0C2E]"> ${opt}</label>`;
-      }).join('');
-      const insArr = typeof getInsuranArray==='function'? getInsuranArray(r.fields) : [];
-      const insToggle = ['TAKAFUL','ETIQA','AL-KHAIRI'].map(opt=>{
-        const active = insArr.includes(opt);
-        let cls = 'bg-white text-slate-400 border-slate-200';
-        if(active){ if(opt==='TAKAFUL') cls='bg-emerald-500 text-white border-emerald-600'; else if(opt==='ETIQA') cls='bg-amber-300 text-amber-900 border-amber-400'; else if(opt==='AL-KHAIRI') cls='bg-blue-400 text-white border-blue-500'; }
-        const label = opt==='TAKAFUL'?'TAK':opt==='AL-KHAIRI'?'KHAIRI':opt;
-        return `<button onclick="toggleInsuran('${r.id}','${opt}')" class="px-1.5 py-0.5 rounded-full border text-[7px] font-bold ${cls}">${label}</button>`;
-      }).join('');
-      const pk = r.fields['PAKEJ'] || ''; const pkColor = PAKEJ_COLORS_V124[pk] || '#FFFFFF'; const pkDisplay = pk || '-';
-      const pakejOptionsHtml = ['','JIMAT EKONOMI','JIMAT STANDARD','JIMAT PREMIUM','EKONOMI LITE','EKONOMI','STANDARD','PREMIUM','PREMIUM PLUS'].map(o=>{
-        const isSel = pk===o || (o==='' && pk===''); const label = o==='' ? '-' : o; const bg = isSel ? 'bg-[#7A0C2E] text-white' : 'hover:bg-slate-100';
-        return `<div onclick="selectPakej_V124('${r.id}','${o}')" class="px-4 py-2 cursor-pointer text-[12px] ${bg} ${isSel?'font-bold':''}">${label}</div>`;
-      }).join('');
-      const pakejDropdown = `<div class="relative"><button onclick="event.stopPropagation(); togglePakejDropdown_V124('${r.id}')" class="w-full text-[9px] border rounded-full px-2.5 py-1.5 font-bold text-left flex items-center justify-between" style="background:${pkColor}; border-color:${pkColor}; color:#1F2937"><span class="truncate">${pkDisplay}</span><span>▼</span></button><div id="pakejDrop-${r.id}" class="hidden absolute z-[99999] w-48 bg-white border border-slate-200 rounded-xl shadow-xl overflow-hidden" onclick="event.stopPropagation()">${pakejOptionsHtml}<div class="flex justify-between gap-1 p-2 border-t bg-slate-50"><button onclick="clearPakej_V124('${r.id}'); event.stopPropagation();" class="text-[10px] px-3 py-1 rounded-full bg-white border">Clear</button><button onclick="closePakejDropdown_V124('${r.id}'); event.stopPropagation();" class="text-[10px] px-3 py-1 rounded-full bg-[#7A0C2E] text-white">OK</button></div></div></div>`;
-      const trChecked = typeof isTrainChecked==='function'? isTrainChecked(r.fields) : false;
-      return `<div ${drag} class="grid grid-cols-12 items-center px-1.5 py-1.5 text-[11px] border-b border-slate-50 ${rowCls}"><div class="col-span-1 text-slate-400 text-[10px]">${String(i+1).padStart(2,'0')}</div><div class="col-span-3 font-medium truncate text-[10px] ${assignedInLoc?'text-slate-500 italic':''}" title="${name}">${name}</div><div class="col-span-2 relative"><div class="relative w-full"><button onclick="event.stopPropagation(); toggleBoardDropdown_V124('${r.id}')" class="text-[8px] border rounded-full px-2 py-1 font-bold ${fbCls} outline-none w-full truncate text-left flex items-center justify-between"><span class="truncate">${fbDisplay}</span><span class="ml-1">▼</span></button><div id="boardDrop-${r.id}" class="hidden absolute left-0 top-full mt-1 w-[220px] bg-white border border-slate-200 rounded-xl shadow-xl z-[9999] overflow-hidden" onclick="event.stopPropagation()">${boardCheckboxes}<div class="border-t border-slate-100 p-2 flex justify-between bg-slate-50"><button onclick="clearBoardMulti_V124('${r.id}'); event.stopPropagation();" class="text-[10px] px-3 py-1 rounded-full bg-white border">Clear</button><button onclick="closeBoardDropdown('${r.id}'); event.stopPropagation();" class="text-[10px] px-3 py-1 rounded-full bg-[#7A0C2E] text-white">OK</button></div></div></div></div><div class="col-span-1 text-center"><input type="checkbox" ${trChecked?'checked':''} onchange="updateJemaahCheckbox('${r.id}','TRAIN',this.checked)" class="w-3.5 h-3.5 accent-[#7A0C2E] rounded"></div><div class="col-span-3 flex items-center gap-0.5 flex-wrap justify-center">${insToggle}</div><div class="col-span-1">${pakejDropdown}</div><div class="col-span-1 flex justify-center">${statusIcon}</div></div>`;
-    }).join('');
-    setTimeout(()=>{ const cont = document.getElementById('namelistContainer'); if(cont && cont.parentElement){ cont.parentElement.style.position='sticky'; cont.parentElement.style.top='10px'; cont.parentElement.style.alignSelf='flex-start'; } }, 100);
-  }catch(e){ console.error(e); }
-};
+// Patch remove from tanpa katil
+const _origRemoveStaffFromTanpa = window.removeStaffFromTanpaKatil || window.removeJemaahFromTanpaKatil;
+function instantRefreshAfterRemove(){
+  setTimeout(()=>{ 
+    if(typeof renderStaffList==='function') renderStaffList(); 
+    if(typeof renderNamelist==='function') renderNamelist();
+    if(typeof renderRoomingGrid==='function') renderRoomingGrid();
+  }, 100);
+}
 
-const origRenderRoomingGrid_V124 = window.renderRoomingGrid;
-window.renderRoomingGrid = function(){
-  try{ if(origRenderRoomingGrid_V124) origRenderRoomingGrid_V124(); }catch(e){}
-  setTimeout(()=>{
-    (window.allRoomingRecords||[]).forEach(room=>{
-      const container = document.getElementById('hotelPakejContainer-'+room.id);
-      if(!container){
-        const roomEl = document.querySelector(`[data-room-id="${room.id}"]`) || document.getElementById(`room-${room.id}`);
-        if(roomEl){ const oldSelect = roomEl.querySelector('select'); if(oldSelect){ const newDiv = document.createElement('div'); newDiv.id = 'hotelPakejContainer-'+room.id; oldSelect.parentNode.replaceChild(newDiv, oldSelect); } }
-      }
-      const cont = document.getElementById('hotelPakejContainer-'+room.id); if(!cont) return;
-      const current = room.fields['PAKEJ / HOTEL'] || 'EKONOMI'; const color = PAKEJ_COLORS_V124[current] || '#DBEAFE';
-      const optionsHtml = ['EKONOMI','JIMAT EKONOMI','JIMAT STANDARD','JIMAT PREMIUM','EKONOMI LITE','STANDARD','PREMIUM','PREMIUM PLUS'].map(o=>{ const isSel = current===o; const bg = isSel ? 'bg-[#7A0C2E] text-white font-bold' : 'hover:bg-slate-100'; return `<div onclick="selectHotelPakej_V124('${room.id}','${o}')" class="px-4 py-2 cursor-pointer text-[12px] ${bg}">${o}</div>`; }).join('');
-      cont.innerHTML = `<div class="relative"><button onclick="event.stopPropagation(); toggleHotelPakejDropdown_V124('${room.id}')" class="w-full text-[11px] border rounded-full px-3 py-1.5 font-bold flex items-center justify-between" style="background:${color}; border-color:${color}"><span>${current}</span><span>▼</span></button><div id="hotelPakejDrop-${room.id}" class="hidden absolute z-[99999] w-48 bg-white border border-slate-200 rounded-xl shadow-xl overflow-hidden" onclick="event.stopPropagation()">${optionsHtml}<div class="flex justify-between gap-1 p-2 border-t bg-slate-50"><button onclick="clearHotelPakej_V124('${room.id}'); event.stopPropagation();" class="text-[10px] px-3 py-1 rounded-full bg-white border">Clear</button><button onclick="closeHotelPakejDropdown_V124('${room.id}'); event.stopPropagation();" class="text-[10px] px-3 py-1 rounded-full bg-[#7A0C2E] text-white">OK</button></div></div></div>`;
-    });
-  }, 150);
-};
+// Hook all remove functions
+['removeStaffFromRoom','removeStaffFromTanpaKatil','removeJemaahFromTanpaKatil','removeJemaahFromRoom'].forEach(fnName=>{
+  const orig = window[fnName];
+  if(orig){
+    window[fnName] = function(){
+      const res = orig.apply(this, arguments);
+      instantRefreshAfterRemove();
+      return res;
+    };
+  }
+});
 
-console.log('V124 FIX REMOVE STAFF TANPA KATIL PAKAI TABLE ID + NO DEBUG BOX LOADED');
+console.log('REALTIME GREY FIX FOR STAFF TANPA KATIL ACTIVE');
