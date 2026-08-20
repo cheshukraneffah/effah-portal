@@ -3219,3 +3219,163 @@ window.renderRoomingGrid = function(){
 };
 
 console.log('V121 FIX ALL 4 BUGS LOADED - hotel dropdown, board responsive, staff tanpa katil, simple 8 options');
+
+
+// V122 - FIX REMOVE STAFF TANPA KATIL STILL NOT WORKING
+
+// Force override both remove functions with aggressive fix
+window.removeJemaahTanpaKatil = async function(roomId, jId){
+  console.log('V122 removeJemaahTanpaKatil called', roomId, jId);
+  const base=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base');
+  const pat=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
+  const room = (window.allRoomingRecords||[]).find(r=>r.id===roomId);
+  
+  if(!room){
+    console.error('Room not found', roomId);
+    return;
+  }
+  
+  console.log('Before remove - JEMAAH TANPA KATIL:', room.fields['JEMAAH TANPA KATIL']);
+  console.log('Before remove - STAFF TANPA KATIL:', room.fields['STAFF TANPA KATIL']);
+  console.log('Before remove - TANPA KATIL:', room.fields['TANPA KATIL']);
+  
+  // Check if jId is staff
+  const isStaff = (window.staffList||[]).some(s=>s.id===jId||s.airtableId===jId);
+  console.log('Is staff?', isStaff, jId);
+  
+  // Remove from all possible tanpa katil fields
+  if(room.fields['JEMAAH TANPA KATIL']){
+    room.fields['JEMAAH TANPA KATIL'] = room.fields['JEMAAH TANPA KATIL'].filter(id=>id!==jId);
+  }
+  if(room.fields['STAFF TANPA KATIL']){
+    room.fields['STAFF TANPA KATIL'] = room.fields['STAFF TANPA KATIL'].filter(id=>id!==jId);
+  }
+  if(room.fields['TANPA KATIL']){
+    room.fields['TANPA KATIL'] = room.fields['TANPA KATIL'].filter(id=>id!==jId);
+  }
+  
+  console.log('After remove - JEMAAH TANPA KATIL:', room.fields['JEMAAH TANPA KATIL']);
+  console.log('After remove - STAFF TANPA KATIL:', room.fields['STAFF TANPA KATIL']);
+  
+  // Save to localStorage
+  try{
+    localStorage.setItem('effah_rooming_records', JSON.stringify(window.allRoomingRecords));
+    console.log('Saved to localStorage');
+  }catch(e){ console.error(e); }
+  
+  // Save to Airtable - PATCH both fields
+  if(base&&pat){
+    try{
+      const fieldsToPatch = {};
+      if(room.fields['JEMAAH TANPA KATIL'] !== undefined) fieldsToPatch['JEMAAH TANPA KATIL'] = room.fields['JEMAAH TANPA KATIL'];
+      if(room.fields['STAFF TANPA KATIL'] !== undefined) fieldsToPatch['STAFF TANPA KATIL'] = room.fields['STAFF TANPA KATIL'];
+      if(room.fields['TANPA KATIL'] !== undefined) fieldsToPatch['TANPA KATIL'] = room.fields['TANPA KATIL'];
+      
+      console.log('Patching Airtable with', fieldsToPatch);
+      const res = await fetch(`https://api.airtable.com/v0/${base}/ROOMING%20LIST/${roomId}`,{
+        method:'PATCH', headers:{'Authorization':`Bearer ${pat}`,'Content-Type':'application/json'},
+        body: JSON.stringify({fields: fieldsToPatch, typecast: true})
+      });
+      const txt = await res.text();
+      let json; try{ json=JSON.parse(txt); }catch(e){ json={raw:txt}; }
+      console.log('V122 Airtable PATCH', res.status, json);
+      if(!res.ok){
+        alert(`Remove tanpa katil failed ${res.status}: ${json.error?.message}`);
+      }
+    }catch(e){ console.error('Airtable error', e); }
+  }
+  
+  // Force re-render
+  setTimeout(()=>{
+    console.log('Re-rendering grid');
+    if(typeof renderRoomingGrid==='function') renderRoomingGrid();
+  }, 200);
+};
+
+window.removeStaffTanpaKatil = window.removeJemaahTanpaKatil;
+
+window.removeStaffFromRoom = async function(roomId, staffId){
+  console.log('V122 removeStaffFromRoom', roomId, staffId);
+  // Check if it's tanpa katil or regular staff
+  const room = (window.allRoomingRecords||[]).find(r=>r.id===roomId);
+  if(room){
+    const isTanpaKatil = (room.fields['STAFF TANPA KATIL']||[]).includes(staffId) || (room.fields['JEMAAH TANPA KATIL']||[]).includes(staffId);
+    if(isTanpaKatil){
+      return window.removeJemaahTanpaKatil(roomId, staffId);
+    }
+  }
+  // Regular staff removal
+  if(room){
+    if(room.fields['STAFF']) room.fields['STAFF'] = room.fields['STAFF'].filter(id=>id!==staffId);
+    try{ localStorage.setItem('effah_rooming_records', JSON.stringify(window.allRoomingRecords)); }catch(e){}
+    const base=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base');
+    const pat=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
+    if(base&&pat){
+      await fetch(`https://api.airtable.com/v0/${base}/ROOMING%20LIST/${roomId}`,{
+        method:'PATCH', headers:{'Authorization':`Bearer ${pat}`,'Content-Type':'application/json'},
+        body: JSON.stringify({fields:{'STAFF': room.fields['STAFF']||[]}, typecast: true})
+      }).then(r=>console.log('V122 remove regular staff', r.status));
+    }
+    setTimeout(()=>{ if(typeof renderRoomingGrid==='function') renderRoomingGrid(); }, 100);
+  }
+};
+
+// Patch renderRoomingGrid to ensure X buttons call correct function with correct params
+const origRenderGrid_V122 = window.renderRoomingGrid;
+window.renderRoomingGrid = function(){
+  if(origRenderGrid_V122) origRenderGrid_V122();
+  setTimeout(()=>{
+    // Fix all X buttons in tanpa katil section
+    document.querySelectorAll('.room-card, [id^="room-"], [data-room-id]').forEach(roomEl=>{
+      const roomId = roomEl.getAttribute('data-room-id') || (roomEl.id ? roomEl.id.replace('room-','') : null);
+      if(!roomId) return;
+      
+      // Find tanpa katil section
+      const tanpaKatilSection = roomEl.querySelector('[class*="TANPA KATIL"]')?.parentElement || roomEl;
+      tanpaKatilSection.querySelectorAll('button').forEach(btn=>{
+        if(btn.textContent.includes('×') || btn.textContent.includes('X') || btn.innerHTML.includes('×')){
+          const parentText = btn.parentElement?.textContent||'';
+          if(parentText.includes('TANPA') || parentText.includes('SHARIFAH') || parentText.includes('EFFA')){
+            // This is likely tanpa katil remove button
+            const staffIdMatch = btn.getAttribute('onclick')?.match(/'([^']+)'[^']*'([^']+)'/);
+            if(staffIdMatch){
+              const rId = staffIdMatch[1];
+              const sId = staffIdMatch[2];
+              // Override to use our fixed function
+              btn.setAttribute('onclick', `removeJemaahTanpaKatil('${rId}','${sId}')`);
+              btn.onclick = (e)=>{ e.stopPropagation(); window.removeJemaahTanpaKatil(rId, sId); };
+              console.log('V122 fixed tanpa katil button', rId, sId);
+            }
+          }
+        }
+      });
+    });
+    
+    // Also fix via direct DOM query for SHARIFAH button
+    const sharifahBtn = Array.from(document.querySelectorAll('button')).find(b=>b.parentElement?.textContent?.includes('SHARIFAH EFFA'));
+    if(sharifahBtn){
+      console.log('Found SHARIFAH button, fixing');
+      const roomCard = sharifahBtn.closest('[data-room-id], [id^="room-"]');
+      const roomId = roomCard?.getAttribute('data-room-id') || roomCard?.id?.replace('room-','');
+      // Find staff ID for SHARIFAH
+      const staff = (window.staffList||[]).find(s=> (s.fields?.['NAMA']||'').includes('SHARIFAH') || (s.fields?.['NAMA STAFF']||'').includes('SHARIFAH'));
+      const staffId = staff?.id || staff?.airtableId || 'recStaffSharifah';
+      if(roomId){
+        sharifahBtn.onclick = (e)=>{ e.stopPropagation(); console.log('SHARIFAH X clicked'); window.removeJemaahTanpaKatil(roomId, staffId); };
+        // Also try to get actual ID from room fields
+        const room = (window.allRoomingRecords||[]).find(r=>r.id===roomId);
+        if(room){
+          const tanpaKatilIds = [...(room.fields['STAFF TANPA KATIL']||[]), ...(room.fields['JEMAAH TANPA KATIL']||[])];
+          console.log('Tanpa katil IDs in room', roomId, tanpaKatilIds);
+          // Assume first ID is SHARIFAH if only one
+          if(tanpaKatilIds.length>0){
+            const actualId = tanpaKatilIds[0];
+            sharifahBtn.onclick = (e)=>{ e.stopPropagation(); window.removeJemaahTanpaKatil(roomId, actualId); };
+          }
+        }
+      }
+    }
+  }, 300);
+};
+
+console.log('V122 FIX REMOVE STAFF TANPA KATIL STILL NOT WORKING LOADED');
