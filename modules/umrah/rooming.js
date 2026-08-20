@@ -771,7 +771,12 @@ function isJemaahAssignedInLocation(jId, location){
   const loc = (location||activeLocation).toUpperCase();
   return allRoomingRecords.some(r=> (r.fields['LOKASI / CITY']||'MEKAH').toUpperCase()===loc && (r.fields['JEMAAH']||[]).includes(jId));
 }
-
+function isStaffAssignedInLocation(staffId, location){
+  const s=staffList.find(x=>x.id===staffId||x.airtableId===staffId); if(!s) return false;
+  if(!s.roomIds || s.roomIds.length===0) return false;
+  const loc = (location||activeLocation).toUpperCase();
+  return allRoomingRecords.some(r=> (r.fields['LOKASI / CITY']||'MEKAH').toUpperCase()===loc && s.roomIds.includes(r.id));
+}
 function getStaffForRoom(roomId){
   const tanpaLocal = (typeof getStaffTanpaKatilForRoom==='function'? getStaffTanpaKatilForRoom(roomId) : []);
   const room = allRoomingRecords.find(r=>r.id===roomId);
@@ -1085,7 +1090,7 @@ function renderStaffList(){
   const cont=document.getElementById('staffListContainer'); const badge=document.getElementById('staffTotalBadge'); if(!cont) return; if(badge) badge.textContent=staffList.length+' Staff';
   if(staffList.length===0){ cont.innerHTML='<div class="p-2.5 text-center text-[11px] text-slate-400">Tiada staff / extra</div>'; return; }
   cont.innerHTML=staffList.map((s,idx)=>{
-    const assignedInLoc = isStaffAssignedInLocation(s.id, activeLocation);
+    const assignedInLoc=isStaffAssignedInLocation(s.id, activeLocation);
     const cls=assignedInLoc?'bg-slate-100 text-slate-400 border-slate-200':'bg-white hover:bg-slate-50 cursor-grab border-slate-200'; // V102 FIX GHOST - no opacity
     const drag=assignedInLoc?'':`draggable="true" ondragstart="dragStaff(event,'${s.id}')" ondragend="dragStaffEnd(event)"`;
     const boardArr=(typeof getStaffBoardArray==='function'? getStaffBoardArray(s) : []);
@@ -1258,8 +1263,43 @@ function getStaffTanpaKatilForRoom(roomId){
     return JSON.parse(localStorage.getItem(key)||'[]');
   }catch(e){ return []; }
 }
-
-
+function removeStaffTanpaKatilFromRoom(roomId, staffId){
+  const room=allRoomingRecords.find(r=>r.id===roomId);
+  if(room){
+    const key='effah_staff_tanpa_'+roomId;
+    let list=[];
+    try{ list=JSON.parse(localStorage.getItem(key)||'[]'); }catch(e){ list=[]; }
+    list=list.filter(id=>id!==staffId);
+    try{ localStorage.setItem(key, JSON.stringify(list)); }catch(e){}
+    if(room.fields['_STAFF_TANPA_KATIL']) room.fields['_STAFF_TANPA_KATIL']=room.fields['_STAFF_TANPA_KATIL'].filter(id=>id!==staffId);
+    if(room.fields['JEMAAH TANPA KATIL']) room.fields['JEMAAH TANPA KATIL']=room.fields['JEMAAH TANPA KATIL'].filter(id=>id!==staffId);
+    // FIX V91: Also remove from staffList roomIds so staff becomes unassigned, not move to regular
+    const sRec = (typeof getStaffById==='function'? getStaffById(staffId) : staffList.find(s=>s.id===staffId||s.airtableId===staffId));
+    if(sRec && sRec.roomIds){
+      sRec.roomIds = sRec.roomIds.filter(rid=>rid!==roomId);
+      // Also remove from ROOMING LIST STAFF LIST field if exists
+      if(room.fields['STAFF LIST (ROOMING)']) room.fields['STAFF LIST (ROOMING)']=room.fields['STAFF LIST (ROOMING)'].filter(id=>id!==staffId);
+    }
+    renderRoomingGrid();
+    renderStaffList();
+    const base=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base')||localStorage.getItem('effah_base_id'); const pat=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
+    if(base&&pat){
+      fetch(`https://api.airtable.com/v0/${base}/ROOMING%20LIST/${roomId}`,{method:'PATCH',headers:{Authorization:`Bearer ${pat}`,'Content-Type':'application/json'},body:JSON.stringify({fields:{'JEMAAH TANPA KATIL': room.fields['JEMAAH TANPA KATIL']||[], 'STAFF LIST (ROOMING)': room.fields['STAFF LIST (ROOMING)']||[], 'STAFF TANPA KATIL': list}})}).catch(()=>{});
+    }
+  }
+}
+function removeTanpaKatilFromRoom(roomId, jId){
+  const room=allRoomingRecords.find(r=>r.id===roomId);
+  if(!room) return;
+  const current=room.fields['JEMAAH TANPA KATIL']||[];
+  const newList=current.filter(id=>id!==jId);
+  room.fields['JEMAAH TANPA KATIL']=newList;
+  renderRoomingGrid();
+  const base=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base')||localStorage.getItem('effah_base_id'); const pat=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
+  if(base&&pat){
+    fetch(`https://api.airtable.com/v0/${base}/ROOMING%20LIST/${roomId}`,{method:'PATCH',headers:{Authorization:`Bearer ${pat}`,'Content-Type':'application/json'},body:JSON.stringify({fields:{'JEMAAH TANPA KATIL': newList}})}).catch(()=>{});
+  }
+}
 
 
 function quickAssignStaffToRoom(staffId, roomId){
@@ -1641,7 +1681,18 @@ function filterTanpaKatilList(q){
   });
 }
 
-async 
+async function removeTanpaKatilFromRoom(roomId, jId){
+  const rec=allRoomingRecords.find(r=>r.id===roomId);
+  if(!rec) return;
+  const cur = rec.fields['JEMAAH TANPA KATIL'] || rec.fields['INFANT'] || [];
+  const newVal=cur.filter(x=>x!==jId);
+  rec.fields['JEMAAH TANPA KATIL']=newVal;
+  renderRoomingGrid();
+  renderNamelist();
+  const b=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base')||localStorage.getItem('effah_base_id');
+  const p=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
+  try{ await fetch(`https://api.airtable.com/v0/${b}/ROOMING%20LIST/${roomId}`,{method:'PATCH',headers:{Authorization:`Bearer ${p}`,'Content-Type':'application/json'},body:JSON.stringify({fields:{'JEMAAH TANPA KATIL':newVal}})}); }catch(e){}
+}
 
 function updateNewRoomIdFromCap(){ const cap=parseInt(document.getElementById('newRoomCap').value)||4; const el=document.getElementById('newRoomId'); if(el) el.value=generateRoomIdFromCap(cap); }
 function changeNewRoomCap(d){ const i=document.getElementById('newRoomCap'); let v=parseInt(i.value)||4; v=Math.max(1,Math.min(8,v+d)); i.value=v; updateNewRoomIdFromCap(); }
@@ -1741,7 +1792,18 @@ async function addTanpaKatilToRoom(roomId, jId){
     if(d.error) console.warn('Airtable save warning', d.error);
   }catch(e){ console.error(e); }
 }
-async 
+async function removeTanpaKatilFromRoom(roomId, jId){
+  const rec=allRoomingRecords.find(r=>r.id===roomId);
+  if(!rec) return;
+  const cur = rec.fields['JEMAAH TANPA KATIL'] || rec.fields['INFANT'] || [];
+  const newVal=cur.filter(x=>x!==jId);
+  rec.fields['JEMAAH TANPA KATIL']=newVal;
+  renderRoomingGrid();
+  renderNamelist();
+  const b=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base')||localStorage.getItem('effah_base_id');
+  const p=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
+  try{ await fetch(`https://api.airtable.com/v0/${b}/ROOMING%20LIST/${roomId}`,{method:'PATCH',headers:{Authorization:`Bearer ${p}`,'Content-Type':'application/json'},body:JSON.stringify({fields:{'JEMAAH TANPA KATIL':newVal}})}); }catch(e){}
+}
 
 
 
@@ -1755,10 +1817,8 @@ function generateRoomingPrint(orientation){ orientation = orientation || 'landsc
     const tripId = window.selectedTripRecord?.id || localStorage.getItem('effah_active_trip_id') || '';
     
     // NAMELIST ROWS - keep existing logic but ensure board badge shows actual value
-    let combinedStaff = [...staffList].sort((a,b)=>{ try{ const na=(getJemaahName(a.fields)||a.fields['NAMA']||'').toString().toUpperCase(); const nb=(getJemaahName(b.fields)||b.fields['NAMA']||'').toString().toUpperCase(); return na.localeCompare(nb); }catch(e){ return 0; } });
-    // FIX SORT A-Z untuk print
-    let sortedJemaahForPrint = [...allRoomingJemaah].sort((a,b)=>{ try{ const na=(getJemaahName(a.fields)||a.fields['NAMA JEMAAH']||a.fields['NAMA']||'').toString().toUpperCase(); const nb=(getJemaahName(b.fields)||b.fields['NAMA JEMAAH']||b.fields['NAMA']||'').toString().toUpperCase(); return na.localeCompare(nb); }catch(e){ return 0; } });
-    let namelistRows = sortedJemaahForPrint.map((r,i)=>{
+    let combinedStaff = [...staffList];
+    let namelistRows = allRoomingJemaah.map((r,i)=>{
       const f=r.fields;
       const name=getJemaahName(f);
       const fbArr=getBoardArray(f);
@@ -2428,468 +2488,57 @@ window.removeStaffFromRoom = removeStaffFromRoom_FIXED;
 console.log('V102 RACE FIX loaded - queue per staff');
 
 
-function toggleStaffBoardMulti_FIXED(staffId, boardVal){
-  const staff = (window.staffList||[]).find(s=>s.id===staffId||s.airtableId===staffId);
-  if(!staff) return;
-  if(!staff.board) staff.board=[];
-  if(!Array.isArray(staff.board)) staff.board = staff.board ? [staff.board] : [];
-  const idx = staff.board.indexOf(boardVal);
-  if(idx>=0) staff.board.splice(idx,1); else staff.board.push(boardVal);
-  const isTrain = staff.board.includes('TRAIN') || !!staff.train;
-  staff.train = isTrain;
-  if(typeof saveStaffList==='function') try{saveStaffList();}catch(e){}
-  if(typeof renderStaffList==='function') renderStaffList();
-  if(typeof renderRoomingGrid==='function') renderRoomingGrid();
-  const base = window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base');
-  const pat = window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
-  if(base&&pat&&staff.airtableId){
-    const boardToSave = staff.board.filter(b=>b!=='TRAIN');
-    fetch('https://api.airtable.com/v0/'+base+'/STAFF%20LIST%20%28ROOMING%29/'+staff.airtableId,{
-      method:'PATCH', headers:{'Authorization':'Bearer '+pat,'Content-Type':'application/json'},
-      body: JSON.stringify({fields:{'BOARD BASIS': boardToSave, 'TRAIN': isTrain}})
-    }).then(r=>r.json()).then(d=>console.log('STAFF BOARD saved')).catch(()=>{});
-  }
-}
-window.toggleStaffBoardMulti = toggleStaffBoardMulti_FIXED;
+// ===== CLEAN FIX V103 - BOARD + REMOVE STAFF - NO SYNTAX ERROR =====
 
-function updateStaffBoardSingle_FIXED(staffId, value){
-  const staff = (window.staffList||[]).find(s=>s.id===staffId||s.airtableId===staffId);
-  if(!staff) return;
-  const hasTrain = (staff.board||[]).includes('TRAIN') || !!staff.train;
-  if(value==='-'||value==='') staff.board = hasTrain ? ['TRAIN'] : [];
-  else staff.board = hasTrain ? [value,'TRAIN'] : [value];
-  if(typeof saveStaffList==='function') try{saveStaffList();}catch(e){}
-  if(typeof renderStaffList==='function') renderStaffList();
-  const base = window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base');
-  const pat = window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
-  if(base&&pat&&staff.airtableId){
-    const boardToSave = (staff.board||[]).filter(b=>b!=='TRAIN');
-    fetch('https://api.airtable.com/v0/'+base+'/STAFF%20LIST%20%28ROOMING%29/'+staff.airtableId,{
-      method:'PATCH', headers:{'Authorization':'Bearer '+pat,'Content-Type':'application/json'},
-      body: JSON.stringify({fields:{'BOARD BASIS': boardToSave}})
-    }).then(r=>r.json()).then(d=>console.log('STAFF BOARD single saved '+value)).catch(()=>{});
-  }
-}
-window.updateStaffBoardSingle = updateStaffBoardSingle_FIXED;
-
-
-
-
-
-
-function isStaffAssignedInLocation(staffId, loc){
-  loc = (loc||activeLocation||'MEKAH').toString().toUpperCase();
-  const staffObj = (window.staffList||[]).find(x=>x.id===staffId||x.airtableId===staffId);
-  const staffName = (staffObj?.name||staffObj?.fields?.['NAMA']||'').toString().toUpperCase();
-  for(const rec of (window.allRoomingRecords||[])){
-    const recLoc = (rec.fields['LOKASI / CITY']||'MEKAH').toString().toUpperCase();
-    if(recLoc!==loc) continue;
-    const staffExtra = rec.fields['STAFF / EXTRA']||[];
-    const staffArr = rec.fields['STAFF']||[];
-    const tanpa = rec.fields['JEMAAH TANPA KATIL']||[];
-    const staffTanpa = rec.fields['STAFF TANPA KATIL']||[];
-    const tanpaKatil2 = rec.fields['TANPA KATIL']||[];
-    const infant = rec.fields['INFANT']||[];
-    const allLists = [...staffExtra, ...staffArr, ...tanpa, ...staffTanpa, ...tanpaKatil2, ...infant];
-    if(allLists.includes(staffId)) return true;
-    // Fallback check by name - Airtable sometimes stores name
-    if(staffName){
-      for(const idOrName of allLists){
-        if(typeof idOrName==='string' && idOrName.toUpperCase().includes(staffName.split('(')[0].trim())) return true;
-      }
-    }
-    // Check legacy roomIds
-    if(staffObj && staffObj.roomIds && staffObj.roomIds.includes(rec.id)) return true;
-  }
-  return false;
-}
-
-function isStaffAssignedAny(staffId){ for(const loc of ['MEKAH','MADINAH','TAIF','JEDDAH','JEDDAH','MUMTAZ']){ if(isStaffAssignedInLocation(staffId, loc)) return true; } return false; }
-
-
-// FIX REALTIME GREY FOR STAFF TANPA KATIL
-const _origUpdateRoomField = window.updateRoomField;
-window.updateRoomField = async function(roomId, field, value, shouldRender=true){
-  // Update local cache instantly
-  const rec = (window.allRoomingRecords||[]).find(r=>r.id===roomId||r.airtableId===roomId);
-  if(rec){
-    if(!rec.fields) rec.fields={};
-    rec.fields[field]=value;
-    // If staff assigned to tanpa katil, also ensure staffList roomIds updated
-    if(field==='JEMAAH TANPA KATIL' || field==='STAFF / EXTRA' || field==='STAFF' || field==='STAFF TANPA KATIL' || field==='TANPA KATIL'){
-      // Trigger instant grey
-      if(typeof renderStaffList==='function') setTimeout(()=>renderStaffList(), 50);
-      if(typeof renderNamelist==='function') setTimeout(()=>renderNamelist(), 50);
-    }
-  }
-  if(_origUpdateRoomField) return _origUpdateRoomField(roomId, field, value, shouldRender);
-  // Fallback fetch
-  const base = window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base');
-  const pat = window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
-  if(base&&pat){
-    fetch(`https://api.airtable.com/v0/${base}/ROOMING%20LIST/${roomId}`,{
-      method:'PATCH', headers:{'Authorization':'Bearer '+pat,'Content-Type':'application/json'},
-      body: JSON.stringify({fields:{[field]: value}})
-    }).then(()=>{ if(shouldRender){ renderRoomingGrid(); renderStaffList(); renderNamelist(); } }).catch(()=>{});
-  }
-};
-
-// Also patch drop handlers for tanpa katil to trigger instant render
-const _origDropStaff = window.dropStaff;
-window.dropStaff = function(e, roomId, isTanpaKatil=false){
-  if(_origDropStaff) {
-    const res = _origDropStaff(e, roomId, isTanpaKatil);
-    setTimeout(()=>{ if(typeof renderStaffList==='function') renderStaffList(); if(typeof renderRoomingGrid==='function') renderRoomingGrid(); }, 100);
-    return res;
-  }
-};
-
-// Patch remove from tanpa katil
-const _origRemoveStaffFromTanpa = window.removeStaffFromTanpaKatil || window.removeJemaahFromTanpaKatil;
-function instantRefreshAfterRemove(){
-  setTimeout(()=>{ 
-    if(typeof renderStaffList==='function') renderStaffList(); 
-    if(typeof renderNamelist==='function') renderNamelist();
-    if(typeof renderRoomingGrid==='function') renderRoomingGrid();
-  }, 100);
-}
-
-// Hook all remove functions
-['removeStaffFromRoom','removeStaffFromTanpaKatil','removeJemaahFromTanpaKatil','removeJemaahFromRoom'].forEach(fnName=>{
-  const orig = window[fnName];
-  if(orig){
-    window[fnName] = function(){
-      const res = orig.apply(this, arguments);
-      instantRefreshAfterRemove();
-      return res;
-    };
-  }
-});
-
-console.log('REALTIME GREY FIX FOR STAFF TANPA KATIL ACTIVE');
-
-
-function removeStaffTanpaKatilFromRoom(roomId, staffId){
-  const room = (window.allRoomingRecords||[]).find(r=>r.id===roomId);
-  if(!room) return;
-  if(!room.fields) room.fields={};
-  // Clear from all possible tanpa fields
-  ['JEMAAH TANPA KATIL','STAFF TANPA KATIL','TANPA KATIL','INFANT'].forEach(key=>{
-    if(Array.isArray(room.fields[key])){
-      room.fields[key] = room.fields[key].filter(id=>id!==staffId);
-    }
-  });
-  if(room.fields['_STAFF_TANPA_KATIL']){
-    room.fields['_STAFF_TANPA_KATIL'] = room.fields['_STAFF_TANPA_KATIL'].filter(id=>id!==staffId);
-  }
-  // Clear localStorage key
+function isStaffAssignedInLocation_V103(staffId, loc){
   try{
-    const key='effah_staff_tanpa_'+roomId;
-    let list = JSON.parse(localStorage.getItem(key)||'[]');
-    list = list.filter(id=>id!==staffId);
-    localStorage.setItem(key, JSON.stringify(list));
-  }catch(e){}
-  // Clear roomIds from staff object
-  const sRec = (window.staffList||[]).find(s=>s.id===staffId||s.airtableId===staffId);
-  if(sRec){
-    if(sRec.roomIds) sRec.roomIds = sRec.roomIds.filter(rid=>rid!==roomId);
-    // Also clear any other room that might have this staff as tanpa
-    (window.allRoomingRecords||[]).forEach(r=>{
-      if(r.id===roomId) return;
-      if(r.fields && Array.isArray(r.fields['JEMAAH TANPA KATIL']) && r.fields['JEMAAH TANPA KATIL'].includes(staffId)){
-        r.fields['JEMAAH TANPA KATIL'] = r.fields['JEMAAH TANPA KATIL'].filter(id=>id!==staffId);
-      }
-    });
-  }
-  // Instant render - force grey removal
-  if(typeof renderRoomingGrid==='function') renderRoomingGrid();
-  if(typeof renderStaffList==='function') renderStaffList();
-  if(typeof renderNamelist==='function') renderNamelist();
-  if(typeof renderLocationTabs==='function') try{renderLocationTabs();}catch(e){}
-  
-  const base=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base')||localStorage.getItem('effah_base_id');
-  const pat=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
-  if(base&&pat){
-    fetch(`https://api.airtable.com/v0/${base}/ROOMING%20LIST/${roomId}`,{
-      method:'PATCH',
-      headers:{'Authorization':`Bearer ${pat}`,'Content-Type':'application/json'},
-      body: JSON.stringify({fields:{
-        'JEMAAH TANPA KATIL': room.fields['JEMAAH TANPA KATIL']||[],
-        'STAFF LIST (ROOMING)': room.fields['STAFF LIST (ROOMING)']||[],
-        'STAFF TANPA KATIL': JSON.parse(localStorage.getItem('effah_staff_tanpa_'+roomId)||'[]')
-      }})
-    }).then(()=>{ console.log('Staff tanpa katil removed', staffId); }).catch(()=>{});
-  }
-}
-function removeTanpaKatilFromRoom(roomId, jId){
-  const room = (window.allRoomingRecords||[]).find(r=>r.id===roomId);
-  if(!room) return;
-  if(!room.fields) room.fields={};
-  ['JEMAAH TANPA KATIL','STAFF TANPA KATIL','TANPA KATIL','INFANT'].forEach(key=>{
-    if(Array.isArray(room.fields[key])){
-      room.fields[key] = room.fields[key].filter(id=>id!==jId);
-    }
-  });
-  // Also clear from staff if it's staff
-  const sRec = (window.staffList||[]).find(s=>s.id===jId||s.airtableId===jId);
-  if(sRec && sRec.roomIds){
-    sRec.roomIds = sRec.roomIds.filter(rid=>rid!==roomId);
-  }
-  if(typeof renderRoomingGrid==='function') renderRoomingGrid();
-  if(typeof renderStaffList==='function') renderStaffList();
-  if(typeof renderNamelist==='function') renderNamelist();
-  const base=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base');
-  const pat=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
-  if(base&&pat){
-    fetch(`https://api.airtable.com/v0/${base}/ROOMING%20LIST/${roomId}`,{
-      method:'PATCH',headers:{'Authorization':`Bearer ${pat}`,'Content-Type':'application/json'},
-      body: JSON.stringify({fields:{'JEMAAH TANPA KATIL': room.fields['JEMAAH TANPA KATIL']||[]}})
-    }).catch(()=>{});
-  }
-}
-window.removeStaffTanpaKatilFromRoom = removeStaffTanpaKatilFromRoom;
-window.removeTanpaKatilFromRoom = removeTanpaKatilFromRoom;
-
-
-function removeStaffFromRoom_FINAL(roomId, staffId){
-  const staff = (window.staffList||[]).find(s=>s.id===staffId||s.airtableId===staffId);
-  const room = (window.allRoomingRecords||[]).find(r=>r.id===roomId);
-  if(room){
-    // Clear from all staff fields
-    ['STAFF / EXTRA','STAFF','STAFF LIST (ROOMING)'].forEach(key=>{
-      if(room.fields[key]){
-        if(Array.isArray(room.fields[key])){
-          room.fields[key]=room.fields[key].filter(id=>id!==staffId);
-        } else if(typeof room.fields[key]==='string'){
-          room.fields[key]=room.fields[key].split(',').map(x=>x.trim()).filter(x=>x&&x!==staffId&&!x.includes(staffId)).join(',');
+    loc = (loc||window.activeLocation||'MEKAH').toString().toUpperCase();
+    const staffObj = (window.staffList||[]).find(x=>x.id===staffId||x.airtableId===staffId);
+    const staffName = (staffObj?.name||'').toString().toUpperCase().split('(')[0].trim();
+    for(const rec of (window.allRoomingRecords||[])){
+      const recLoc = (rec.fields['LOKASI / CITY']||'MEKAH').toString().toUpperCase();
+      if(recLoc!==loc) continue;
+      const checkKeys = ['STAFF / EXTRA','STAFF','JEMAAH TANPA KATIL','STAFF TANPA KATIL','STAFF LIST (ROOMING)','TANPA KATIL'];
+      for(const key of checkKeys){
+        const val = rec.fields[key];
+        if(!val) continue;
+        if(Array.isArray(val)){
+          if(val.includes(staffId)) return true;
+          if(staffName && val.some(v=> typeof v==='string' && v.toUpperCase().includes(staffName))) return true;
+        } else if(typeof val==='string'){
+          if(val.includes(staffId)) return true;
+          if(staffName && val.toUpperCase().includes(staffName)) return true;
         }
       }
-    });
-    // Also clear from tanpa katil if exists
-    ['JEMAAH TANPA KATIL','STAFF TANPA KATIL'].forEach(key=>{
-      if(Array.isArray(room.fields[key])){
-        room.fields[key]=room.fields[key].filter(id=>id!==staffId);
-      }
-    });
-  }
-  if(staff){
-    if(staff.roomIds) staff.roomIds = staff.roomIds.filter(id=>id!==roomId);
-    if(staff.roomLink===roomId) staff.roomLink = staff.roomIds[0]||null;
-    if(typeof saveStaffList==='function') try{saveStaffList();}catch(e){}
-  }
-  if(typeof renderRoomingGrid==='function') renderRoomingGrid();
-  if(typeof renderStaffList==='function') renderStaffList();
-  if(typeof renderLocationTabs==='function') try{renderLocationTabs();}catch(e){}
-  
-  const base=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base');
-  const pat=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
-  if(base&&pat){
-    const staffAirtableId = staff?.airtableId||staffId;
-    // Patch staff record roomIds
-    fetch(`https://api.airtable.com/v0/${base}/STAFF%20LIST%20%28ROOMING%29/${staffAirtableId}`,{
-      method:'PATCH', headers:{'Authorization':`Bearer ${pat}`,'Content-Type':'application/json'},
-      body: JSON.stringify({fields:{'ROOMING LIST': staff ? staff.roomIds||[] : []}})
-    }).catch(()=>{});
-    // Patch room record
-    if(room){
-      fetch(`https://api.airtable.com/v0/${base}/ROOMING%20LIST/${roomId}`,{
-        method:'PATCH', headers:{'Authorization':`Bearer ${pat}`,'Content-Type':'application/json'},
-        body: JSON.stringify({fields:{
-          'STAFF / EXTRA': room.fields['STAFF / EXTRA']||'',
-          'JEMAAH TANPA KATIL': room.fields['JEMAAH TANPA KATIL']||[],
-          'STAFF LIST (ROOMING)': room.fields['STAFF LIST (ROOMING)']||[]
-        }})
-      }).catch(()=>{});
+      if(staffObj && staffObj.roomIds && staffObj.roomIds.includes(rec.id)) return true;
     }
-  }
+  }catch(e){ console.error('isStaffAssigned error', e); }
+  return false;
 }
-window.removeStaffFromRoom = removeStaffFromRoom_FINAL;
-window.removeStaffFromRoom_FIXED = removeStaffFromRoom_FINAL;
+window.isStaffAssignedInLocation = isStaffAssignedInLocation_V103;
 
-
-function clearBoardMultiStaff_FIXED2(staffId){
-  const staff = (window.staffList||[]).find(s=>s.id===staffId||s.airtableId===staffId);
-  if(!staff) return;
-  const hadTrain = !!staff.train || (staff.board||[]).includes('TRAIN');
-  staff.board = hadTrain ? ['TRAIN'] : [];
-  staff.boardBasis = staff.board;
-  try{ localStorage.setItem('effah_staff_board_'+staffId, JSON.stringify(staff.board)); }catch(e){}
-  if(typeof saveStaffList==='function') try{saveStaffList();}catch(e){}
-  if(typeof renderStaffList==='function') renderStaffList();
-  const base = window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base')||localStorage.getItem('effah_base_id')||localStorage.getItem('VITE_AIRTABLE_BASE_ID');
-  const pat = window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat')||localStorage.getItem('VITE_AIRTABLE_PAT')||localStorage.getItem('airtable_pat');
-  if(base&&pat&&staff.airtableId){
-    fetch(`https://api.airtable.com/v0/${base}/STAFF%20LIST%20%28ROOMING%29/${staff.airtableId}`,{
-      method:'PATCH', headers:{'Authorization':`Bearer ${pat}`,'Content-Type':'application/json'},
-      body: JSON.stringify({fields:{'BOARD BASIS': [], 'BOARD': ''}})
-    }).then(r=>r.json()).then(d=>console.log('BOARD cleared saved', d)).catch(e=>console.error('BOARD clear fail', e));
-  }
-}
-window.clearBoardMulti = clearBoardMultiStaff_FIXED2;
-window.clearStaffBoardMulti = clearBoardMultiStaff_FIXED2;
-
-function toggleStaffBoardMulti_FINAL(staffId, boardVal){
-  const staff = (window.staffList||[]).find(s=>s.id===staffId||s.airtableId===staffId);
-  if(!staff) return;
-  if(!staff.board) staff.board=[];
-  if(!Array.isArray(staff.board)) staff.board = staff.board ? [staff.board] : [];
-  const idx = staff.board.indexOf(boardVal);
-  if(idx>=0) staff.board.splice(idx,1); else staff.board.push(boardVal);
-  staff.boardBasis = staff.board;
-  const isTrain = staff.board.includes('TRAIN') || !!staff.train;
-  staff.train = isTrain;
-  try{ localStorage.setItem('effah_staff_board_'+staffId, JSON.stringify(staff.board)); }catch(e){}
-  if(typeof saveStaffList==='function') try{saveStaffList();}catch(e){}
-  if(typeof renderStaffList==='function') renderStaffList();
-  const base = window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base')||localStorage.getItem('effah_base_id')||localStorage.getItem('VITE_AIRTABLE_BASE_ID');
-  const pat = window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat')||localStorage.getItem('VITE_AIRTABLE_PAT')||localStorage.getItem('airtable_pat');
-  if(base&&pat&&staff.airtableId){
-    const boardToSave = staff.board.filter(b=>b!=='TRAIN');
-    fetch(`https://api.airtable.com/v0/${base}/STAFF%20LIST%20%28ROOMING%29/${staff.airtableId}`,{
-      method:'PATCH', headers:{'Authorization':`Bearer ${pat}`,'Content-Type':'application/json'},
-      body: JSON.stringify({fields:{'BOARD BASIS': boardToSave, 'BOARD': boardToSave.join(', '), 'TRAIN': isTrain}})
-    }).then(r=>r.json()).then(d=>console.log('STAFF BOARD saved', boardToSave)).catch(e=>console.error('BOARD save fail', e));
-  }
-}
-window.toggleStaffBoardMulti = toggleStaffBoardMulti_FINAL;
-
-function updateStaffBoardSingle_FINAL(staffId, value){
-  const staff = (window.staffList||[]).find(s=>s.id===staffId||s.airtableId===staffId);
-  if(!staff) return;
-  const hasTrain = (staff.board||[]).includes('TRAIN') || !!staff.train;
-  if(value==='-'||value===''||value==='- BOARD'||value==='-BOARD'){
-    staff.board = hasTrain ? ['TRAIN'] : [];
-  } else {
-    staff.board = hasTrain ? [value,'TRAIN'] : [value];
-  }
-  staff.boardBasis = staff.board;
-  try{ localStorage.setItem('effah_staff_board_'+staffId, JSON.stringify(staff.board)); }catch(e){}
-  if(typeof saveStaffList==='function') try{saveStaffList();}catch(e){}
-  if(typeof renderStaffList==='function') renderStaffList();
-  const base = window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base')||localStorage.getItem('effah_base_id')||localStorage.getItem('VITE_AIRTABLE_BASE_ID');
-  const pat = window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat')||localStorage.getItem('VITE_AIRTABLE_PAT')||localStorage.getItem('airtable_pat');
-  if(base&&pat&&staff.airtableId){
-    const boardToSave = (staff.board||[]).filter(b=>b!=='TRAIN');
-    fetch(`https://api.airtable.com/v0/${base}/STAFF%20LIST%20%28ROOMING%29/${staff.airtableId}`,{
-      method:'PATCH', headers:{'Authorization':`Bearer ${pat}`,'Content-Type':'application/json'},
-      body: JSON.stringify({fields:{'BOARD BASIS': boardToSave, 'BOARD': boardToSave.join(', ')||''}})
-    }).then(r=>r.json()).then(d=>console.log('STAFF BOARD single saved', boardToSave)).catch(e=>console.error(e));
-  }
-}
-window.updateStaffBoardSingle = updateStaffBoardSingle_FINAL;
-
-
-function removeStaffFromRoom_FINAL2(roomId, staffIdOrName){
+async function removeStaffFromRoom_V103(roomId, staffIdOrName){
+  console.log('V103 removeStaffFromRoom', roomId, staffIdOrName);
   const room = (window.allRoomingRecords||[]).find(r=>r.id===roomId);
-  const staffListLocal = window.staffList||[];
-  let staff = staffListLocal.find(s=>s.id===staffIdOrName||s.airtableId===staffIdOrName);
-  // If not found by ID, find by name contains
+  let staff = (window.staffList||[]).find(s=>s.id===staffIdOrName||s.airtableId===staffIdOrName);
   if(!staff){
-    staff = staffListLocal.find(s=> staffIdOrName && (s.name||'').toUpperCase().includes(staffIdOrName.toString().toUpperCase().split('(')[0].trim()));
-  }
-  const realStaffId = staff ? staff.id : staffIdOrName;
-  const staffNamePart = staff ? (staff.name||'').split('(')[0].trim().toUpperCase() : staffIdOrName.toString().toUpperCase().split('(')[0].trim();
-  
-  if(room && room.fields){
-    // Clear from STAFF / EXTRA which may be string or array
-    ['STAFF / EXTRA','STAFF','STAFF LIST (ROOMING)','JEMAAH TANPA KATIL','STAFF TANPA KATIL'].forEach(key=>{
-      const val = room.fields[key];
-      if(!val) return;
-      if(Array.isArray(val)){
-        room.fields[key] = val.filter(v=>{
-          if(v===realStaffId) return false;
-          if(v===staffIdOrName) return false;
-          if(typeof v==='string' && staffNamePart && v.toUpperCase().includes(staffNamePart)) return false;
-          return true;
-        });
-      } else if(typeof val==='string'){
-        const parts = val.split(',').map(x=>x.trim()).filter(Boolean);
-        const filtered = parts.filter(p=>{
-          if(p===realStaffId) return false;
-          if(p===staffIdOrName) return false;
-          if(staffNamePart && p.toUpperCase().includes(staffNamePart)) return false;
-          return true;
-        });
-        room.fields[key] = filtered.join(', ');
-      }
-    });
-  }
-  if(staff){
-    if(staff.roomIds) staff.roomIds = staff.roomIds.filter(id=>id!==roomId);
-    if(staff.roomLink===roomId) staff.roomLink = staff.roomIds[0]||null;
-    if(typeof saveStaffList==='function') try{saveStaffList();}catch(e){}
-  }
-  if(typeof renderRoomingGrid==='function') renderRoomingGrid();
-  if(typeof renderStaffList==='function') renderStaffList();
-  if(typeof renderLocationTabs==='function') try{renderLocationTabs();}catch(e){}
-  
-  const base=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base')||localStorage.getItem('effah_base_id')||localStorage.getItem('VITE_AIRTABLE_BASE_ID');
-  const pat=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat')||localStorage.getItem('VITE_AIRTABLE_PAT')||localStorage.getItem('airtable_pat');
-  if(base&&pat&&room){
-    fetch(`https://api.airtable.com/v0/${base}/ROOMING%20LIST/${roomId}`,{
-      method:'PATCH', headers:{'Authorization':`Bearer ${pat}`,'Content-Type':'application/json'},
-      body: JSON.stringify({fields:{
-        'STAFF / EXTRA': room.fields['STAFF / EXTRA']||'',
-        'JEMAAH TANPA KATIL': room.fields['JEMAAH TANPA KATIL']||[],
-        'STAFF LIST (ROOMING)': room.fields['STAFF LIST (ROOMING)']||[]
-      }})
-    }).catch(()=>{});
-    if(staff && staff.airtableId){
-      fetch(`https://api.airtable.com/v0/${base}/STAFF%20LIST%20%28ROOMING%29/${staff.airtableId}`,{
-        method:'PATCH', headers:{'Authorization':`Bearer ${pat}`,'Content-Type':'application/json'},
-        body: JSON.stringify({fields:{'ROOMING LIST': staff.roomIds||[]}})
-      }).catch(()=>{});
-    }
-  }
-}
-window.removeStaffFromRoom = removeStaffFromRoom_FINAL2;
-window.removeStaffFromRoom_FIXED = removeStaffFromRoom_FINAL2;
-window.removeStaffFromRoom_FINAL = removeStaffFromRoom_FINAL2;
-
-
-// DEBUG BOARD SAVE
-function debugBoardSave(staffId){
-  const staff = (window.staffList||[]).find(s=>s.id===staffId||s.airtableId===staffId);
-  console.log('DEBUG staff', staff);
-  const base = window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base')||localStorage.getItem('effah_base_id')||localStorage.getItem('VITE_AIRTABLE_BASE_ID');
-  const pat = window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat')||localStorage.getItem('VITE_AIRTABLE_PAT')||localStorage.getItem('airtable_pat');
-  console.log('DEBUG base', base, 'pat exists', !!pat);
-  if(!base||!pat){ alert('Base ID / PAT tak jumpa! Check localStorage effah_api_base'); return; }
-  if(!staff?.airtableId){ alert('Staff airtableId takde!'); return; }
-  const boardToSave = (staff.board||[]).filter(b=>b!=='TRAIN');
-  console.log('DEBUG saving board', boardToSave, 'to', staff.airtableId);
-  fetch(`https://api.airtable.com/v0/${base}/STAFF%20LIST%20%28ROOMING%29/${staff.airtableId}`,{
-    method:'PATCH', headers:{'Authorization':`Bearer ${pat}`,'Content-Type':'application/json'},
-    body: JSON.stringify({fields:{'BOARD BASIS': boardToSave, 'BOARD': boardToSave.join(', ')}})
-  }).then(r=>r.json().then(j=>{ console.log('DEBUG Airtable response', r.status, j); if(j.error){ alert('Airtable error: '+j.error.message); } else { alert('Board saved OK ke Airtable: '+(boardToSave.join(', ')||'- BOARD')); } })).catch(e=>{ console.error(e); alert('Fetch fail: '+e.message); });
-}
-window.debugBoardSave = debugBoardSave;
-
-// FORCE REMOVE STAFF - bypass all checks
-function forceRemoveStaffFromAllRooms(staffIdOrName){
-  const staffListLocal = window.staffList||[];
-  let staff = staffListLocal.find(s=>s.id===staffIdOrName||s.airtableId===staffIdOrName);
-  if(!staff){
-    staff = staffListLocal.find(s=> (s.name||'').toUpperCase().includes(staffIdOrName.toString().toUpperCase().split('(')[0].trim()));
+    const namePart = staffIdOrName.toString().toUpperCase().split('(')[0].trim();
+    staff = (window.staffList||[]).find(s=> (s.name||'').toUpperCase().includes(namePart));
   }
   const realId = staff ? staff.id : staffIdOrName;
   const namePart = staff ? (staff.name||'').split('(')[0].trim().toUpperCase() : staffIdOrName.toString().toUpperCase().split('(')[0].trim();
-  console.log('FORCE REMOVE', realId, namePart);
-  let removedCount=0;
-  (window.allRoomingRecords||[]).forEach(room=>{
-    if(!room.fields) return;
-    ['STAFF / EXTRA','STAFF','STAFF LIST (ROOMING)','JEMAAH TANPA KATIL','STAFF TANPA KATIL','JEMAAH','TANPA KATIL'].forEach(key=>{
+  
+  if(room && room.fields){
+    ['STAFF / EXTRA','STAFF','STAFF LIST (ROOMING)','JEMAAH TANPA KATIL','STAFF TANPA KATIL','TANPA KATIL'].forEach(key=>{
       const val = room.fields[key];
       if(!val) return;
       if(Array.isArray(val)){
-        const before=val.length;
         room.fields[key]=val.filter(v=>{
           if(v===realId) return false;
           if(v===staffIdOrName) return false;
           if(typeof v==='string' && namePart && v.toUpperCase().includes(namePart)) return false;
           return true;
         });
-        if(before!==room.fields[key].length) removedCount++;
       } else if(typeof val==='string'){
         const parts=val.split(',').map(x=>x.trim()).filter(Boolean);
         const filtered=parts.filter(p=>{
@@ -2898,28 +2547,179 @@ function forceRemoveStaffFromAllRooms(staffIdOrName){
           if(namePart && p.toUpperCase().includes(namePart)) return false;
           return true;
         });
-        if(parts.length!==filtered.length){ room.fields[key]=filtered.join(', '); removedCount++; }
+        room.fields[key]=filtered.join(', ');
       }
     });
-    if(staff && staff.roomIds) staff.roomIds = staff.roomIds.filter(id=>id!==room.id);
-  });
+  }
   if(staff){
-    staff.roomIds=[];
-    staff.roomLink=null;
+    if(staff.roomIds) staff.roomIds = staff.roomIds.filter(id=>id!==roomId);
+    if(staff.roomLink===roomId) staff.roomLink = staff.roomIds[0]||null;
     try{ if(typeof saveStaffList==='function') saveStaffList(); }catch(e){}
   }
-  console.log('FORCE REMOVE removed from', removedCount, 'fields');
   if(typeof renderRoomingGrid==='function') renderRoomingGrid();
   if(typeof renderStaffList==='function') renderStaffList();
-  if(typeof renderNamelist==='function') renderNamelist();
-  alert('Force removed '+ (staff?.name||staffIdOrName) +' dari '+removedCount+' bilik (local). Refresh kalau still ada, tu Airtable tak update.');
-}
-window.forceRemoveStaffFromAllRooms = forceRemoveStaffFromAllRooms;
-
-// Hook X buttons to use force remove if normal fails
-document.addEventListener('click', function(e){
-  const target = e.target.closest('[onclick*="removeStaffFromRoom"]');
-  if(target){
-    console.log('X clicked', target.getAttribute('onclick'));
+  if(typeof renderLocationTabs==='function') try{renderLocationTabs();}catch(e){}
+  
+  // PATCH Airtable
+  const base=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base')||localStorage.getItem('effah_base_id')||localStorage.getItem('VITE_AIRTABLE_BASE_ID');
+  const pat=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat')||localStorage.getItem('VITE_AIRTABLE_PAT')||localStorage.getItem('airtable_pat');
+  if(base&&pat&&room){
+    try{
+      const res = await fetch(`https://api.airtable.com/v0/${base}/ROOMING%20LIST/${roomId}`,{
+        method:'PATCH', headers:{'Authorization':`Bearer ${pat}`,'Content-Type':'application/json'},
+        body: JSON.stringify({fields:{
+          'STAFF / EXTRA': room.fields['STAFF / EXTRA']||'',
+          'JEMAAH TANPA KATIL': room.fields['JEMAAH TANPA KATIL']||[],
+          'STAFF LIST (ROOMING)': room.fields['STAFF LIST (ROOMING)']||[]
+        }})
+      });
+      const j = await res.json();
+      console.log('remove room patch', res.status, j);
+      if(j.error) console.error('Airtable 422 error', j.error);
+    }catch(e){ console.error('remove patch fail', e); }
   }
-});
+  if(base&&pat&&staff&&staff.airtableId){
+    try{
+      await fetch(`https://api.airtable.com/v0/${base}/STAFF%20LIST%20%28ROOMING%29/${staff.airtableId}`,{
+        method:'PATCH', headers:{'Authorization':`Bearer ${pat}`,'Content-Type':'application/json'},
+        body: JSON.stringify({fields:{'ROOMING LIST': staff.roomIds||[]}})
+      });
+    }catch(e){ console.error(e); }
+  }
+}
+window.removeStaffFromRoom = removeStaffFromRoom_V103;
+window.removeStaff = function(roomId, staffId){ return removeStaffFromRoom_V103(roomId, staffId); };
+
+async function removeStaffTanpaKatilFromRoom_V103(roomId, staffIdOrName){
+  console.log('V103 removeStaffTanpa', roomId, staffIdOrName);
+  const room = (window.allRoomingRecords||[]).find(r=>r.id===roomId);
+  let staff = (window.staffList||[]).find(s=>s.id===staffIdOrName||s.airtableId===staffIdOrName);
+  if(!staff){
+    const namePart = staffIdOrName.toString().toUpperCase().split('(')[0].trim();
+    staff = (window.staffList||[]).find(s=> (s.name||'').toUpperCase().includes(namePart));
+  }
+  if(room && room.fields){
+    ['JEMAAH TANPA KATIL','STAFF TANPA KATIL','TANPA KATIL','STAFF / EXTRA'].forEach(key=>{
+      const val = room.fields[key];
+      if(!val) return;
+      if(Array.isArray(val)){
+        room.fields[key]=val.filter(v=> v!==staffIdOrName && v!==(staff?.id) && !(typeof v==='string' && staff && v.toUpperCase().includes(staff.name.split('(')[0].trim().toUpperCase())));
+      }
+    });
+  }
+  if(staff && staff.roomIds) staff.roomIds = staff.roomIds.filter(id=>id!==roomId);
+  try{ const k='effah_staff_tanpa_'+roomId; let list=JSON.parse(localStorage.getItem(k)||'[]'); list=list.filter(id=>id!==staffIdOrName && id!==staff?.id); localStorage.setItem(k, JSON.stringify(list)); }catch(e){}
+  if(typeof renderRoomingGrid==='function') renderRoomingGrid();
+  if(typeof renderStaffList==='function') renderStaffList();
+  
+  const base=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base')||localStorage.getItem('effah_base_id');
+  const pat=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat')||localStorage.getItem('VITE_AIRTABLE_PAT');
+  if(base&&pat&&room){
+    try{
+      await fetch(`https://api.airtable.com/v0/${base}/ROOMING%20LIST/${roomId}`,{
+        method:'PATCH', headers:{'Authorization':`Bearer ${pat}`,'Content-Type':'application/json'},
+        body: JSON.stringify({fields:{'JEMAAH TANPA KATIL': room.fields['JEMAAH TANPA KATIL']||[]}})
+      });
+    }catch(e){}
+  }
+}
+window.removeStaffTanpaKatilFromRoom = removeStaffTanpaKatilFromRoom_V103;
+window.removeTanpaKatilFromRoom = async function(roomId, jId){
+  // reuse for jemaah too
+  const room = (window.allRoomingRecords||[]).find(r=>r.id===roomId);
+  if(room && room.fields && Array.isArray(room.fields['JEMAAH TANPA KATIL'])){
+    room.fields['JEMAAH TANPA KATIL']=room.fields['JEMAAH TANPA KATIL'].filter(id=>id!==jId);
+  }
+  if(typeof renderRoomingGrid==='function') renderRoomingGrid();
+  if(typeof renderNamelist==='function') renderNamelist();
+  if(typeof renderStaffList==='function') renderStaffList();
+  const base=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base');
+  const pat=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
+  if(base&&pat&&room){
+    try{
+      await fetch(`https://api.airtable.com/v0/${base}/ROOMING%20LIST/${roomId}`,{
+        method:'PATCH', headers:{'Authorization':`Bearer ${pat}`,'Content-Type':'application/json'},
+        body: JSON.stringify({fields:{'JEMAAH TANPA KATIL': room.fields['JEMAAH TANPA KATIL']||[]}})
+      });
+    }catch(e){}
+  }
+};
+
+// BOARD FIX V103
+async function clearStaffBoard_V103(staffId){
+  const staff = (window.staffList||[]).find(s=>s.id===staffId||s.airtableId===staffId);
+  if(!staff) return;
+  const hadTrain = !!staff.train;
+  staff.board = hadTrain ? ['TRAIN'] : [];
+  staff.boardBasis = [];
+  try{ localStorage.setItem('effah_staff_board_'+staffId, JSON.stringify(staff.board)); }catch(e){}
+  if(typeof saveStaffList==='function') try{saveStaffList();}catch(e){}
+  if(typeof renderStaffList==='function') renderStaffList();
+  const base=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base')||localStorage.getItem('effah_base_id');
+  const pat=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
+  console.log('V103 clear board', staffId, staff.airtableId);
+  if(base&&pat&&staff.airtableId){
+    try{
+      const res = await fetch(`https://api.airtable.com/v0/${base}/STAFF%20LIST%20%28ROOMING%29/${staff.airtableId}`,{
+        method:'PATCH', headers:{'Authorization':`Bearer ${pat}`,'Content-Type':'application/json'},
+        body: JSON.stringify({fields:{'BOARD BASIS': [], 'BOARD': ''}})
+      });
+      const j = await res.json();
+      console.log('clear board resp', res.status, j);
+      if(j.error) alert('Airtable board clear error: '+JSON.stringify(j.error));
+    }catch(e){ console.error(e); alert('Board clear fetch fail '+e.message); }
+  }
+}
+window.clearBoardMulti = clearStaffBoard_V103;
+window.clearStaffBoardMulti = clearStaffBoard_V103;
+
+async function updateStaffBoard_V103(staffId, value){
+  const staff = (window.staffList||[]).find(s=>s.id===staffId||s.airtableId===staffId);
+  if(!staff) return;
+  if(value==='-'||value===''||value==='- BOARD'||value==='-BOARD'){
+    staff.board = staff.train ? ['TRAIN'] : [];
+  } else {
+    staff.board = staff.train ? [value,'TRAIN'] : [value];
+  }
+  staff.boardBasis = staff.board.filter(b=>b!=='TRAIN');
+  try{ localStorage.setItem('effah_staff_board_'+staffId, JSON.stringify(staff.board)); }catch(e){}
+  if(typeof saveStaffList==='function') try{saveStaffList();}catch(e){}
+  if(typeof renderStaffList==='function') renderStaffList();
+  const base=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base')||localStorage.getItem('effah_base_id');
+  const pat=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
+  if(base&&pat&&staff.airtableId){
+    try{
+      const boardToSave = staff.board.filter(b=>b!=='TRAIN');
+      const res = await fetch(`https://api.airtable.com/v0/${base}/STAFF%20LIST%20%28ROOMING%29/${staff.airtableId}`,{
+        method:'PATCH', headers:{'Authorization':`Bearer ${pat}`,'Content-Type':'application/json'},
+        body: JSON.stringify({fields:{'BOARD BASIS': boardToSave, 'BOARD': boardToSave.join(', ')}})
+      });
+      const j = await res.json();
+      console.log('update board resp', res.status, j);
+    }catch(e){ console.error(e); }
+  }
+}
+window.updateStaffBoardSingle = updateStaffBoard_V103;
+window.toggleStaffBoardMulti = async function(staffId, boardVal){
+  const staff = (window.staffList||[]).find(s=>s.id===staffId||s.airtableId===staffId);
+  if(!staff) return;
+  if(!staff.board) staff.board=[];
+  if(!Array.isArray(staff.board)) staff.board=[staff.board].filter(Boolean);
+  const idx = staff.board.indexOf(boardVal);
+  if(idx>=0) staff.board.splice(idx,1); else staff.board.push(boardVal);
+  staff.boardBasis = staff.board.filter(b=>b!=='TRAIN');
+  try{ localStorage.setItem('effah_staff_board_'+staffId, JSON.stringify(staff.board)); }catch(e){}
+  if(typeof saveStaffList==='function') try{saveStaffList();}catch(e){}
+  if(typeof renderStaffList==='function') renderStaffList();
+  const base=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base');
+  const pat=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
+  if(base&&pat&&staff.airtableId){
+    const boardToSave = staff.board.filter(b=>b!=='TRAIN');
+    await fetch(`https://api.airtable.com/v0/${base}/STAFF%20LIST%20%28ROOMING%29/${staff.airtableId}`,{
+      method:'PATCH', headers:{'Authorization':`Bearer ${pat}`,'Content-Type':'application/json'},
+      body: JSON.stringify({fields:{'BOARD BASIS': boardToSave, 'BOARD': boardToSave.join(', ')}})
+    });
+  }
+};
+
+console.log('V103 CLEAN FIX LOADED - removeStaff + board fixed');
