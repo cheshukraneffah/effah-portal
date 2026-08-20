@@ -1447,9 +1447,7 @@ async function updateRoomField(roomId,field,value,doRender=true){
 }
 
 async function updateJemaahField(jemaahId, field, value){
-  if(field==='STATUS VISA' && (value==='' || value==='- VISA' || value==='-' || value===null)){
-    value = null;
-  }
+  if(field==='STATUS VISA'){ const v=(value||'').toString().trim(); if(v==='' || v.toUpperCase()==='- VISA' || v==='-' ){ value = null; } }
   if(field==='PAKEJ' && (value==='-' || value==='')){
     value = null;
   }
@@ -2825,4 +2823,58 @@ window.allowDropRoom = allowDropRoom;
 window.leaveDropRoom = leaveDropRoom;
 window.dropRoomReorder = dropRoomReorder;
 console.log('Drag room handlers injected');
+
+
+
+// PATCH V103.16 - Fix STATUS VISA Single Select clear
+(function(){
+  const originalUpdate = window.updateJemaahField;
+  window.updateJemaahField = async function(jemaahId, field, value){
+    console.log('PATCHED updateJemaahField', jemaahId, field, value);
+    if(field==='STATUS VISA'){
+      const v = (value||'').toString().trim();
+      if(v==='' || v.toUpperCase()==='- VISA' || v==='-' || v==='--'){
+        value = null;
+        console.log('Clearing STATUS VISA -> null for', jemaahId);
+      }
+    }
+    // Call original if exists, else do fetch directly
+    if(originalUpdate && originalUpdate !== window.updateJemaahField){
+      try{
+        return await originalUpdate(jemaahId, field, value);
+      }catch(e){
+        console.error('originalUpdate failed', e);
+      }
+    }
+    // Fallback direct Airtable update
+    const base = window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base')||localStorage.getItem('effah_base_id');
+    const pat = window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
+    if(!base||!pat) return alert('Airtable config missing');
+    const rec = allRoomingJemaah.find(r=>r.id===jemaahId);
+    if(rec) rec.fields[field]=value;
+    if(typeof renderNamelist==='function') renderNamelist();
+    try{
+      const res = await fetch(`https://api.airtable.com/v0/${base}/DATA%20JEMAAH%20UMRAH/${jemaahId}`,{
+        method:'PATCH',
+        headers:{Authorization:`Bearer ${pat}`,'Content-Type':'application/json'},
+        body: JSON.stringify({fields:{[field]: value}})
+      });
+      const data = await res.json();
+      if(data.error){
+        console.error('Airtable error', data.error);
+        if(data.error.type==='INVALID_MULTIPLE_CHOICE_OPTIONS' && field==='STATUS VISA'){
+          alert('Gagal clear STATUS VISA: Airtable field ni Single Select. Untuk clear, Airtable perlukan null. Cuba lagi atau kosongkan manual di Airtable. Error: '+JSON.stringify(data.error));
+        }else{
+          alert('Airtable update error: '+JSON.stringify(data.error));
+        }
+      }else{
+        console.log('Update success', field, value);
+      }
+    }catch(e){
+      console.error('Fetch error', e);
+      alert('Fetch error: '+e.message);
+    }
+  };
+  console.log('V103.16 PATCH applied for STATUS VISA single select');
+})();
 
