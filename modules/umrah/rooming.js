@@ -933,7 +933,7 @@ function renderNamelist(){
         ${insToggle}
       </div>
       <div class="col-span-1 flex items-center gap-0.5">
-        <select onchange="updateJemaahField('${r.id}','PAKEJ',this.value)" class="text-[8px] border border-slate-200 rounded-full px-1.5 py-0.5 bg-white max-w-[70px] truncate">
+        <select onchange="updateJemaahField('${r.id}','PAKEJ',this.value)" class="text-[8px] border border-slate-200 rounded-full px-1.5 py-0.5 bg-white max-w-[55px] truncate text-[7px]">
           <option value="-" ${pk==='-'?'selected':''}>-</option>
           <option value="JIMAT EKONOMI" ${pk==='JIMAT EKONOMI'?'selected':''}>JIMAT EKONOMI</option>
           <option value="JIMAT STANDARD" ${pk==='JIMAT STANDARD'?'selected':''}>JIMAT STANDARD</option>
@@ -946,7 +946,7 @@ function renderNamelist(){
         </select>
       </div>
       <div class="col-span-2 flex items-center justify-center" >
-        <select onchange="updateJemaahField('${r.id}','STATUS VISA',this.value)" class="text-[7px] border border-slate-300 rounded-full px-2 py-0.5 bg-white w-full max-w-[80px] truncate font-bold ${getVisaClass(getVisaVal(r.fields))}">
+        <select onchange="updateJemaahField('${r.id}','STATUS VISA',this.value)" class="text-[7px] border border-slate-300 rounded-full px-2 py-0.5 bg-white w-full max-w-[60px] truncate font-bold text-[7px] ${getVisaClass(getVisaVal(r.fields))}">
           <option value="" ${getVisaVal(r.fields)===''?'selected':''}>- VISA</option>
           <option value="TOURIST" ${getVisaVal(r.fields)==='TOURIST'?'selected':''}>TOURIST</option>
           <option value="TOURIST (VALID)" ${getVisaVal(r.fields)==='TOURIST (VALID)'?'selected':''}>TOURIST (VALID)</option>
@@ -2241,111 +2241,8 @@ function renderStaffList_V80(){
 renderStaffList = renderStaffList_V80;
 
 // Patch renderNamelist to use insuran multi dropdown
-const _origRenderNamelist_V80 = renderNamelist;
-renderNamelist = function(){
-  // Inject insuran multi vars into the original function's scope by patching its HTML generation
-  // We will call original, then post-process its output to replace old insuran badges with multi dropdown
-  // For simplicity, we recreate the row logic with multi insuran
-  try{
-    const cont=document.getElementById('namelistContainer');
-    if(!cont){ return _origRenderNamelist_V80.apply(this, arguments); }
-    // Use original logic but with our helpers for board and insuran multi
-    const q=(document.getElementById('searchNamelist')?.value||'').toLowerCase();
-    let filtered=[...allRoomingJemaah];
-    if(q) filtered=filtered.filter(r=> (getJemaahName(r.fields)||'').toLowerCase().includes(q));
-    // Sort if active
-    if(roomingSortActive){
-      filtered.sort((a,b)=>{
-        const na=(getJemaahName(a.fields)||'').toLowerCase();
-        const nb=(getJemaahName(b.fields)||'').toLowerCase();
-        return roomingSortDir==='asc'? na.localeCompare(nb) : nb.localeCompare(na);
-      });
-    }
-    const boardOptions = ['FULLBOARD','FULLBOARD (MEKAH)','BB (MEKAH)','FULLBOARD (MADINAH)','BB (MADINAH)'];
-    cont.innerHTML=filtered.map((r,i)=>{
-      const name=getJemaahName(r.fields);
-      const assignedNormalInLoc=isJemaahAssignedInLocation(r.id, activeLocation);
-      const assignedTanpaInLoc=allRoomingRecords.some(rec=> (rec.fields['LOKASI / CITY']||'MEKAH').toUpperCase()===activeLocation.toUpperCase() && ((rec.fields['JEMAAH TANPA KATIL']||[]).includes(r.id)));
-      const assignedInLoc = assignedNormalInLoc || assignedTanpaInLoc;
-      const assignedGlobal=isJemaahAssignedAny(r.id);
-      const rowCls=assignedInLoc?'bg-slate-100 text-slate-500':'hover:bg-slate-50';
-      const drag=assignedInLoc?'':`draggable="true" ondragstart="dragJemaah(event,'${r.id}')" ondragend="dragEnd(event)"`;
-      let statusIcon = assignedInLoc? `<button onclick="removeJemaahFromCurrentLoc('${r.id}')" class="w-5 h-5 rounded-full bg-amber-100 text-amber-700 text-[10px]" title="Keluarkan dari ${activeLocation}">✕</button>` : `<button onclick="quickAssign('${r.id}')" class="w-5 h-5 rounded-full border bg-slate-100 hover:bg-slate-200 text-[10px]">+</button>`;
-      if(!assignedInLoc && assignedGlobal) statusIcon = `<button onclick="quickAssign('${r.id}')" class="w-5 h-5 rounded-full border bg-amber-100 hover:bg-amber-200 text-[10px]" title="Sudah ada di lokasi lain">+</button>`;
-      const fbArr = getBoardArray(r.fields);
-      const fbDisplay = fbArr.length ? fbArr.join(', ') : '-';
-      const pk = typeof getPakejVal==='function'? (getPakejVal(r.fields) || '-') : '-';
-      const trChecked = typeof isTrainChecked==='function'? isTrainChecked(r.fields) : false;
-      let fbCls='bg-white border-slate-200';
-      if(fbArr.some(x=>x.includes('MEKAH'))) fbCls='bg-orange-100 border-orange-200 text-orange-800';
-      else if(fbArr.some(x=>x.includes('MADINAH'))) fbCls='bg-blue-100 border-blue-200 text-blue-800';
-      else if(fbArr.includes('FULLBOARD')) fbCls='bg-emerald-100 border-emerald-200 text-emerald-800';
-      else if(fbArr.length===0) fbCls='bg-white border-dashed border-slate-300 text-slate-400';
-      const boardCheckboxes=boardOptions.map(opt=>{
-        const checked=fbArr.includes(opt);
-        return `<label class="flex items-center gap-1.5 px-2 py-1 hover:bg-slate-50 rounded text-[10px] cursor-pointer"><input type="checkbox" ${checked?'checked':''} onchange="toggleBoardMulti('${r.id}','${opt}')" class="w-3 h-3 accent-[#7A0C2E]"> ${opt}</label>`;
-      }).join('');
-      const insArr = getInsuranArrayV2(r.fields);
-      const insDisplay = insArr.length ? insArr.join(', ') : '- INSURAN';
-      const insuranOptions = ['TAKAFUL','ETIQA','AL-KHAIRI'];
-      const insCheckboxes = insuranOptions.map(opt=>{
-        const checked = insArr.includes(opt);
-        const color = opt==='TAKAFUL'?'bg-emerald-100':opt==='ETIQA'?'bg-amber-100':opt==='AL-KHAIRI'?'bg-blue-100':'bg-slate-100';
-        return `<label class="flex items-center gap-1.5 px-2 py-1 hover:bg-slate-50 rounded text-[10px] cursor-pointer"><input type="checkbox" ${checked?'checked':''} onchange="toggleInsuranMulti('${r.id}','${opt}')" class="w-3 h-3 accent-[#7A0C2E]"> <span class="px-1.5 py-0.5 rounded-full text-[8px] ${color}">${opt}</span></label>`;
-      }).join('');
-          return `<div ${drag} class="grid grid-cols-12 items-center px-1.5 py-1.5 text-[11px] border-b border-slate-50 ${rowCls}">
-      <div class="col-span-1 text-slate-400 text-[10px]">${String(i+1).padStart(2,'0')}</div>
-      <div class="col-span-3 font-medium truncate text-[10px] ${assignedInLoc?'text-slate-500 italic':''}" title="${name}">${name}</div>
-      <div class="col-span-2 flex items-center gap-0.5 relative">
-        <div class="relative w-full">
-          <button onclick="event.stopPropagation(); toggleBoardDropdown('${r.id}')" class="text-[7px] border rounded-full px-2 py-0.5 font-bold ${fbCls} outline-none w-full truncate text-left flex items-center justify-between bg-white opacity-100" style="opacity:1; isolation:isolate;" title="BOARD BASIS - klik untuk pilih 2">
-            <span class="truncate">${fbDisplay}</span><span class="ml-1">▼</span>
-          </button>
-          <div id="boardDrop-${r.id}" class="hidden absolute left-0 top-full mt-1 w-[190px] bg-white border border-slate-200 rounded-xl shadow-xl z-[9999] p-1" style="background:#ffffff !important; opacity:1 !important; isolation:isolate;">
-            ${boardCheckboxes}
-            <div class="border-t border-slate-100 mt-1 pt-1 flex justify-between">
-              <button onclick="clearBoardMulti('${r.id}'); closeBoardDropdown('${r.id}')" class="text-[8px] px-2 py-0.5 rounded-full bg-slate-100">Clear</button>
-              <button onclick="closeBoardDropdown('${r.id}')" class="text-[8px] px-2 py-0.5 rounded-full bg-[#7A0C2E] text-white">OK</button>
-            </div>
-            <div class="text-[7px] text-slate-400 px-2 mt-1">Boleh pilih 2: BB (MEKAH) + FB (MADINAH)</div>
-          </div>
-        </div>
-      </div>
-      <div class="col-span-1 text-center">
-        <input type="checkbox" ${trChecked?'checked':''} onchange="updateJemaahCheckbox('${r.id}','TRAIN',this.checked)" class="w-3.5 h-3.5 accent-[#7A0C2E] rounded" title="TRAIN">
-      </div>
-      <div class="col-span-2 flex items-center gap-0.5 flex-wrap justify-center">
-        ${insToggle}
-      </div>
-      <div class="col-span-1 flex items-center gap-0.5">
-        <select onchange="updateJemaahField('${r.id}','PAKEJ',this.value)" class="text-[8px] border border-slate-200 rounded-full px-1.5 py-0.5 bg-white max-w-[70px] truncate">
-          <option value="-" ${pk==='-'?'selected':''}>-</option>
-          <option value="JIMAT EKONOMI" ${pk==='JIMAT EKONOMI'?'selected':''}>JIMAT EKONOMI</option>
-          <option value="JIMAT STANDARD" ${pk==='JIMAT STANDARD'?'selected':''}>JIMAT STANDARD</option>
-          <option value="JIMAT PREMIUM" ${pk==='JIMAT PREMIUM'?'selected':''}>JIMAT PREMIUM</option>
-          <option value="EKONOMI LITE" ${pk==='EKONOMI LITE'?'selected':''}>EKONOMI LITE</option>
-          <option value="EKONOMI" ${pk==='EKONOMI'?'selected':''}>EKONOMI</option>
-          <option value="STANDARD" ${pk==='STANDARD'?'selected':''}>STANDARD</option>
-          <option value="PREMIUM" ${pk==='PREMIUM'?'selected':''}>PREMIUM</option>
-          <option value="PREMIUM PLUS" ${pk==='PREMIUM PLUS'?'selected':''}>PREMIUM PLUS</option>
-        </select>
-      </div>
-      <div class="col-span-2 flex items-center justify-center" >
-        <select onchange="updateJemaahField('${r.id}','STATUS VISA',this.value)" class="text-[7px] border border-slate-300 rounded-full px-2 py-0.5 bg-white w-full max-w-[80px] truncate font-bold ${getVisaClass(getVisaVal(r.fields))}">
-          <option value="" ${getVisaVal(r.fields)===''?'selected':''}>- VISA</option>
-          <option value="TOURIST" ${getVisaVal(r.fields)==='TOURIST'?'selected':''}>TOURIST</option>
-          <option value="TOURIST (VALID)" ${getVisaVal(r.fields)==='TOURIST (VALID)'?'selected':''}>TOURIST (VALID)</option>
-          <option value="UMRAH" ${getVisaVal(r.fields)==='UMRAH'?'selected':''}>UMRAH</option>
-          <option value="UMRAH (VALID)" ${getVisaVal(r.fields)==='UMRAH (VALID)'?'selected':''}>UMRAH (VALID)</option>
-          <option value="IQAMA (VALID)" ${getVisaVal(r.fields)==='IQAMA (VALID)'?'selected':''}>IQAMA (VALID)</option>
-          <option value="" ${getVisaVal(r.fields)===''?'selected':''}>- VISA</option>
-        </select>
-      </div>
-    </div>`;
-    }).join('');
-    if(typeof makeNamelistSticky==='function') makeNamelistSticky();
-  }catch(e){ console.error('V80 renderNamelist override error', e); return _origRenderNamelist_V80.apply(this, arguments); }
-};
+// V80 override removed in V103.22 - fixed insToggle error
+;
 
 function findRoomingContainers(){
   const selectors={namelist:['#namelistContainer','#namelist-container','[data-testid="namelist"]','.namelist-container','#jemaahList','#jemaahListContainer'],grid:['#roomingGrid','#roomingGridContainer','#rooming-grid','.rooming-grid','#bilikGrid','#roomingListGrid']};
@@ -2890,3 +2787,17 @@ console.log('Drag room handlers injected');
   console.log('V103.17 PATCH applied - STATUS VISA single select clear uses null');
 })();
 
+
+// CSS fix for overlap
+(function(){
+  const style = document.createElement('style');
+  style.textContent = `
+    #namelistContainer .grid-cols-12 { gap: 2px; }
+    #namelistContainer .grid-cols-12 > div.col-span-1 { min-width: 0; overflow: hidden; }
+    #namelistContainer select { font-size: 7px !important; padding: 2px 4px !important; max-width: 62px !important; line-height: 1.1; }
+    #namelistContainer .col-span-1 select { max-width: 58px !important; }
+    #namelistContainer .col-span-2 select { max-width: 80px !important; }
+  `;
+  document.head.appendChild(style);
+  console.log('V103.22 CSS overlap fix applied');
+})();
