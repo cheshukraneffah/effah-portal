@@ -2657,10 +2657,10 @@ window.addTanpaKatilToRoom = async function(roomId, jemaahId){
 console.log('V106 LOADED');
 
 
-// V113 - FIX HOTEL PAKEJ SAME AS JEMAAH COLOR + BOARD CLEAR
+// V114 - FIX HOTEL PAKEJ BUTTON NOT UPDATING + BOARD 403 FULL ERROR + FALLBACK
 
-const PAKEJ_ORDER_V113 = ['JIMAT EKONOMI','JIMAT STANDARD','JIMAT PREMIUM','EKONOMI LITE','EKONOMI','STANDARD','PREMIUM','PREMIUM PLUS'];
-const PAKEJ_COLORS_V113 = {
+const PAKEJ_ORDER_V114 = ['JIMAT EKONOMI','JIMAT STANDARD','JIMAT PREMIUM','EKONOMI LITE','EKONOMI','STANDARD','PREMIUM','PREMIUM PLUS'];
+const PAKEJ_COLORS_V114 = {
   'JIMAT EKONOMI': '#E8E8E8',
   'JIMAT STANDARD': '#FFF8DC',
   'JIMAT PREMIUM': '#FFE4D6',
@@ -2671,33 +2671,33 @@ const PAKEJ_COLORS_V113 = {
   'PREMIUM PLUS': '#F3E8FF'
 };
 
-function closeAllDropdowns_V113(){
+function closeAllDropdowns_V114(){
   document.querySelectorAll('[id^="boardDrop-"]').forEach(el=>el.classList.add('hidden'));
   document.querySelectorAll('[id^="pakejDrop-"]').forEach(el=>el.classList.add('hidden'));
   document.querySelectorAll('[id^="hotelPakejDrop-"]').forEach(el=>el.classList.add('hidden'));
 }
 
-// BOARD
-function getBoardFallback_V113(jId){
+// BOARD FALLBACK
+function getBoardFallback_V114(jId){
   try{ const raw = localStorage.getItem('effah_board_fallback_'+jId); if(raw) return JSON.parse(raw); }catch(e){}
   return null;
 }
-function setBoardFallback_V113(jId, arr){
+function setBoardFallback_V114(jId, arr){
   try{ localStorage.setItem('effah_board_fallback_'+jId, JSON.stringify(arr)); }catch(e){}
 }
 
-function toggleBoardDropdown_V113(jId){
+function toggleBoardDropdown_V114(jId){
   const drop = document.getElementById('boardDrop-'+jId);
   if(!drop) return;
   const isHidden = drop.classList.contains('hidden');
-  closeAllDropdowns_V113();
+  closeAllDropdowns_V114();
   if(isHidden) drop.classList.remove('hidden');
   else {
     drop.classList.add('hidden');
     setTimeout(()=>{ if(typeof renderNamelist==='function') renderNamelist(); }, 10);
   }
 }
-window.toggleBoardDropdown = toggleBoardDropdown_V113;
+window.toggleBoardDropdown = toggleBoardDropdown_V114;
 function closeBoardDropdown(jId){
   const drop = document.getElementById('boardDrop-'+jId);
   if(drop) drop.classList.add('hidden');
@@ -2705,12 +2705,12 @@ function closeBoardDropdown(jId){
 }
 window.closeBoardDropdown = closeBoardDropdown;
 
-function toggleBoardMulti_V113(jId, boardVal){
+async function toggleBoardMulti_V114(jId, boardVal){
   try{
     const jRec = (window.allRoomingJemaah||[]).find(j=>j.id===jId);
     if(jRec){
       if(!jRec.fields) jRec.fields={};
-      const fb = getBoardFallback_V113(jId);
+      const fb = getBoardFallback_V114(jId);
       if((!jRec.fields['BOARD BASIS'] || jRec.fields['BOARD BASIS'].length===0) && fb && fb.length){
         jRec.fields['BOARD BASIS']=[...fb];
       }
@@ -2718,7 +2718,8 @@ function toggleBoardMulti_V113(jId, boardVal){
       if(!Array.isArray(jRec.fields['BOARD BASIS'])) jRec.fields['BOARD BASIS']=[jRec.fields['BOARD BASIS']].filter(Boolean);
       const idx = jRec.fields['BOARD BASIS'].indexOf(boardVal);
       if(idx>=0) jRec.fields['BOARD BASIS'].splice(idx,1); else jRec.fields['BOARD BASIS'].push(boardVal);
-      setBoardFallback_V113(jId, jRec.fields['BOARD BASIS']);
+      setBoardFallback_V114(jId, jRec.fields['BOARD BASIS']);
+      
       const drop = document.getElementById('boardDrop-'+jId);
       if(drop){
         drop.querySelectorAll('input[type="checkbox"]').forEach(cb=>{
@@ -2729,20 +2730,29 @@ function toggleBoardMulti_V113(jId, boardVal){
         });
         drop.classList.remove('hidden');
       }
-      document.querySelectorAll(`button[onclick*="toggleBoardDropdown_V113('${jId}')"]`).forEach(btn=>{
+      document.querySelectorAll(`button[onclick*="toggleBoardDropdown_V114('${jId}')"]`).forEach(btn=>{
         const span = btn.querySelector('span.truncate');
         if(span) span.textContent = jRec.fields['BOARD BASIS'].length ? jRec.fields['BOARD BASIS'].join(', ') : '-';
       });
+      
       const base=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base');
       const pat=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
       if(base&&pat){
-        fetch(`https://api.airtable.com/v0/${base}/JEMAAH/${jId}`,{
+        const res = await fetch(`https://api.airtable.com/v0/${base}/JEMAAH/${jId}`,{
           method:'PATCH', headers:{'Authorization':`Bearer ${pat}`,'Content-Type':'application/json'},
-          body: JSON.stringify({fields:{'BOARD BASIS': jRec.fields['BOARD BASIS']}})
-        }).then(async r=>{
-          console.log('V113 board toggle', r.status, jRec.fields['BOARD BASIS']);
-          if(r.ok) try{ localStorage.removeItem('effah_board_fallback_'+jId); }catch(e){}
+          body: JSON.stringify({fields:{'BOARD BASIS': jRec.fields['BOARD BASIS']}, typecast: true})
         });
+        const txt = await res.text();
+        let json; try{ json=JSON.parse(txt); }catch(e){ json={raw:txt}; }
+        console.log('V114 board toggle', res.status, jRec.fields['BOARD BASIS'], 'response', json);
+        if(res.status===403){
+          console.error('403 FULL ERROR:', json);
+          console.error('Error type:', json.error?.type, 'Message:', json.error?.message);
+          if(json.error?.message?.includes('permission') || json.error?.message?.includes('Permission')){
+            alert('BOARD BASIS 403: Field permission locked. Pergi Airtable → BOARD BASIS header → Edit field permissions → Set to Everyone can edit. Buat masa ni board 2 disimpan dalam localStorage fallback.');
+          }
+        }
+        if(res.ok){ try{ localStorage.removeItem('effah_board_fallback_'+jId); }catch(e){} }
       }
     } else {
       const sRec = (window.staffList||[]).find(s=>s.id===jId||s.airtableId===jId);
@@ -2759,29 +2769,29 @@ function toggleBoardMulti_V113(jId, boardVal){
         if(base&&pat&&sRec.airtableId){
           fetch(`https://api.airtable.com/v0/${base}/STAFF%20LIST%20%28ROOMING%29/${sRec.airtableId}`,{
             method:'PATCH', headers:{'Authorization':`Bearer ${pat}`,'Content-Type':'application/json'},
-            body: JSON.stringify({fields:{'BOARD BASIS': sRec.boardBasis}})
-          });
+            body: JSON.stringify({fields:{'BOARD BASIS': sRec.boardBasis}, typecast: true})
+          }).then(r=>console.log('V114 staff board', r.status));
         }
       }
     }
   }catch(e){ console.error(e); }
 }
-window.toggleBoardMulti = toggleBoardMulti_V113;
+window.toggleBoardMulti = toggleBoardMulti_V114;
 
-function clearBoardMulti_V113(jId){
-  console.log('V113 clearBoardMulti', jId);
+function clearBoardMulti_V114(jId){
+  console.log('V114 clearBoardMulti', jId);
   try{
     const jRec = (window.allRoomingJemaah||[]).find(j=>j.id===jId);
     if(jRec){ if(!jRec.fields) jRec.fields={}; jRec.fields['BOARD BASIS']=[]; }
     const sRec = (window.staffList||[]).find(s=>s.id===jId||s.airtableId===jId);
     if(sRec){ sRec.board = sRec.train ? ['TRAIN'] : []; sRec.boardBasis=[]; try{ localStorage.setItem('effah_staff_board_'+jId, JSON.stringify(sRec.board)); }catch(e){} }
-    setBoardFallback_V113(jId, []);
+    setBoardFallback_V114(jId, []);
     const drop = document.getElementById('boardDrop-'+jId);
     if(drop){
       drop.querySelectorAll('input[type="checkbox"]').forEach(cb=>cb.checked=false);
       drop.classList.remove('hidden');
     }
-    document.querySelectorAll(`button[onclick*="toggleBoardDropdown_V113('${jId}')"]`).forEach(btn=>{
+    document.querySelectorAll(`button[onclick*="toggleBoardDropdown_V114('${jId}')"]`).forEach(btn=>{
       const span = btn.querySelector('span.truncate');
       if(span) span.textContent='-';
       btn.className='text-[8px] border rounded-full px-2 py-1 font-bold bg-white border-dashed border-slate-300 text-slate-400 outline-none w-full truncate text-left flex items-center justify-between';
@@ -2793,36 +2803,40 @@ function clearBoardMulti_V113(jId){
       const table = jRec ? 'JEMAAH' : 'STAFF%20LIST%20%28ROOMING%29';
       fetch(`https://api.airtable.com/v0/${base}/${table}/${idToPatch}`,{
         method:'PATCH', headers:{'Authorization':`Bearer ${pat}`,'Content-Type':'application/json'},
-        body: JSON.stringify({fields:{'BOARD BASIS': []}})
-      }).then(r=>console.log('V113 clear board', r.status));
+        body: JSON.stringify({fields:{'BOARD BASIS': []}, typecast: true})
+      }).then(async r=>{
+        const txt = await r.text();
+        let j; try{ j=JSON.parse(txt); }catch(e){ j={raw:txt}; }
+        console.log('V114 clear board', r.status, j);
+      });
     }
   }catch(e){ console.error(e); }
 }
-window.clearBoardMulti = clearBoardMulti_V113;
+window.clearBoardMulti = clearBoardMulti_V114;
 
-// PAKEJ JEMAAH
-function togglePakejDropdown_V113(jId){
+// PAKEJ JEMAAH - FIX
+function togglePakejDropdown_V114(jId){
   const drop = document.getElementById('pakejDrop-'+jId);
   if(!drop) return;
   const isHidden = drop.classList.contains('hidden');
-  closeAllDropdowns_V113();
+  closeAllDropdowns_V114();
   if(isHidden) drop.classList.remove('hidden');
 }
-window.togglePakejDropdown = togglePakejDropdown_V113;
-function closePakejDropdown_V113(jId){
+window.togglePakejDropdown = togglePakejDropdown_V114;
+function closePakejDropdown_V114(jId){
   const drop = document.getElementById('pakejDrop-'+jId);
   if(drop) drop.classList.add('hidden');
   setTimeout(()=>{ if(typeof renderNamelist==='function') renderNamelist(); }, 10);
 }
-window.closePakejDropdown = closePakejDropdown_V113;
-function selectPakej_V113(jId, pakej){
+window.closePakejDropdown = closePakejDropdown_V114;
+function selectPakej_V114(jId, pakej){
   const jRec = (window.allRoomingJemaah||[]).find(j=>j.id===jId);
   if(jRec) jRec.fields['PAKEJ']=pakej;
   const drop = document.getElementById('pakejDrop-'+jId);
   if(drop) drop.classList.remove('hidden');
-  const btn = document.querySelector(`button[onclick*="togglePakejDropdown_V113('${jId}')"]`);
+  const btn = document.querySelector(`button[onclick*="togglePakejDropdown_V114('${jId}')"]`);
   if(btn){
-    const color = PAKEJ_COLORS_V113[pakej] || '#FFFFFF';
+    const color = PAKEJ_COLORS_V114[pakej] || '#FFFFFF';
     btn.style.background=color; btn.style.borderColor=color;
     const span = btn.querySelector('span.truncate');
     if(span) span.textContent=pakej;
@@ -2832,69 +2846,88 @@ function selectPakej_V113(jId, pakej){
   if(base&&pat&&jRec){
     fetch(`https://api.airtable.com/v0/${base}/JEMAAH/${jId}`,{
       method:'PATCH', headers:{'Authorization':`Bearer ${pat}`,'Content-Type':'application/json'},
-      body: JSON.stringify({fields:{'PAKEJ': pakej}})
-    }).then(r=>console.log('V113 pakej saved', r.status));
+      body: JSON.stringify({fields:{'PAKEJ': pakej}, typecast: true})
+    }).then(r=>console.log('V114 pakej saved', r.status));
   }
 }
-window.selectPakej = selectPakej_V113;
-function clearPakej_V113(jId){
+window.selectPakej = selectPakej_V114;
+function clearPakej_V114(jId){
   const jRec = (window.allRoomingJemaah||[]).find(j=>j.id===jId);
   if(jRec) jRec.fields['PAKEJ']='';
-  const drop = document.getElementById('pakejDrop-'+jId);
-  if(drop) drop.classList.remove('hidden');
+  setTimeout(()=>{ if(typeof renderNamelist==='function') renderNamelist(); }, 10);
   const base=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base');
   const pat=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
   if(base&&pat){
     fetch(`https://api.airtable.com/v0/${base}/JEMAAH/${jId}`,{
       method:'PATCH', headers:{'Authorization':`Bearer ${pat}`,'Content-Type':'application/json'},
-      body: JSON.stringify({fields:{'PAKEJ': ''}})
+      body: JSON.stringify({fields:{'PAKEJ': ''}, typecast: true})
     });
   }
-  setTimeout(()=>{ if(typeof renderNamelist==='function') renderNamelist(); }, 10);
 }
-window.clearPakej = clearPakej_V113;
+window.clearPakej = clearPakej_V114;
 
-// HOTEL PAKEJ - FIX TO USE SAME COLOR DROPDOWN AS JEMAAH
-function toggleHotelPakejDropdown_V113(roomId){
+// HOTEL PAKEJ - FIX BUTTON NOT UPDATING BUG
+function toggleHotelPakejDropdown_V114(roomId){
   const drop = document.getElementById('hotelPakejDrop-'+roomId);
   if(!drop) return;
   const isHidden = drop.classList.contains('hidden');
-  closeAllDropdowns_V113();
+  closeAllDropdowns_V114();
   if(isHidden) drop.classList.remove('hidden');
 }
-window.toggleHotelPakejDropdown = toggleHotelPakejDropdown_V113;
+window.toggleHotelPakejDropdown = toggleHotelPakejDropdown_V114;
 
-function closeHotelPakejDropdown_V113(roomId){
+function closeHotelPakejDropdown_V114(roomId){
   const drop = document.getElementById('hotelPakejDrop-'+roomId);
   if(drop) drop.classList.add('hidden');
   setTimeout(()=>{ if(typeof renderRoomingGrid==='function') renderRoomingGrid(); }, 10);
 }
-window.closeHotelPakejDropdown = closeHotelPakejDropdown_V113;
+window.closeHotelPakejDropdown = closeHotelPakejDropdown_V114;
 
-function selectHotelPakej_V113(roomId, pakej){
+function selectHotelPakej_V114(roomId, pakej){
+  console.log('V114 selectHotelPakej', roomId, pakej);
   const room = (window.allRoomingRecords||[]).find(r=>r.id===roomId);
   if(room) room.fields['PAKEJ / HOTEL']=pakej;
-  const drop = document.getElementById('hotelPakejDrop-'+roomId);
-  if(drop) drop.classList.remove('hidden');
-  const btn = document.querySelector(`button[onclick*="toggleHotelPakejDropdown_V113('${roomId}')"]`);
-  if(btn){
-    const color = PAKEJ_COLORS_V113[pakej] || '#FFFFFF';
-    btn.style.background=color; btn.style.borderColor=color;
-    const span = btn.querySelector('span');
-    if(span) span.textContent=pakej;
+  // Update button immediately - FIX for bug where box still shows EKONOMI
+  const container = document.getElementById('hotelPakejContainer-'+roomId);
+  if(container){
+    const color = PAKEJ_COLORS_V114[pakej] || '#DBEAFE';
+    // Update button inside container
+    const btn = container.querySelector('button');
+    if(btn){
+      btn.style.background=color;
+      btn.style.borderColor=color;
+      const span = btn.querySelector('span');
+      if(span) span.textContent=pakej;
+      console.log('V114 hotel button updated to', pakej, color);
+    }
+    // Keep dropdown open
+    const drop = document.getElementById('hotelPakejDrop-'+roomId);
+    if(drop) drop.classList.remove('hidden');
+    // Also update dropdown checkmarks
+    if(drop){
+      drop.querySelectorAll('div[onclick*="selectHotelPakej"]').forEach(div=>{
+        const isSel = div.getAttribute('onclick')?.includes(`'${pakej}'`);
+        const checkSpan = div.querySelector('span.w-4');
+        if(checkSpan) checkSpan.textContent = isSel ? '✓' : '';
+        const rightSpan = div.querySelector('span.ml-auto');
+        if(rightSpan) rightSpan.textContent = isSel ? '✓' : '×';
+        if(isSel) div.classList.add('bg-slate-100','font-bold');
+        else div.classList.remove('bg-slate-100','font-bold');
+      });
+    }
   }
   const base=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base');
   const pat=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
   if(base&&pat&&room){
     fetch(`https://api.airtable.com/v0/${base}/ROOMING%20LIST/${roomId}`,{
       method:'PATCH', headers:{'Authorization':`Bearer ${pat}`,'Content-Type':'application/json'},
-      body: JSON.stringify({fields:{'PAKEJ / HOTEL': pakej}})
-    }).then(r=>console.log('V113 hotel pakej saved', r.status, pakej));
+      body: JSON.stringify({fields:{'PAKEJ / HOTEL': pakej}, typecast: true})
+    }).then(r=>console.log('V114 hotel pakej saved', r.status, pakej));
   }
 }
-window.selectHotelPakej = selectHotelPakej_V113;
+window.selectHotelPakej = selectHotelPakej_V114;
 
-function clearHotelPakej_V113(roomId){
+function clearHotelPakej_V114(roomId){
   const room = (window.allRoomingRecords||[]).find(r=>r.id===roomId);
   if(room) room.fields['PAKEJ / HOTEL']='';
   setTimeout(()=>{ if(typeof renderRoomingGrid==='function') renderRoomingGrid(); }, 10);
@@ -2903,25 +2936,25 @@ function clearHotelPakej_V113(roomId){
   if(base&&pat&&room){
     fetch(`https://api.airtable.com/v0/${base}/ROOMING%20LIST/${roomId}`,{
       method:'PATCH', headers:{'Authorization':`Bearer ${pat}`,'Content-Type':'application/json'},
-      body: JSON.stringify({fields:{'PAKEJ / HOTEL': ''}})
+      body: JSON.stringify({fields:{'PAKEJ / HOTEL': ''}, typecast: true})
     });
   }
 }
-window.clearHotelPakej = clearHotelPakej_V113;
+window.clearHotelPakej = clearHotelPakej_V114;
 
-// Outside click auto collapse
-document.removeEventListener('click', window._v113Outside);
-window._v113Outside = function(e){
-  const isBoardBtn = e.target.closest('button[onclick*="toggleBoardDropdown_V113"]');
-  const isPakejBtn = e.target.closest('button[onclick*="togglePakejDropdown_V113"]');
-  const isHotelBtn = e.target.closest('button[onclick*="toggleHotelPakejDropdown_V113"]');
+// Outside click
+document.removeEventListener('click', window._v114Outside);
+window._v114Outside = function(e){
+  const isBoardBtn = e.target.closest('button[onclick*="toggleBoardDropdown_V114"]');
+  const isPakejBtn = e.target.closest('button[onclick*="togglePakejDropdown_V114"]');
+  const isHotelBtn = e.target.closest('button[onclick*="toggleHotelPakejDropdown_V114"]');
   const isInsideBoard = e.target.closest('[id^="boardDrop-"]');
   const isInsidePakej = e.target.closest('[id^="pakejDrop-"]');
   const isInsideHotel = e.target.closest('[id^="hotelPakejDrop-"]');
   if(!isBoardBtn && !isPakejBtn && !isHotelBtn && !isInsideBoard && !isInsidePakej && !isInsideHotel){
     const open = document.querySelector('[id^="boardDrop-"]:not(.hidden), [id^="pakejDrop-"]:not(.hidden), [id^="hotelPakejDrop-"]:not(.hidden)');
     if(open){
-      closeAllDropdowns_V113();
+      closeAllDropdowns_V114();
       setTimeout(()=>{
         if(typeof renderNamelist==='function') renderNamelist();
         if(typeof renderRoomingGrid==='function') renderRoomingGrid();
@@ -2929,16 +2962,16 @@ window._v113Outside = function(e){
     }
   }
 };
-document.addEventListener('click', window._v113Outside);
+document.addEventListener('click', window._v114Outside);
 
-// Override renderNamelist with pakej color dropdown
-const origRenderNamelist_V113 = window.renderNamelist;
+// Override renderNamelist
+const origRenderNamelist_V114 = window.renderNamelist;
 window.renderNamelist = function(){
   try{
     (window.allRoomingJemaah||[]).forEach(j=>{
       if(!j.fields) j.fields={};
       j.fields._jemaahId = j.id;
-      const fb = getBoardFallback_V113(j.id);
+      const fb = getBoardFallback_V114(j.id);
       if(fb && fb.length && (!j.fields['BOARD BASIS'] || j.fields['BOARD BASIS'].length===0)){
         j.fields['BOARD BASIS']=fb;
       }
@@ -2970,7 +3003,7 @@ window.renderNamelist = function(){
     const boardOptions = ['FULLBOARD','FULLBOARD (MEKAH)','BB (MEKAH)','FULLBOARD (MADINAH)','BB (MADINAH)'];
     const boardCheckboxes = boardOptions.map(opt=>{
       const checked=fbArr.includes(opt);
-      return `<label class="flex items-center gap-1.5 px-2 py-1 hover:bg-slate-50 rounded text-[10px] cursor-pointer" onclick="event.stopPropagation()"><input type="checkbox" ${checked?'checked':''} onchange="toggleBoardMulti_V113('${r.id}','${opt}')" class="w-3 h-3 accent-[#7A0C2E]"> ${opt}</label>`;
+      return `<label class="flex items-center gap-1.5 px-2 py-1 hover:bg-slate-50 rounded text-[10px] cursor-pointer" onclick="event.stopPropagation()"><input type="checkbox" ${checked?'checked':''} onchange="toggleBoardMulti_V114('${r.id}','${opt}')" class="w-3 h-3 accent-[#7A0C2E]"> ${opt}</label>`;
     }).join('');
     const insArr = typeof getInsuranArray==='function'? getInsuranArray(r.fields) : [];
     const insToggle = ['TAKAFUL','ETIQA','AL-KHAIRI'].map(opt=>{
@@ -2985,26 +3018,26 @@ window.renderNamelist = function(){
       return `<button onclick="toggleInsuran('${r.id}','${opt}')" class="px-1 py-0.5 rounded-full border text-[7px] font-bold ${cls}">${label}</button>`;
     }).join('');
     const pk = r.fields['PAKEJ'] || '';
-    const pkColor = PAKEJ_COLORS_V113[pk] || '#FFFFFF';
+    const pkColor = PAKEJ_COLORS_V114[pk] || '#FFFFFF';
     const pkDisplay = pk || '-';
-    const pakejDropdown = `<div class="relative"><button onclick="event.stopPropagation(); togglePakejDropdown_V113('${r.id}')" class="w-full text-[9px] border rounded-full px-2.5 py-1.5 font-bold text-left flex items-center justify-between" style="background:${pkColor}; border-color:${pkColor}; color:#1F2937"><span class="truncate">${pkDisplay}</span><span>▼</span></button><div id="pakejDrop-${r.id}" class="hidden absolute z-[9999] mt-1 w-48 bg-white border border-slate-300 rounded-xl shadow-2xl p-1" onclick="event.stopPropagation()">${PAKEJ_ORDER_V113.map(o=>{
-      const c = PAKEJ_COLORS_V113[o];
+    const pakejDropdown = `<div class="relative"><button onclick="event.stopPropagation(); togglePakejDropdown_V114('${r.id}')" class="w-full text-[9px] border rounded-full px-2.5 py-1.5 font-bold text-left flex items-center justify-between" style="background:${pkColor}; border-color:${pkColor}; color:#1F2937"><span class="truncate">${pkDisplay}</span><span>▼</span></button><div id="pakejDrop-${r.id}" class="hidden absolute z-[9999] mt-1 w-48 bg-white border border-slate-300 rounded-xl shadow-2xl p-1" onclick="event.stopPropagation()">${PAKEJ_ORDER_V114.map(o=>{
+      const c = PAKEJ_COLORS_V114[o];
       const isSel = pk===o;
-      return `<div onclick="selectPakej_V113('${r.id}','${o}')" class="flex items-center gap-2 px-2.5 py-1.5 hover:bg-slate-50 cursor-pointer text-[11px] rounded-lg ${isSel?'bg-slate-100 font-bold':''}"><span class="w-4 h-4 rounded-full flex items-center justify-center text-[9px] border" style="background:${c}; border-color:${c}">${isSel?'✓':''}</span> ${o} <span class="ml-auto text-slate-400">${isSel?'✓':'×'}</span></div>`;
-    }).join('')}<div class="flex justify-between gap-1 mt-1 pt-1 border-t bg-white"><button onclick="clearPakej_V113('${r.id}'); event.stopPropagation();" class="text-[9px] px-3 py-1 rounded-full bg-slate-100">Clear</button><button onclick="closePakejDropdown_V113('${r.id}'); event.stopPropagation();" class="text-[9px] px-3 py-1 rounded-full bg-[#7A0C2E] text-white">OK</button></div></div></div>`;
+      return `<div onclick="selectPakej_V114('${r.id}','${o}')" class="flex items-center gap-2 px-2.5 py-1.5 hover:bg-slate-50 cursor-pointer text-[11px] rounded-lg ${isSel?'bg-slate-100 font-bold':''}"><span class="w-4 h-4 rounded-full flex items-center justify-center text-[9px] border" style="background:${c}; border-color:${c}">${isSel?'✓':''}</span> ${o} <span class="ml-auto text-slate-400">${isSel?'✓':'×'}</span></div>`;
+    }).join('')}<div class="flex justify-between gap-1 mt-1 pt-1 border-t bg-white"><button onclick="clearPakej_V114('${r.id}'); event.stopPropagation();" class="text-[9px] px-3 py-1 rounded-full bg-slate-100">Clear</button><button onclick="closePakejDropdown_V114('${r.id}'); event.stopPropagation();" class="text-[9px] px-3 py-1 rounded-full bg-[#7A0C2E] text-white">OK</button></div></div></div>`;
     const trChecked = typeof isTrainChecked==='function'? isTrainChecked(r.fields) : false;
     return `<div ${drag} class="grid grid-cols-12 items-center px-1.5 py-1.5 text-[11px] border-b border-slate-50 ${rowCls}">
       <div class="col-span-1 text-slate-400 text-[10px]">${String(i+1).padStart(2,'0')}</div>
       <div class="col-span-3 font-medium truncate text-[10px] ${assignedInLoc?'text-slate-500 italic':''}" title="${name}">${name}</div>
       <div class="col-span-2 flex items-center gap-0.5 relative">
         <div class="relative w-full">
-          <button onclick="event.stopPropagation(); toggleBoardDropdown_V113('${r.id}')" class="text-[8px] border rounded-full px-2 py-1 font-bold ${fbCls} outline-none w-full truncate text-left flex items-center justify-between bg-white">
+          <button onclick="event.stopPropagation(); toggleBoardDropdown_V114('${r.id}')" class="text-[8px] border rounded-full px-2 py-1 font-bold ${fbCls} outline-none w-full truncate text-left flex items-center justify-between bg-white">
             <span class="truncate">${fbDisplay}</span><span class="ml-1">▼</span>
           </button>
           <div id="boardDrop-${r.id}" class="hidden absolute left-0 top-full mt-1 w-[190px] bg-white border border-slate-200 rounded-xl shadow-xl z-[9999] p-1" onclick="event.stopPropagation()">
             ${boardCheckboxes}
             <div class="border-t border-slate-100 mt-1 pt-1 flex justify-between">
-              <button onclick="clearBoardMulti_V113('${r.id}'); event.stopPropagation();" class="text-[8px] px-2 py-0.5 rounded-full bg-slate-100">Clear</button>
+              <button onclick="clearBoardMulti_V114('${r.id}'); event.stopPropagation();" class="text-[8px] px-2 py-0.5 rounded-full bg-slate-100">Clear</button>
               <button onclick="closeBoardDropdown('${r.id}'); event.stopPropagation();" class="text-[8px] px-2 py-0.5 rounded-full bg-[#7A0C2E] text-white">OK</button>
             </div>
             <div class="text-[7px] text-slate-400 px-2 mt-1">Boleh pilih 2: BB(MEKAH)+FB(MADINAH)</div>
@@ -3025,23 +3058,23 @@ window.renderNamelist = function(){
   }).join('');
 };
 
-// Override renderRoomingGrid to include hotel pakej color dropdown
-const origRenderRoomingGrid_V113 = window.renderRoomingGrid;
+// Hotel grid with color dropdown
+const origRenderRoomingGrid_V114 = window.renderRoomingGrid;
 window.renderRoomingGrid = function(){
-  if(origRenderRoomingGrid_V113) origRenderRoomingGrid_V113();
+  if(origRenderRoomingGrid_V114) origRenderRoomingGrid_V114();
   setTimeout(()=>{
     (window.allRoomingRecords||[]).forEach(room=>{
       const container = document.getElementById('hotelPakejContainer-'+room.id);
       if(!container) return;
       const current = room.fields['PAKEJ / HOTEL'] || 'EKONOMI';
-      const color = PAKEJ_COLORS_V113[current] || '#FFFFFF';
-      container.innerHTML = `<div class="relative"><button onclick="event.stopPropagation(); toggleHotelPakejDropdown_V113('${room.id}')" class="w-full text-[10px] border rounded-full px-3 py-1.5 font-bold flex items-center justify-between" style="background:${color}; border-color:${color}"><span>${current}</span><span>▼</span></button><div id="hotelPakejDrop-${room.id}" class="hidden absolute z-[9999] mt-1 w-48 bg-white border border-slate-300 rounded-xl shadow-2xl p-1" onclick="event.stopPropagation()">${PAKEJ_ORDER_V113.map(o=>{
-        const c = PAKEJ_COLORS_V113[o];
+      const color = PAKEJ_COLORS_V114[current] || '#DBEAFE';
+      container.innerHTML = `<div class="relative"><button onclick="event.stopPropagation(); toggleHotelPakejDropdown_V114('${room.id}')" class="w-full text-[10px] border rounded-full px-3 py-1.5 font-bold flex items-center justify-between" style="background:${color}; border-color:${color}"><span>${current}</span><span>▼</span></button><div id="hotelPakejDrop-${room.id}" class="hidden absolute z-[9999] mt-1 w-48 bg-white border border-slate-300 rounded-xl shadow-2xl p-1" onclick="event.stopPropagation()">${PAKEJ_ORDER_V114.map(o=>{
+        const c = PAKEJ_COLORS_V114[o];
         const isSel = current===o;
-        return `<div onclick="selectHotelPakej_V113('${room.id}','${o}')" class="flex items-center gap-2 px-2.5 py-1.5 hover:bg-slate-50 cursor-pointer text-[11px] rounded-lg ${isSel?'bg-slate-100 font-bold':''}"><span class="w-4 h-4 rounded-full border flex items-center justify-center text-[9px]" style="background:${c}; border-color:${c}">${isSel?'✓':''}</span> ${o} <span class="ml-auto">${isSel?'✓':'×'}</span></div>`;
-      }).join('')}<div class="flex justify-between gap-1 mt-1 pt-1 border-t"><button onclick="clearHotelPakej_V113('${room.id}'); event.stopPropagation();" class="text-[9px] px-3 py-1 rounded-full bg-slate-100">Clear</button><button onclick="closeHotelPakejDropdown_V113('${room.id}'); event.stopPropagation();" class="text-[9px] px-3 py-1 rounded-full bg-[#7A0C2E] text-white">OK</button></div></div></div>`;
+        return `<div onclick="selectHotelPakej_V114('${room.id}','${o}')" class="flex items-center gap-2 px-2.5 py-1.5 hover:bg-slate-50 cursor-pointer text-[11px] rounded-lg ${isSel?'bg-slate-100 font-bold':''}"><span class="w-4 h-4 rounded-full border flex items-center justify-center text-[9px]" style="background:${c}; border-color:${c}">${isSel?'✓':''}</span> ${o} <span class="ml-auto">${isSel?'✓':'×'}</span></div>`;
+      }).join('')}<div class="flex justify-between gap-1 mt-1 pt-1 border-t"><button onclick="clearHotelPakej_V114('${room.id}'); event.stopPropagation();" class="text-[9px] px-3 py-1 rounded-full bg-slate-100">Clear</button><button onclick="closeHotelPakejDropdown_V114('${room.id}'); event.stopPropagation();" class="text-[9px] px-3 py-1 rounded-full bg-[#7A0C2E] text-white">OK</button></div></div></div>`;
     });
   }, 100);
 };
 
-console.log('V113 HOTEL PAKEJ COLOR SAME AS JEMAAH + BOARD CLEAR FIX + OUTSIDE CLICK LOADED');
+console.log('V114 FIX HOTEL PAKEJ BUTTON + BOARD 403 FULL ERROR + OUTSIDE CLICK LOADED');
