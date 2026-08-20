@@ -2657,160 +2657,68 @@ window.addTanpaKatilToRoom = async function(roomId, jemaahId){
 console.log('V106 LOADED');
 
 
-// V109 MINIMAL FIX - BOARD MULTIPLE SELECT STAY OPEN, NO CRASH
+// V111 DEBUG 403 BOARD BASIS - log full error message
 
-function closeAllDropdowns_V109(){
-  document.querySelectorAll('[id^="boardDrop-"]').forEach(el=>el.classList.add('hidden'));
-}
-
-function toggleBoardDropdown_V109(jId){
-  const drop = document.getElementById('boardDrop-'+jId);
-  if(!drop) return;
-  const isHidden = drop.classList.contains('hidden');
-  document.querySelectorAll('[id^="boardDrop-"]').forEach(el=>{ if(el.id!==`boardDrop-${jId}`) el.classList.add('hidden'); });
-  document.querySelectorAll('[id^="pakejDrop-"]').forEach(el=>el.classList.add('hidden'));
-  document.querySelectorAll('[id^="hotelPakejDrop-"]').forEach(el=>el.classList.add('hidden'));
-  if(isHidden) drop.classList.remove('hidden');
-  else {
-    drop.classList.add('hidden');
-    // Save on close
-    if(typeof renderNamelist==='function') setTimeout(()=>renderNamelist(), 10);
-  }
-}
-window.toggleBoardDropdown = toggleBoardDropdown_V109;
-
-function closeBoardDropdown(jId){
-  const drop = document.getElementById('boardDrop-'+jId);
-  if(drop) drop.classList.add('hidden');
-  if(typeof renderNamelist==='function') setTimeout(()=>renderNamelist(), 10);
-}
-window.closeBoardDropdown = closeBoardDropdown;
-
-// Board multi - stay open, no re-render until OK or outside
-function toggleBoardMulti_V109(jId, boardVal){
-  try{
-    const jRec = (window.allRoomingJemaah||[]).find(j=>j.id===jId);
-    if(jRec){
-      if(!jRec.fields) jRec.fields={};
-      if(!jRec.fields['BOARD BASIS']) jRec.fields['BOARD BASIS']=[];
-      if(!Array.isArray(jRec.fields['BOARD BASIS'])) jRec.fields['BOARD BASIS']=[jRec.fields['BOARD BASIS']].filter(Boolean);
-      const idx = jRec.fields['BOARD BASIS'].indexOf(boardVal);
-      if(idx>=0) jRec.fields['BOARD BASIS'].splice(idx,1); else jRec.fields['BOARD BASIS'].push(boardVal);
-      
-      // Update UI without full re-render - just checkbox and button
-      const drop = document.getElementById('boardDrop-'+jId);
-      if(drop){
-        // Find checkbox for this value and update
-        const labels = drop.querySelectorAll('label');
-        labels.forEach(label=>{
-          const input = label.querySelector('input');
-          if(!input) return;
-          const onchange = input.getAttribute('onchange')||'';
-          if(onchange.includes(boardVal)){
-            input.checked = jRec.fields['BOARD BASIS'].includes(boardVal);
-          }
-        });
-        drop.classList.remove('hidden'); // stay open
-      }
-      // Update button text in place
-      const allButtons = document.querySelectorAll(`button[onclick*="toggleBoardDropdown_V109('${jId}')"], button[onclick*="toggleBoardDropdown('${jId}')"]`);
-      allButtons.forEach(btn=>{
-        const span = btn.querySelector('span.truncate');
-        if(span){
-          const display = jRec.fields['BOARD BASIS'].length ? jRec.fields['BOARD BASIS'].join(', ') : '-';
-          span.textContent = display;
-        }
-      });
-      
-      // PATCH to Airtable in background
-      const base=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base');
-      const pat=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
-      if(base&&pat){
-        fetch(`https://api.airtable.com/v0/${base}/JEMAAH/${jId}`,{
-          method:'PATCH', headers:{'Authorization':`Bearer ${pat}`,'Content-Type':'application/json'},
-          body: JSON.stringify({fields:{'BOARD BASIS': jRec.fields['BOARD BASIS']}})
-        }).then(r=>{
-          console.log('V109 board toggle', r.status, jRec.fields['BOARD BASIS']);
-          if(r.status===403) console.error('403 Forbidden - PAT no write to JEMAAH');
-        }).catch(e=>console.error(e));
-      }
-    } else {
-      // Staff
-      const sRec = (window.staffList||[]).find(s=>s.id===jId||s.airtableId===jId);
-      if(sRec){
-        if(!sRec.board) sRec.board=[];
-        const idx = sRec.board.indexOf(boardVal);
-        if(idx>=0) sRec.board.splice(idx,1); else sRec.board.push(boardVal);
-        sRec.boardBasis = sRec.board.filter(b=>b!=='TRAIN');
-        try{ localStorage.setItem('effah_staff_board_'+jId, JSON.stringify(sRec.board)); }catch(e){}
-        const drop = document.getElementById('boardDrop-'+jId);
-        if(drop) drop.classList.remove('hidden');
-        const base=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base');
-        const pat=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
-        if(base&&pat&&sRec.airtableId){
-          fetch(`https://api.airtable.com/v0/${base}/STAFF%20LIST%20%28ROOMING%29/${sRec.airtableId}`,{
-            method:'PATCH', headers:{'Authorization':`Bearer ${pat}`,'Content-Type':'application/json'},
-            body: JSON.stringify({fields:{'BOARD BASIS': sRec.boardBasis}})
-          }).then(r=>console.log('V109 staff board', r.status, sRec.boardBasis));
-        }
-      }
-    }
-  }catch(e){
-    console.error('V109 toggleBoardMulti error', e);
-  }
-}
-window.toggleBoardMulti = toggleBoardMulti_V109;
-
-function clearBoardMulti_V109(jId){
-  try{
-    const jRec = (window.allRoomingJemaah||[]).find(j=>j.id===jId);
-    if(jRec){
-      if(!jRec.fields) jRec.fields={};
-      jRec.fields['BOARD BASIS']=[];
-    }
-    const sRec = (window.staffList||[]).find(s=>s.id===jId||s.airtableId===jId);
-    if(sRec){
-      sRec.board = sRec.train ? ['TRAIN'] : [];
-      sRec.boardBasis = [];
-      try{ localStorage.setItem('effah_staff_board_'+jId, JSON.stringify(sRec.board)); }catch(e){}
-      if(typeof saveStaffList==='function') try{saveStaffList();}catch(e){}
-    }
-    const drop = document.getElementById('boardDrop-'+jId);
-    if(drop){
-      drop.querySelectorAll('input[type="checkbox"]').forEach(cb=>cb.checked=false);
-      drop.classList.remove('hidden'); // stay open
-    }
-    document.querySelectorAll(`button[onclick*="${jId}"]`).forEach(btn=>{
-      const span = btn.querySelector('span.truncate');
-      if(span && btn.innerHTML.includes('BOARD')) span.textContent='-';
-    });
-    const base=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base');
-    const pat=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
-    if(base&&pat){
-      const idToPatch = jRec ? jId : (sRec?.airtableId||jId);
-      const table = jRec ? 'JEMAAH' : 'STAFF%20LIST%20%28ROOMING%29';
-      fetch(`https://api.airtable.com/v0/${base}/${table}/${idToPatch}`,{
+async function debugBoardPatch(jId, boardArr){
+  const base=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base');
+  const pat=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
+  console.log('DEBUG BOARD PATCH - jId', jId, 'boardArr', boardArr, 'base', base, 'pat exists', !!pat);
+  if(!base||!pat){ alert('Base/PAT missing'); return; }
+  
+  // Try 3 different field name variations
+  const tries = [
+    {'BOARD BASIS': boardArr},
+    {'BOARD': boardArr.join(', ')},
+    {'BOARD BASIS': boardArr, 'BOARD': boardArr.join(', ')}
+  ];
+  
+  for(let i=0;i<tries.length;i++){
+    const fields = tries[i];
+    console.log(`Try ${i+1}:`, fields);
+    try{
+      const res = await fetch(`https://api.airtable.com/v0/${base}/JEMAAH/${jId}`,{
         method:'PATCH', headers:{'Authorization':`Bearer ${pat}`,'Content-Type':'application/json'},
-        body: JSON.stringify({fields:{'BOARD BASIS': []}})
-      }).then(r=>console.log('V109 clear board', r.status));
+        body: JSON.stringify({fields})
+      });
+      const text = await res.text();
+      let json;
+      try{ json = JSON.parse(text); }catch(e){ json = {raw: text}; }
+      console.log(`Try ${i+1} status`, res.status, 'response', json);
+      if(res.ok){
+        alert(`Try ${i+1} SUCCESS ${res.status}: ${JSON.stringify(fields)}`);
+        return;
+      } else {
+        console.error(`Try ${i+1} FAILED`, json);
+        // Log detailed error
+        if(json.error){
+          console.error('Error type:', json.error.type);
+          console.error('Error message:', json.error.message);
+        }
+      }
+    }catch(e){
+      console.error(`Try ${i+1} exception`, e);
     }
+  }
+  alert('All tries failed, check console for full error message');
+}
+window.debugBoardPatch = debugBoardPatch;
+
+// Also check what fields exist in JEMAAH table via schema
+async function checkJemaahFields(){
+  const base=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base');
+  const pat=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
+  if(!base||!pat) return;
+  try{
+    // Get one record to see fields
+    const res = await fetch(`https://api.airtable.com/v0/${base}/JEMAAH?maxRecords=1`,{
+      headers:{'Authorization':`Bearer ${pat}`}
+    });
+    const data = await res.json();
+    console.log('JEMAAH sample record fields:', Object.keys(data.records?.[0]?.fields||{}));
+    console.log('Full sample:', data.records?.[0]?.fields);
+    alert('Check console - JEMAAH fields: ' + Object.keys(data.records?.[0]?.fields||{}).join(', '));
   }catch(e){ console.error(e); }
 }
-window.clearBoardMulti = clearBoardMulti_V109;
+window.checkJemaahFields = checkJemaahFields;
 
-// Outside click - close and then render
-document.removeEventListener('click', window._v109Outside);
-window._v109Outside = function(e){
-  const isBtn = e.target.closest('button[onclick*="toggleBoardDropdown"]');
-  const isInside = e.target.closest('[id^="boardDrop-"]');
-  if(!isBtn && !isInside){
-    const open = document.querySelector('[id^="boardDrop-"]:not(.hidden)');
-    if(open){
-      open.classList.add('hidden');
-      if(typeof renderNamelist==='function') setTimeout(()=>renderNamelist(), 10);
-    }
-  }
-};
-document.addEventListener('click', window._v109Outside);
-
-console.log('V109 MINIMAL BOARD MULTIPLE SELECT LOADED - no M_I D crash');
+console.log('V111 DEBUG LOADED - run debugBoardPatch("recId", ["FULLBOARD","BB (MEKAH)"]) or checkJemaahFields() in console');
