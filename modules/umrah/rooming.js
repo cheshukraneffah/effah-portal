@@ -384,7 +384,7 @@ function renderRoomingHTML(){
               <i class="fa-solid fa-magnifying-glass absolute left-2.5 top-2.5 text-slate-400 text-[10px]"></i>
               <input id="searchRoomingJemaah" onkeyup="filterRoomingNamelist()" placeholder="Cari nama jemaah..." class="w-full text-[11px] pl-7 pr-2.5 py-2 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:outline-none">
             </div>
-            <select id="filterPakejRooming" onchange="filterRoomingNamelist()" class="text-[11px] border border-slate-200 rounded-xl px-2.5 py-2 bg-white font-medium"><option value="">Semua Pakej</option><option value="JIMAT STANDARD">JIMAT STANDARD</option><option value="JIMAT PREMIUM">JIMAT PREMIUM</option><option value="EKONOMI LITE">EKONOMI LITE</option><option value="EKONOMI">EKONOMI</option><option value="STANDARD">STANDARD</option><option value="PREMIUM">PREMIUM</option><option value="PREMIUM PLUS">PREMIUM PLUS</option></select>
+            <select id="filterPakejRooming" onchange="filterRoomingNamelist()" class="text-[11px] border border-slate-200 rounded-xl px-2.5 py-2 bg-white font-medium"><option value="">Semua Pakej</option><option value="JIMAT EKONOMI">JIMAT EKONOMI</option><option value="JIMAT EKONOMI">JIMAT EKONOMI</option><option value="JIMAT STANDARD">JIMAT STANDARD</option><option value="JIMAT PREMIUM">JIMAT PREMIUM</option><option value="EKONOMI LITE">EKONOMI LITE</option><option value="EKONOMI">EKONOMI</option><option value="STANDARD">STANDARD</option><option value="PREMIUM">PREMIUM</option><option value="PREMIUM PLUS">PREMIUM PLUS</option></select>
           </div>
         </div>
         <div class="px-2.5 py-1.5 bg-slate-50/70 border-b border-slate-200 grid grid-cols-12 text-[9px] font-bold text-slate-500 tracking-wider">
@@ -445,7 +445,7 @@ function renderRoomingHTML(){
           <p class="text-[9px] text-slate-400 mt-0.5">Dijana automatik: B + Kapasiti</p>
         </div>
         <select id="newRoomLokasi" class="w-full p-2 border border-slate-200 rounded-xl bg-white text-[11px]"><option value="MEKAH">MEKAH</option><option value="MADINAH">MADINAH</option><option value="TAIF">TAIF</option><option value="JEDDAH">JEDDAH</option></select>
-        <select id="newRoomPakej" class="w-full p-2 border border-slate-200 rounded-xl bg-white text-[11px] font-bold"><option value="JIMAT STANDARD">JIMAT STANDARD</option><option value="JIMAT PREMIUM">JIMAT PREMIUM</option><option value="EKONOMI LITE">EKONOMI LITE</option><option value="EKONOMI">EKONOMI</option><option value="STANDARD">STANDARD</option><option value="PREMIUM">PREMIUM</option><option value="PREMIUM PLUS">PREMIUM PLUS</option></select>
+        <select id="newRoomPakej" class="w-full p-2 border border-slate-200 rounded-xl bg-white text-[11px] font-bold"><option value="JIMAT EKONOMI">JIMAT EKONOMI</option><option value="JIMAT EKONOMI">JIMAT EKONOMI</option><option value="JIMAT STANDARD">JIMAT STANDARD</option><option value="JIMAT PREMIUM">JIMAT PREMIUM</option><option value="EKONOMI LITE">EKONOMI LITE</option><option value="EKONOMI">EKONOMI</option><option value="STANDARD">STANDARD</option><option value="PREMIUM">PREMIUM</option><option value="PREMIUM PLUS">PREMIUM PLUS</option></select>
         <input id="newRoomHotel" placeholder="Nama Hotel" class="w-full p-2 border border-slate-200 rounded-xl bg-white text-[11px]">
         <div class="flex gap-2 items-center">
           <input id="newRoomCap" type="number" value="4" min="1" max="8" oninput="updateNewRoomIdFromCap()" class="flex-1 p-2 border border-slate-200 rounded-xl font-bold bg-white text-[11px]">
@@ -895,7 +895,7 @@ function renderNamelist(){
       <div class="col-span-1 flex items-center gap-0.5">
         <select onchange="updateJemaahField('${r.id}','PAKEJ',this.value)" class="text-[9px] border border-slate-200 rounded-full px-2 py-1 bg-white">
           <option value="-" ${pk==='-'?'selected':''}>-</option>
-          <option value="JIMAT STANDARD" ${pk==='JIMAT STANDARD'?'selected':''}>JIMAT STANDARD</option>
+          <option value="JIMAT EKONOMI" ${pk==='JIMAT EKONOMI'?'selected':''}>JIMAT EKONOMI</option><option value="JIMAT STANDARD" ${pk==='JIMAT STANDARD'?'selected':''}>JIMAT STANDARD</option>
           <option value="JIMAT PREMIUM" ${pk==='JIMAT PREMIUM'?'selected':''}>JIMAT PREMIUM</option>
           <option value="EKONOMI LITE" ${pk==='EKONOMI LITE'?'selected':''}>EKONOMI LITE</option>
           <option value="EKONOMI" ${pk==='EKONOMI'?'selected':''}>EKONOMI</option>
@@ -1060,7 +1060,7 @@ const emptyCount=Math.max(0,cap-count); const emptySlots=Array.from({length:empt
       </div>
       <div class="flex items-center gap-1.5 text-[10px]">
         <div class="flex items-center gap-1 px-2.5 py-1 bg-slate-50 rounded-full border"><select onchange="updateRoomField('${rec.id}','PAKEJ / HOTEL',this.value)" class="text-[10px] border border-slate-200 rounded-full px-2 py-1 bg-white font-bold">
-          <option value="JIMAT STANDARD" ${pakej==='JIMAT STANDARD'?'selected':''}>JIMAT STANDARD</option>
+          <option value="JIMAT EKONOMI" ${pakej==='JIMAT EKONOMI'?'selected':''}>JIMAT EKONOMI</option><option value="JIMAT STANDARD" ${pakej==='JIMAT STANDARD'?'selected':''}>JIMAT STANDARD</option>
           <option value="JIMAT PREMIUM" ${pakej==='JIMAT PREMIUM'?'selected':''}>JIMAT PREMIUM</option>
           <option value="EKONOMI LITE" ${pakej==='EKONOMI LITE'?'selected':''}>EKONOMI LITE</option>
           <option value="EKONOMI" ${pakej==='EKONOMI'?'selected':''}>EKONOMI</option>
@@ -2246,7 +2246,7 @@ renderNamelist = function(){
         <div class="col-span-1 flex items-center gap-0.5">
           <select onchange="updateJemaahField('${r.id}','PAKEJ',this.value)" class="text-[9px] border border-slate-200 rounded-full px-2 py-1 bg-white">
           <option value="-" ${pk==='-'?'selected':''}>-</option>
-          <option value="JIMAT STANDARD" ${pk==='JIMAT STANDARD'?'selected':''}>JIMAT STANDARD</option>
+          <option value="JIMAT EKONOMI" ${pk==='JIMAT EKONOMI'?'selected':''}>JIMAT EKONOMI</option><option value="JIMAT STANDARD" ${pk==='JIMAT STANDARD'?'selected':''}>JIMAT STANDARD</option>
           <option value="JIMAT PREMIUM" ${pk==='JIMAT PREMIUM'?'selected':''}>JIMAT PREMIUM</option>
           <option value="EKONOMI LITE" ${pk==='EKONOMI LITE'?'selected':''}>EKONOMI LITE</option>
           <option value="EKONOMI" ${pk==='EKONOMI'?'selected':''}>EKONOMI</option>
@@ -2442,40 +2442,48 @@ function toggleStaffBoardMulti_FIXED(staffId, boardVal){
   if(idx>=0) staff.board.splice(idx,1); else staff.board.push(boardVal);
   const isTrain = staff.board.includes('TRAIN') || !!staff.train;
   staff.train = isTrain;
+  staff.boardBasis = (staff.board||[]).filter(b=>b!=='TRAIN').join(',');
   if(typeof saveStaffList==='function') try{saveStaffList();}catch(e){}
   if(typeof renderStaffList==='function') renderStaffList();
   if(typeof renderRoomingGrid==='function') renderRoomingGrid();
-  const base = window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base');
+  const base = window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base')||localStorage.getItem('effah_base_id');
   const pat = window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
   if(base&&pat&&staff.airtableId){
     const boardToSave = staff.board.filter(b=>b!=='TRAIN');
+    const payload = boardToSave.length===0 ? null : boardToSave;
     fetch('https://api.airtable.com/v0/'+base+'/STAFF%20LIST%20%28ROOMING%29/'+staff.airtableId,{
       method:'PATCH', headers:{'Authorization':'Bearer '+pat,'Content-Type':'application/json'},
-      body: JSON.stringify({fields:{'BOARD BASIS': boardToSave, 'TRAIN': isTrain}})
-    }).then(r=>r.json()).then(d=>console.log('STAFF BOARD saved')).catch(()=>{});
+      body: JSON.stringify({fields:{'BOARD BASIS': payload, 'TRAIN': isTrain}})
+    }).then(r=>r.json()).then(d=>console.log('STAFF BOARD saved', payload, d)).catch(e=>console.error(e));
   }
 }
 window.toggleStaffBoardMulti = toggleStaffBoardMulti_FIXED;
+window.toggleStaffBoardMulti_FIXED = toggleStaffBoardMulti_FIXED;
+
 
 function updateStaffBoardSingle_FIXED(staffId, value){
   const staff = (window.staffList||[]).find(s=>s.id===staffId||s.airtableId===staffId);
   if(!staff) return;
   const hasTrain = (staff.board||[]).includes('TRAIN') || !!staff.train;
-  if(value==='-'||value==='') staff.board = hasTrain ? ['TRAIN'] : [];
+  if(value==='-'||value===''||value===null) staff.board = hasTrain ? ['TRAIN'] : [];
   else staff.board = hasTrain ? [value,'TRAIN'] : [value];
+  staff.boardBasis = (staff.board||[]).filter(b=>b!=='TRAIN').join(',');
   if(typeof saveStaffList==='function') try{saveStaffList();}catch(e){}
   if(typeof renderStaffList==='function') renderStaffList();
-  const base = window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base');
+  const base = window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base')||localStorage.getItem('effah_base_id');
   const pat = window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
   if(base&&pat&&staff.airtableId){
     const boardToSave = (staff.board||[]).filter(b=>b!=='TRAIN');
+    const payload = boardToSave.length===0 ? null : boardToSave;
+    console.log('Saving BOARD BASIS for', staff.name, '->', payload);
     fetch('https://api.airtable.com/v0/'+base+'/STAFF%20LIST%20%28ROOMING%29/'+staff.airtableId,{
       method:'PATCH', headers:{'Authorization':'Bearer '+pat,'Content-Type':'application/json'},
-      body: JSON.stringify({fields:{'BOARD BASIS': boardToSave}})
-    }).then(r=>r.json()).then(d=>console.log('STAFF BOARD single saved '+value)).catch(()=>{});
+      body: JSON.stringify({fields:{'BOARD BASIS': payload}})
+    }).then(r=>r.json()).then(d=>{ console.log('STAFF BOARD single saved', value, d); if(d.error) alert('Airtable error: '+JSON.stringify(d.error)); }).catch(e=>{ console.error(e); alert('Gagal save board: '+e.message); });
   }
 }
 window.updateStaffBoardSingle = updateStaffBoardSingle_FIXED;
+window.updateStaffBoardSingle_FIXED = updateStaffBoardSingle_FIXED;
 
 
 
