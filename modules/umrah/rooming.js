@@ -3039,3 +3039,79 @@ window.renderRoomingGrid = function(){
 };
 
 console.log('V117 FIX MODEL NOT FOUND - LIST TABLES + PATCH BY TABLE ID LOADED');
+
+
+// V118 - FIX NAMELIST STICKY FLOAT + KEEP ALL V117 FIXES
+
+// Add sticky CSS for namelist left
+(function addStickyCSS(){
+  const style = document.createElement('style');
+  style.textContent = `
+    #namelistContainer {
+      position: relative;
+    }
+    /* Make the left panel sticky */
+    #namelistContainer {
+      max-height: calc(100vh - 200px);
+      overflow-y: auto;
+      overflow-x: hidden;
+    }
+    /* Sticky header for namelist */
+    #namelistContainer::-webkit-scrollbar {
+      width: 6px;
+    }
+    #namelistContainer::-webkit-scrollbar-thumb {
+      background: #CBD5E1;
+      border-radius: 3px;
+    }
+    /* Ensure parent wrapper is sticky */
+    .namelist-wrapper, #namelistWrapper, [id*="namelist"] {
+      position: sticky;
+      top: 10px;
+      z-index: 10;
+    }
+  `;
+  document.head.appendChild(style);
+  console.log('V118 sticky CSS added');
+})();
+
+// Ensure namelist container parent gets sticky class after render
+function makeNamelistSticky(){
+  const cont = document.getElementById('namelistContainer');
+  if(!cont) return;
+  // Find parent that should be sticky - usually the left column
+  let parent = cont.parentElement;
+  // Go up 2 levels to find the column wrapper
+  if(parent){
+    parent.style.position = 'sticky';
+    parent.style.top = '10px';
+    parent.style.maxHeight = 'calc(100vh - 20px)';
+    parent.style.overflowY = 'auto';
+    parent.style.alignSelf = 'flex-start';
+    console.log('V118 made namelist parent sticky', parent);
+  }
+  cont.style.maxHeight = 'calc(100vh - 250px)';
+  cont.style.overflowY = 'auto';
+}
+
+const origRenderNamelist_V118 = window.renderNamelist;
+window.renderNamelist = function(){
+  if(origRenderNamelist_V118){
+    origRenderNamelist_V118();
+  }
+  setTimeout(makeNamelistSticky, 100);
+};
+
+const origRenderRoomingGrid_V118 = window.renderRoomingGrid;
+window.renderRoomingGrid = function(){
+  if(origRenderRoomingGrid_V118){
+    origRenderRoomingGrid_V118();
+  }
+  setTimeout(makeNamelistSticky, 100);
+};
+
+// Initial call
+setTimeout(makeNamelistSticky, 500);
+setTimeout(makeNamelistSticky, 1500);
+
+console.log('V118 STICKY NAMELIST FIX LOADED');
