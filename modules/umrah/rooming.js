@@ -3379,3 +3379,213 @@ window.renderRoomingGrid = function(){
 };
 
 console.log('V122 FIX REMOVE STAFF TANPA KATIL STILL NOT WORKING LOADED');
+
+
+// V123 - BRUTE FORCE REMOVE SHARIFAH BY NAME + LOG ALL ROOM FIELDS
+
+window.debugB2Room = function(){
+  console.log('=== DEBUG B2 SNOOD ROOM ===');
+  (window.allRoomingRecords||[]).forEach(room=>{
+    const lokasi = room.fields['LOKASI / CITY'] || room.fields['LOKASI'] || '';
+    const bilik = room.fields['BILIK'] || room.fields['BILIK NO'] || room.fields['NAMA BILIK'] || '';
+    if(bilik.includes('SNOOD') || room.id.includes('B2') || JSON.stringify(room.fields).includes('SNOOD')){
+      console.log('Room found:', room.id, bilik, lokasi);
+      console.log('All fields:', Object.keys(room.fields));
+      console.log('Full room object:', room.fields);
+      for(let key of Object.keys(room.fields)){
+        if(key.toUpperCase().includes('TANPA') || key.toUpperCase().includes('STAFF') || key.toUpperCase().includes('JEMAAH')){
+          console.log(`Field ${key}:`, room.fields[key]);
+        }
+      }
+    }
+  });
+  // Also find B2 specifically
+  const b2 = (window.allRoomingRecords||[]).find(r=> (r.fields['BILIK']||'').includes('B2') || r.id==='recB2');
+  if(b2){
+    console.log('B2 room by ID:', b2);
+  } else {
+    console.log('Searching all rooms with SHARIFAH');
+    (window.allRoomingRecords||[]).forEach(room=>{
+      const str = JSON.stringify(room.fields);
+      if(str.includes('SHARIFAH')){
+        console.log('Room with SHARIFAH:', room.id, room.fields);
+      }
+    });
+  }
+};
+
+setTimeout(()=>{ window.debugB2Room(); }, 1000);
+
+window.removeSharifahBruteForce = async function(){
+  console.log('V123 BRUTE FORCE REMOVE SHARIFAH');
+  const base=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base');
+  const pat=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
+  
+  // Find all rooms containing SHARIFAH
+  const roomsWithSharifah = [];
+  (window.allRoomingRecords||[]).forEach(room=>{
+    const str = JSON.stringify(room.fields).toUpperCase();
+    if(str.includes('SHARIFAH')){
+      roomsWithSharifah.push(room);
+    }
+  });
+  
+  console.log('Rooms with SHARIFAH:', roomsWithSharifah.length, roomsWithSharifah.map(r=>r.id));
+  
+  for(let room of roomsWithSharifah){
+    console.log('Processing room', room.id);
+    console.log('Before:', JSON.parse(JSON.stringify(room.fields)));
+    
+    // Try to find staff ID for SHARIFAH
+    const staff = (window.staffList||[]).find(s=>{
+      const name = (s.fields?.['NAMA']||s.fields?.['NAMA STAFF']||s.fields?.['NAMA JEMAAH']||'').toUpperCase();
+      return name.includes('SHARIFAH');
+    });
+    const jemaah = (window.allRoomingJemaah||[]).find(j=>{
+      const name = (typeof getJemaahName==='function' ? getJemaahName(j.fields) : '').toUpperCase();
+      return name.includes('SHARIFAH');
+    });
+    
+    console.log('Found staff:', staff);
+    console.log('Found jemaah:', jemaah);
+    
+    const targetId = staff?.id || staff?.airtableId || jemaah?.id;
+    console.log('Target ID to remove:', targetId);
+    
+    // Remove from ALL fields that might contain it
+    const fieldsToCheck = Object.keys(room.fields).filter(k=>{
+      const upper = k.toUpperCase();
+      return upper.includes('TANPA') || upper.includes('STAFF') || upper.includes('JEMAAH') || upper.includes('INFANT');
+    });
+    
+    console.log('Fields to check:', fieldsToCheck);
+    
+    let changed = false;
+    for(let fieldName of fieldsToCheck){
+      const val = room.fields[fieldName];
+      if(Array.isArray(val)){
+        const beforeLen = val.length;
+        // Remove by ID if we have targetId
+        if(targetId){
+          room.fields[fieldName] = val.filter(id=>id!==targetId);
+        }
+        // Also remove any ID that when looked up is SHARIFAH
+        room.fields[fieldName] = room.fields[fieldName].filter(id=>{
+          const s = (window.staffList||[]).find(st=>st.id===id||st.airtableId===id);
+          if(s){
+            const sName = (s.fields?.['NAMA']||s.fields?.['NAMA STAFF']||'').toUpperCase();
+            if(sName.includes('SHARIFAH')) return false;
+          }
+          const j = (window.allRoomingJemaah||[]).find(jm=>jm.id===id);
+          if(j){
+            const jName = (typeof getJemaahName==='function' ? getJemaahName(j.fields) : '').toUpperCase();
+            if(jName.includes('SHARIFAH')) return false;
+          }
+          return true;
+        });
+        if(room.fields[fieldName].length !== beforeLen) changed = true;
+      }
+    }
+    
+    console.log('After local change:', JSON.parse(JSON.stringify(room.fields)));
+    console.log('Changed?', changed);
+    
+    if(!changed){
+      console.log('No change detected via ID filtering, trying direct Airtable fetch for this room');
+      // Fetch fresh from Airtable
+      if(base&&pat){
+        try{
+          const res = await fetch(`https://api.airtable.com/v0/${base}/ROOMING%20LIST/${room.id}`,{
+            headers:{'Authorization':`Bearer ${pat}`}
+          });
+          const data = await res.json();
+          console.log('Fresh Airtable data for room', room.id, data.fields);
+          // Try to remove from fresh data
+          const freshFields = data.fields;
+          const tanpaFields = Object.keys(freshFields).filter(k=>k.toUpperCase().includes('TANPA'));
+          console.log('Tanpa fields in fresh data:', tanpaFields);
+          tanpaFields.forEach(f=>{
+            console.log(`${f}:`, freshFields[f]);
+          });
+        }catch(e){ console.error(e); }
+      }
+    }
+    
+    // Save to localStorage
+    try{
+      localStorage.setItem('effah_rooming_records', JSON.stringify(window.allRoomingRecords));
+    }catch(e){}
+    
+    // Patch Airtable with whatever we have now
+    if(base&&pat && changed){
+      const patchFields = {};
+      fieldsToCheck.forEach(f=>{
+        if(Array.isArray(room.fields[f])) patchFields[f] = room.fields[f];
+      });
+      console.log('Patching Airtable with', patchFields);
+      try{
+        const res = await fetch(`https://api.airtable.com/v0/${base}/ROOMING%20LIST/${room.id}`,{
+          method:'PATCH', headers:{'Authorization':`Bearer ${pat}`,'Content-Type':'application/json'},
+          body: JSON.stringify({fields: patchFields, typecast: true})
+        });
+        const txt = await res.text();
+        let json; try{ json=JSON.parse(txt); }catch(e){ json={raw:txt}; }
+        console.log('PATCH result', res.status, json);
+      }catch(e){ console.error(e); }
+    }
+  }
+  
+  setTimeout(()=>{
+    if(typeof renderRoomingGrid==='function') renderRoomingGrid();
+  }, 500);
+};
+
+// Override remove functions to use brute force
+window.removeJemaahTanpaKatil = window.removeSharifahBruteForce;
+window.removeStaffTanpaKatil = window.removeSharifahBruteForce;
+
+// Add manual button to page for testing
+setTimeout(()=>{
+  const btn = document.createElement('button');
+  btn.textContent = 'FORCE REMOVE SHARIFAH (DEBUG)';
+  btn.style.position = 'fixed';
+  btn.style.bottom = '20px';
+  btn.style.right = '20px';
+  btn.style.zIndex = '999999';
+  btn.style.background = '#EF4444';
+  btn.style.color = 'white';
+  btn.style.padding = '10px 20px';
+  btn.style.borderRadius = '20px';
+  btn.style.fontWeight = 'bold';
+  btn.style.boxShadow = '0 4px 10px rgba(0,0,0,0.3)';
+  btn.onclick = ()=>window.removeSharifahBruteForce();
+  document.body.appendChild(btn);
+  console.log('Added FORCE REMOVE button at bottom right');
+}, 1000);
+
+const origRenderGrid_V123 = window.renderRoomingGrid;
+window.renderRoomingGrid = function(){
+  if(origRenderGrid_V123) origRenderGrid_V123();
+  setTimeout(()=>{
+    // Find SHARIFAH X buttons and override
+    const allButtons = document.querySelectorAll('button');
+    allButtons.forEach(btn=>{
+      const parent = btn.parentElement;
+      if(parent && parent.textContent.toUpperCase().includes('SHARIFAH')){
+        if(btn.textContent.includes('×') || btn.textContent.includes('x') || btn.innerHTML.includes('×')){
+          console.log('Found SHARIFAH X button, overriding');
+          btn.onclick = (e)=>{
+            e.stopPropagation();
+            e.preventDefault();
+            console.log('SHARIFAH X clicked - brute force');
+            window.removeSharifahBruteForce();
+          };
+          btn.style.background = '#EF4444';
+          btn.style.color = 'white';
+        }
+      }
+    });
+  }, 500);
+};
+
+console.log('V123 BRUTE FORCE REMOVE SHARIFAH LOADED - check console for debugB2Room() output and click FORCE REMOVE button at bottom right');
