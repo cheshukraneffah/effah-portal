@@ -936,7 +936,7 @@ function renderNamelist(){
       </div>
       
             <div class="col-span-1 flex items-center justify-center">
-        <select onchange="updateJemaahField('${r.id}','STATUS VISA',this.value)" class="text-[8px] border border-slate-300 rounded-full px-2 py-1 bg-white w-full max-w-[80px] truncate font-bold ${getVisaClass(getVisaVal(r.fields))}" title="STATUS VISA - ${getVisaVal(r.fields)||'-'}">
+        <select onchange="updateJemaahField('${r.id}','STATUS VISA',this.value)" class="text-[8px] border border-slate-300 rounded-full px-2 py-1 bg-white w-full max-w-[80px] truncate font-bold ${getVisaClass(getVisaVal(r.fields))}" title='STATUS VISA'>
           <option value="" ${getVisaVal(r.fields)===''?'selected':''}>- VISA</option>
           <option value="TOURIST" ${getVisaVal(r.fields)==='TOURIST'?'selected':''}>TOURIST</option>
           <option value="TOURIST (VALID)" ${getVisaVal(r.fields)==='TOURIST (VALID)'?'selected':''}>TOURIST (VALID)</option>
@@ -2180,7 +2180,7 @@ function generateRoomingPrint(orientation){ orientation = orientation || 'landsc
     const namelistOverviewHTML = '<div style="margin-top:12px;border:1px solid #000;padding:8px 10px;background:#f9fafb"><div style="font-weight:bold;font-size:10px;margin-bottom:6px">RINGKASAN NAMELIST</div><div style="display:flex;gap:20px;font-size:9px;flex-wrap:wrap"><div><b>Bilangan Speedtrain:</b> ' + trainCount + ' orang</div><div><b>Bilangan Insuran:</b> ' + totalInsuranUnique + ' orang</div><div><b>Total Jemaah:</b> ' + allRoomingJemaah.length + ' orang</div><div><b>Total Staff:</b> ' + staffCountPrint + ' orang</div><div><b>Grand Total:</b> ' + (allRoomingJemaah.length + staffCountPrint) + ' ( ' + allRoomingJemaah.length + ' Jemaah + ' + staffCountPrint + ' Staff )</div></div></div>';
 
     const html=`<html><head><title>Rooming ${tripName} - ${orientation}</title><style>body{font-family:Arial,Helvetica,sans-serif;font-size:10px;margin:12px;color:#000}table{border-collapse:collapse;width:100%}th,td{border:1px solid #000;padding:4px 6px;font-size:9px}th{background:#7A0C2E;color:#fff;font-weight:bold;text-transform:uppercase}.header{display:flex;justify-content:space-between;font-weight:bold;font-size:12px;border-bottom:2px solid #000;padding-bottom:6px;margin-bottom:8px}.page-break{page-break-before:always}.namelist-page{max-width:900px;margin:0 auto}.location-page{max-width:100%}@media print{@page{size:A4 ${orientation};margin:${orientation==='portrait' ? '8mm' : '10mm'}}body{-webkit-print-color-adjust:exact;print-color-adjust:exact}.page-break{page-break-before:always}}</style></head><body>
-      <div class="namelist-page"><div class="header"><span>NAMELIST ${tripName}</span><span>Total: ${allRoomingJemaah.length} Jemaah + ${combinedStaff.length} Staff</span></div><div style="font-size:9px;margin-bottom:8px"><b>Trip:</b> ${tripName} | <b>Tarikh Cetak:</b> ${new Date().toLocaleDateString('ms-MY')} | <b>Orientasi:</b> ${orientation.toUpperCase()}</div><table style="table-layout:fixed"><colgroup><col style="width:28px"><col style="width:38%"><col style="width:90px"><col style="width:45px"><col style="width:55px"><col style="width:70px"><col style="width:70px"></colgroup><tr><th>NO</th><th style="text-align:left">NAMA JEMAAH</th><th>BOARD</th><th>TRAIN</th><th>PAKEJ</th><th>INSURAN</th><th>VISA</th></tr>${namelistRows}</table>${namelistOverviewHTML}</div>
+      <div class="namelist-page"><div class="header" style="display:flex;justify-content:space-between;font-weight:bold;font-size:11px;margin-bottom:8px"><span>NAMELIST ${tripName}</span><span>Total: ${allRoomingJemaah.length} Jemaah + ${combinedStaff.length} Staff</span></div><div style="font-size:9px;margin-bottom:8px"><b>Trip:</b> ${tripName} | <b>Tarikh Cetak:</b> ${new Date().toLocaleDateString('ms-MY')} | <b>Orientasi:</b> ${orientation.toUpperCase()}</div><table style="table-layout:fixed;width:100%;border-collapse:collapse;border:1px solid #000"><colgroup><col style="width:28px"><col style="width:34%"><col style="width:85px"><col style="width:40px"><col style="width:55px"><col style="width:60px"><col style="width:65px"></colgroup><tr style="background:#7A0C2E;color:#fff"><th style="border:1px solid #000;padding:4px 3px;font-size:8px">NO</th><th style="border:1px solid #000;padding:4px 3px;text-align:left;font-size:8px">NAMA JEMAAH</th><th style="border:1px solid #000;padding:4px 3px;font-size:8px">BOARD</th><th style="border:1px solid #000;padding:4px 3px;font-size:8px">TRAIN</th><th style="border:1px solid #000;padding:4px 3px;font-size:8px">PAKEJ</th><th style="border:1px solid #000;padding:4px 3px;font-size:8px">INSURAN</th><th style="border:1px solid #000;padding:4px 3px;font-size:8px">VISA</th></tr>${namelistRows}</table>${namelistOverviewHTML}</div>
       ${locationPages||'<div style="page-break-before:always"><div style="border:1px dashed #000;padding:20px;text-align:center">Tiada bilik untuk trip ini</div></div>'}
       <script>window.onload=function(){setTimeout(()=>window.print(),600)}; window.onafterprint=function(){window.close();}; setTimeout(()=>{try{window.close();}catch(e){}},3500);<\/script>
     </body></html>`;
@@ -2827,4 +2827,28 @@ window.allowDropRoom = allowDropRoom;
 window.leaveDropRoom = leaveDropRoom;
 window.dropRoomReorder = dropRoomReorder;
 console.log('Drag room handlers injected');
+
+
+
+(function(){
+  if(!document.getElementById('visa-col-fix')){
+    const style=document.createElement('style');
+    style.id='visa-col-fix';
+    style.textContent=`
+      .namelist-grid-header, .namelist-grid-row {
+        display: grid !important;
+        grid-template-columns: 35px 180px 110px 45px 110px 75px 75px 35px !important;
+        gap: 4px !important;
+        align-items: center !important;
+      }
+      #namelistContainer > div {
+        display: grid !important;
+        grid-template-columns: 35px 180px 110px 45px 110px 75px 75px 35px !important;
+        gap: 4px !important;
+      }
+    `;
+    document.head.appendChild(style);
+    console.log('visa grid fix injected');
+  }
+})();
 
