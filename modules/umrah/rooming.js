@@ -1,4 +1,4 @@
-console.log('ROOMING V103.11 FINAL FIX');
+console.log('ROOMING V103.14 VISA FIX - '+new Date().toISOString()); alert('V103.14 LOADED - VISA SHOULD BE VISIBLE');
 var _autoScrollInterval = window._autoScrollInterval || null;
 window._roomingDragListenersAdded = window._roomingDragListenersAdded || false;
 // ROOMING V103 CLEAN - Deduped + Modular Ready
@@ -899,7 +899,7 @@ function renderNamelist(){
       return `<button onclick="toggleInsuran('${r.id}','${opt}')" class="px-1 py-0.5 rounded-full border text-[7px] font-bold ${cls}" title="${opt}">${label}</button>`;
     }).join('');
 
-    return `<div ${drag} class="grid grid-cols-12 items-center px-1.5 py-1.5 text-[11px] border-b border-slate-50 ${rowCls}">
+        return `<div ${drag} class="grid grid-cols-12 items-center px-1.5 py-1.5 text-[11px] border-b border-slate-50 ${rowCls} bg-yellow-50">
       <div class="col-span-1 text-slate-400 text-[10px]">${String(i+1).padStart(2,'0')}</div>
       <div class="col-span-3 font-medium truncate text-[10px] ${assignedInLoc?'text-slate-500 italic':''}" title="${name}">${name}</div>
       <div class="col-span-2 flex items-center gap-0.5 relative">
@@ -926,7 +926,8 @@ function renderNamelist(){
       <div class="col-span-1 flex items-center gap-0.5">
         <select onchange="updateJemaahField('${r.id}','PAKEJ',this.value)" class="text-[8px] border border-slate-200 rounded-full px-1.5 py-0.5 bg-white max-w-[70px] truncate">
           <option value="-" ${pk==='-'?'selected':''}>-</option>
-          <option value="JIMAT EKONOMI" ${pk==='JIMAT EKONOMI'?'selected':''}>JIMAT EKONOMI</option><option value="JIMAT STANDARD" ${pk==='JIMAT STANDARD'?'selected':''}>JIMAT STANDARD</option>
+          <option value="JIMAT EKONOMI" ${pk==='JIMAT EKONOMI'?'selected':''}>JIMAT EKONOMI</option>
+          <option value="JIMAT STANDARD" ${pk==='JIMAT STANDARD'?'selected':''}>JIMAT STANDARD</option>
           <option value="JIMAT PREMIUM" ${pk==='JIMAT PREMIUM'?'selected':''}>JIMAT PREMIUM</option>
           <option value="EKONOMI LITE" ${pk==='EKONOMI LITE'?'selected':''}>EKONOMI LITE</option>
           <option value="EKONOMI" ${pk==='EKONOMI'?'selected':''}>EKONOMI</option>
@@ -935,8 +936,8 @@ function renderNamelist(){
           <option value="PREMIUM PLUS" ${pk==='PREMIUM PLUS'?'selected':''}>PREMIUM PLUS</option>
         </select>
       </div>
-            <div class="col-span-2 flex items-center justify-center">
-        <select onchange="updateJemaahField('${r.id}','STATUS VISA',this.value)" class="text-[8px] border border-slate-300 rounded-full px-2 py-1 bg-white w-full max-w-[110px] truncate font-bold ${getVisaClass(getVisaVal(r.fields))}">
+      <div class="col-span-2 flex items-center justify-center" style="border:2px solid red !important; background: #fef3c7;">
+        <select onchange="updateJemaahField('${r.id}','STATUS VISA',this.value)" class="text-[8px] border-2 border-red-500 rounded-full px-2 py-1 bg-yellow-100 w-full max-w-[110px] truncate font-bold ${getVisaClass(getVisaVal(r.fields))}">
           <option value="" ${getVisaVal(r.fields)===''?'selected':''}>- VISA</option>
           <option value="TOURIST" ${getVisaVal(r.fields)==='TOURIST'?'selected':''}>TOURIST</option>
           <option value="TOURIST (VALID)" ${getVisaVal(r.fields)==='TOURIST (VALID)'?'selected':''}>TOURIST (VALID)</option>
@@ -2277,37 +2278,35 @@ renderNamelist = function(){
         const color = opt==='TAKAFUL'?'bg-emerald-100':opt==='ETIQA'?'bg-amber-100':opt==='AL-KHAIRI'?'bg-blue-100':'bg-slate-100';
         return `<label class="flex items-center gap-1.5 px-2 py-1 hover:bg-slate-50 rounded text-[10px] cursor-pointer"><input type="checkbox" ${checked?'checked':''} onchange="toggleInsuranMulti('${r.id}','${opt}')" class="w-3 h-3 accent-[#7A0C2E]"> <span class="px-1.5 py-0.5 rounded-full text-[8px] ${color}">${opt}</span></label>`;
       }).join('');
-      return `<div ${drag} class="grid grid-cols-12 items-center px-1.5 py-1.5 text-[11px] border-b border-slate-50 ${rowCls}">
-        <div class="col-span-1 text-slate-400 text-[10px]">${String(i+1).padStart(2,'0')}</div>
-        <div class="col-span-3 font-medium truncate text-[10px] ${assignedInLoc?'text-slate-500 italic':''}" title="${name}">${name}</div>
-        <div class="col-span-2 flex items-center gap-0.5 relative">
-          <div class="relative w-full">
-            <button onclick="event.stopPropagation(); toggleBoardDropdown('${r.id}')" class="text-[8px] border rounded-full px-2 py-1 font-bold ${fbCls} outline-none w-full truncate text-left flex items-center justify-between bg-white opacity-100" style="opacity:1; isolation:isolate;" title="BOARD BASIS - klik untuk pilih 2">
-              <span class="truncate">${fbDisplay}</span><span class="ml-1">▼</span>
-            </button>
-            <div id="boardDrop-${r.id}" class="hidden absolute left-0 top-full mt-1 w-[190px] bg-white border border-slate-200 rounded-xl shadow-xl z-[9999] p-1" style="background:#ffffff !important; opacity:1 !important; isolation:isolate;">
-              ${boardCheckboxes}
-              <div class="border-t border-slate-100 mt-1 pt-1 flex justify-between"><button onclick="clearBoardMulti('${r.id}'); closeBoardDropdown('${r.id}')" class="text-[8px] px-2 py-0.5 rounded-full bg-slate-100">Clear</button><button onclick="closeBoardDropdown('${r.id}')" class="text-[8px] px-2 py-0.5 rounded-full bg-[#7A0C2E] text-white">OK</button></div>
-              <div class="text-[7px] text-slate-400 px-2 mt-1">Boleh pilih 2: BB (MEKAH) + FB (MADINAH)</div>
+          return `<div ${drag} class="grid grid-cols-12 items-center px-1.5 py-1.5 text-[11px] border-b border-slate-50 ${rowCls} bg-yellow-50">
+      <div class="col-span-1 text-slate-400 text-[10px]">${String(i+1).padStart(2,'0')}</div>
+      <div class="col-span-3 font-medium truncate text-[10px] ${assignedInLoc?'text-slate-500 italic':''}" title="${name}">${name}</div>
+      <div class="col-span-2 flex items-center gap-0.5 relative">
+        <div class="relative w-full">
+          <button onclick="event.stopPropagation(); toggleBoardDropdown('${r.id}')" class="text-[8px] border rounded-full px-2 py-1 font-bold ${fbCls} outline-none w-full truncate text-left flex items-center justify-between bg-white opacity-100" style="opacity:1; isolation:isolate;" title="BOARD BASIS - klik untuk pilih 2">
+            <span class="truncate">${fbDisplay}</span><span class="ml-1">▼</span>
+          </button>
+          <div id="boardDrop-${r.id}" class="hidden absolute left-0 top-full mt-1 w-[190px] bg-white border border-slate-200 rounded-xl shadow-xl z-[9999] p-1" style="background:#ffffff !important; opacity:1 !important; isolation:isolate;">
+            ${boardCheckboxes}
+            <div class="border-t border-slate-100 mt-1 pt-1 flex justify-between">
+              <button onclick="clearBoardMulti('${r.id}'); closeBoardDropdown('${r.id}')" class="text-[8px] px-2 py-0.5 rounded-full bg-slate-100">Clear</button>
+              <button onclick="closeBoardDropdown('${r.id}')" class="text-[8px] px-2 py-0.5 rounded-full bg-[#7A0C2E] text-white">OK</button>
             </div>
+            <div class="text-[7px] text-slate-400 px-2 mt-1">Boleh pilih 2: BB (MEKAH) + FB (MADINAH)</div>
           </div>
         </div>
-        <div class="col-span-1 text-center"><input type="checkbox" ${trChecked?'checked':''} onchange="updateJemaahCheckbox('${r.id}','TRAIN',this.checked)" class="w-3.5 h-3.5 accent-[#7A0C2E] rounded" title="TRAIN"></div>
-        <div class="col-span-3 flex items-center gap-0.5 relative">
-          <div class="relative w-full">
-            <button onclick="event.stopPropagation(); toggleInsuranDropdown('${r.id}')" class="text-[8px] border rounded-full px-2 py-1 bg-white font-bold w-full text-left flex justify-between items-center ${insArr.length? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-white border-slate-200 text-slate-400'}" style="opacity:1;">
-              <span class="truncate">${insDisplay}</span><span>▼</span>
-            </button>
-            <div id="insuranDrop-${r.id}" class="hidden absolute left-0 top-full mt-1 w-[170px] bg-white border border-slate-200 rounded-xl shadow-xl z-[9999] p-1">
-              ${insCheckboxes}
-              <div class="border-t border-slate-100 mt-1 pt-1 flex justify-between"><button onclick="clearInsuranMulti('${r.id}'); closeInsuranDropdown('${r.id}')" class="text-[8px] px-2 py-0.5 rounded-full bg-slate-100">Clear</button><button onclick="closeInsuranDropdown('${r.id}')" class="text-[8px] px-2 py-0.5 rounded-full bg-[#7A0C2E] text-white">OK</button></div>
-            </div>
-          </div>
-        </div>
-        <div class="col-span-1 flex items-center gap-0.5">
-          <select onchange="updateJemaahField('${r.id}','PAKEJ',this.value)" class="text-[8px] border border-slate-200 rounded-full px-1.5 py-0.5 bg-white max-w-[70px] truncate">
+      </div>
+      <div class="col-span-1 text-center">
+        <input type="checkbox" ${trChecked?'checked':''} onchange="updateJemaahCheckbox('${r.id}','TRAIN',this.checked)" class="w-3.5 h-3.5 accent-[#7A0C2E] rounded" title="TRAIN">
+      </div>
+      <div class="col-span-2 flex items-center gap-0.5 flex-wrap justify-center">
+        ${insToggle}
+      </div>
+      <div class="col-span-1 flex items-center gap-0.5">
+        <select onchange="updateJemaahField('${r.id}','PAKEJ',this.value)" class="text-[8px] border border-slate-200 rounded-full px-1.5 py-0.5 bg-white max-w-[70px] truncate">
           <option value="-" ${pk==='-'?'selected':''}>-</option>
-          <option value="JIMAT EKONOMI" ${pk==='JIMAT EKONOMI'?'selected':''}>JIMAT EKONOMI</option><option value="JIMAT STANDARD" ${pk==='JIMAT STANDARD'?'selected':''}>JIMAT STANDARD</option>
+          <option value="JIMAT EKONOMI" ${pk==='JIMAT EKONOMI'?'selected':''}>JIMAT EKONOMI</option>
+          <option value="JIMAT STANDARD" ${pk==='JIMAT STANDARD'?'selected':''}>JIMAT STANDARD</option>
           <option value="JIMAT PREMIUM" ${pk==='JIMAT PREMIUM'?'selected':''}>JIMAT PREMIUM</option>
           <option value="EKONOMI LITE" ${pk==='EKONOMI LITE'?'selected':''}>EKONOMI LITE</option>
           <option value="EKONOMI" ${pk==='EKONOMI'?'selected':''}>EKONOMI</option>
@@ -2315,9 +2314,18 @@ renderNamelist = function(){
           <option value="PREMIUM" ${pk==='PREMIUM'?'selected':''}>PREMIUM</option>
           <option value="PREMIUM PLUS" ${pk==='PREMIUM PLUS'?'selected':''}>PREMIUM PLUS</option>
         </select>
-        </div>
-        
-      </div>`;
+      </div>
+      <div class="col-span-2 flex items-center justify-center" style="border:2px solid red !important; background: #fef3c7;">
+        <select onchange="updateJemaahField('${r.id}','STATUS VISA',this.value)" class="text-[8px] border-2 border-red-500 rounded-full px-2 py-1 bg-yellow-100 w-full max-w-[110px] truncate font-bold ${getVisaClass(getVisaVal(r.fields))}">
+          <option value="" ${getVisaVal(r.fields)===''?'selected':''}>- VISA</option>
+          <option value="TOURIST" ${getVisaVal(r.fields)==='TOURIST'?'selected':''}>TOURIST</option>
+          <option value="TOURIST (VALID)" ${getVisaVal(r.fields)==='TOURIST (VALID)'?'selected':''}>TOURIST (VALID)</option>
+          <option value="UMRAH" ${getVisaVal(r.fields)==='UMRAH'?'selected':''}>UMRAH</option>
+          <option value="UMRAH (VALID)" ${getVisaVal(r.fields)==='UMRAH (VALID)'?'selected':''}>UMRAH (VALID)</option>
+          <option value="IQAMA (VALID)" ${getVisaVal(r.fields)==='IQAMA (VALID)'?'selected':''}>IQAMA (VALID)</option>
+        </select>
+      </div>
+    </div>`;
     }).join('');
     if(typeof makeNamelistSticky==='function') makeNamelistSticky();
   }catch(e){ console.error('V80 renderNamelist override error', e); return _origRenderNamelist_V80.apply(this, arguments); }
