@@ -1,4 +1,4 @@
-console.log('ROOMING V103.14 VISA FIX - '+new Date().toISOString()); alert('V103.14 LOADED - VISA SHOULD BE VISIBLE');
+console.log('ROOMING V103.15 FINAL - VISA CLEAR FIX'); console.log('V103.15 CLEAN VISA');
 var _autoScrollInterval = window._autoScrollInterval || null;
 window._roomingDragListenersAdded = window._roomingDragListenersAdded || false;
 // ROOMING V103 CLEAN - Deduped + Modular Ready
@@ -899,7 +899,7 @@ function renderNamelist(){
       return `<button onclick="toggleInsuran('${r.id}','${opt}')" class="px-1 py-0.5 rounded-full border text-[7px] font-bold ${cls}" title="${opt}">${label}</button>`;
     }).join('');
 
-        return `<div ${drag} class="grid grid-cols-12 items-center px-1.5 py-1.5 text-[11px] border-b border-slate-50 ${rowCls} bg-yellow-50">
+        return `<div ${drag} class="grid grid-cols-12 items-center px-1.5 py-1.5 text-[11px] border-b border-slate-50 ${rowCls}">
       <div class="col-span-1 text-slate-400 text-[10px]">${String(i+1).padStart(2,'0')}</div>
       <div class="col-span-3 font-medium truncate text-[10px] ${assignedInLoc?'text-slate-500 italic':''}" title="${name}">${name}</div>
       <div class="col-span-2 flex items-center gap-0.5 relative">
@@ -936,14 +936,15 @@ function renderNamelist(){
           <option value="PREMIUM PLUS" ${pk==='PREMIUM PLUS'?'selected':''}>PREMIUM PLUS</option>
         </select>
       </div>
-      <div class="col-span-2 flex items-center justify-center" style="border:2px solid red !important; background: #fef3c7;">
-        <select onchange="updateJemaahField('${r.id}','STATUS VISA',this.value)" class="text-[8px] border-2 border-red-500 rounded-full px-2 py-1 bg-yellow-100 w-full max-w-[110px] truncate font-bold ${getVisaClass(getVisaVal(r.fields))}">
+      <div class="col-span-2 flex items-center justify-center" >
+        <select onchange="updateJemaahField('${r.id}','STATUS VISA',this.value)" class="text-[8px] border border-slate-300 rounded-full px-2 py-1 bg-white w-full max-w-[110px] truncate font-bold ${getVisaClass(getVisaVal(r.fields))}">
           <option value="" ${getVisaVal(r.fields)===''?'selected':''}>- VISA</option>
           <option value="TOURIST" ${getVisaVal(r.fields)==='TOURIST'?'selected':''}>TOURIST</option>
           <option value="TOURIST (VALID)" ${getVisaVal(r.fields)==='TOURIST (VALID)'?'selected':''}>TOURIST (VALID)</option>
           <option value="UMRAH" ${getVisaVal(r.fields)==='UMRAH'?'selected':''}>UMRAH</option>
           <option value="UMRAH (VALID)" ${getVisaVal(r.fields)==='UMRAH (VALID)'?'selected':''}>UMRAH (VALID)</option>
           <option value="IQAMA (VALID)" ${getVisaVal(r.fields)==='IQAMA (VALID)'?'selected':''}>IQAMA (VALID)</option>
+          <option value="" ${getVisaVal(r.fields)===''?'selected':''}>- VISA</option>
         </select>
       </div>
     </div>`;
@@ -1446,6 +1447,13 @@ async function updateRoomField(roomId,field,value,doRender=true){
 }
 
 async function updateJemaahField(jemaahId, field, value){
+  if(field==='STATUS VISA' && (value==='' || value==='- VISA' || value==='-' || value===null)){
+    value = null;
+  }
+  if(field==='PAKEJ' && (value==='-' || value==='')){
+    value = null;
+  }
+
   const base=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base')||localStorage.getItem('effah_base_id'); const pat=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
   if(!base||!pat) return alert('Airtable config missing');
   const rec=allRoomingJemaah.find(r=>r.id===jemaahId);
@@ -2278,7 +2286,7 @@ renderNamelist = function(){
         const color = opt==='TAKAFUL'?'bg-emerald-100':opt==='ETIQA'?'bg-amber-100':opt==='AL-KHAIRI'?'bg-blue-100':'bg-slate-100';
         return `<label class="flex items-center gap-1.5 px-2 py-1 hover:bg-slate-50 rounded text-[10px] cursor-pointer"><input type="checkbox" ${checked?'checked':''} onchange="toggleInsuranMulti('${r.id}','${opt}')" class="w-3 h-3 accent-[#7A0C2E]"> <span class="px-1.5 py-0.5 rounded-full text-[8px] ${color}">${opt}</span></label>`;
       }).join('');
-          return `<div ${drag} class="grid grid-cols-12 items-center px-1.5 py-1.5 text-[11px] border-b border-slate-50 ${rowCls} bg-yellow-50">
+          return `<div ${drag} class="grid grid-cols-12 items-center px-1.5 py-1.5 text-[11px] border-b border-slate-50 ${rowCls}">
       <div class="col-span-1 text-slate-400 text-[10px]">${String(i+1).padStart(2,'0')}</div>
       <div class="col-span-3 font-medium truncate text-[10px] ${assignedInLoc?'text-slate-500 italic':''}" title="${name}">${name}</div>
       <div class="col-span-2 flex items-center gap-0.5 relative">
@@ -2315,14 +2323,15 @@ renderNamelist = function(){
           <option value="PREMIUM PLUS" ${pk==='PREMIUM PLUS'?'selected':''}>PREMIUM PLUS</option>
         </select>
       </div>
-      <div class="col-span-2 flex items-center justify-center" style="border:2px solid red !important; background: #fef3c7;">
-        <select onchange="updateJemaahField('${r.id}','STATUS VISA',this.value)" class="text-[8px] border-2 border-red-500 rounded-full px-2 py-1 bg-yellow-100 w-full max-w-[110px] truncate font-bold ${getVisaClass(getVisaVal(r.fields))}">
+      <div class="col-span-2 flex items-center justify-center" >
+        <select onchange="updateJemaahField('${r.id}','STATUS VISA',this.value)" class="text-[8px] border border-slate-300 rounded-full px-2 py-1 bg-white w-full max-w-[110px] truncate font-bold ${getVisaClass(getVisaVal(r.fields))}">
           <option value="" ${getVisaVal(r.fields)===''?'selected':''}>- VISA</option>
           <option value="TOURIST" ${getVisaVal(r.fields)==='TOURIST'?'selected':''}>TOURIST</option>
           <option value="TOURIST (VALID)" ${getVisaVal(r.fields)==='TOURIST (VALID)'?'selected':''}>TOURIST (VALID)</option>
           <option value="UMRAH" ${getVisaVal(r.fields)==='UMRAH'?'selected':''}>UMRAH</option>
           <option value="UMRAH (VALID)" ${getVisaVal(r.fields)==='UMRAH (VALID)'?'selected':''}>UMRAH (VALID)</option>
           <option value="IQAMA (VALID)" ${getVisaVal(r.fields)==='IQAMA (VALID)'?'selected':''}>IQAMA (VALID)</option>
+          <option value="" ${getVisaVal(r.fields)===''?'selected':''}>- VISA</option>
         </select>
       </div>
     </div>`;
