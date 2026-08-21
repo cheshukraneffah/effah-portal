@@ -2168,11 +2168,8 @@ function generateRoomingPrint(orientation){ orientation = orientation || 'landsc
       </div>`;
     });
 
-    // --- NAMELIST OVERVIEW: Speedtrain & Insuran unique ---
-    const trainJemaah = allRoomingJemaah.filter(j=> { try{ return isTrainChecked(j.fields); }catch(e){ return !!j.fields['TRAIN']; } }).length;
-    const trainStaff = (typeof staffList!=='undefined' ? staffList.filter(s=> !!(s.train||s.fields?.TRAIN)).length : 0);
-        // TRIP OVERVIEW - FIXED V103.25
-    const _staffList = (typeof staffList !== 'undefined' ? staffList : []);
+        // TRIP OVERVIEW - FIXED V103.28 - use combinedStaff and s.train
+    const _staffList = (typeof combinedStaff !== 'undefined' && combinedStaff.length ? combinedStaff : (typeof staffList !== 'undefined' ? staffList : []));
     const totalStaffCount = _staffList.length;
     const totalJemaahOnly = allRoomingJemaah.length;
     const visaCounts = {};
@@ -2180,7 +2177,6 @@ function generateRoomingPrint(orientation){ orientation = orientation || 'landsc
       const v=(j.fields['STATUS VISA']||j.fields['VISA']||'').toString().trim().toUpperCase();
       if(v && v!=='-' && v!=='- VISA'){ visaCounts[v]=(visaCounts[v]||0)+1; }
     });
-    // Visa - bahagikan setiap jenis, jangan bersambung
     let visaHtml = `
       <span style="display:inline-block;margin-right:12px;"><b>TOURIST:</b> ${visaCounts['TOURIST']||0}</span>
       <span style="display:inline-block;margin-right:12px;"><b>TOURIST VALID:</b> ${visaCounts['TOURIST (VALID)']||visaCounts['TOURIST VALID']||0}</span>
@@ -2188,15 +2184,17 @@ function generateRoomingPrint(orientation){ orientation = orientation || 'landsc
       <span style="display:inline-block;margin-right:12px;"><b>UMRAH (VALID):</b> ${visaCounts['UMRAH (VALID)']||0}</span>
       <span style="display:inline-block;margin-right:12px;"><b>IQAMA (VALID):</b> ${visaCounts['IQAMA (VALID)']||0}</span>
     `;
-    const _trainJemaahCount = allRoomingJemaah.filter(j=>{ try{ return typeof isTrainChecked==='function' ? isTrainChecked(j.fields) : !!j.fields['TRAIN']; }catch(e){return false;}}).length;
-    const _trainStaffCount = _staffList.filter(s=>{ try{ 
-      const f=s.fields; 
-      if(typeof isTrainChecked==='function' && isTrainChecked(f)) return true;
-      return !!f['TRAIN'] || !!f['SPEEDTRAIN'] || !!f['TRAIN STAFF'] || !!f['SPEEDTRAIN STAFF'] || !!f['SPEEDTRAIN_STAFF'] || !!f['SPEED TRAIN'] || f['TRAIN']==true || f['TRAIN']=='1' || f['TRAIN']=='true' || f['TRAIN']=='TRUE';
-    }catch(e){return false;}}).length;
+    const _trainJemaahCount = allRoomingJemaah.filter(j=>{ try{ return typeof isTrainChecked==='function' ? isTrainChecked(j.fields) : !!j.fields['TRAIN']; }catch(e){return !!j.fields['TRAIN'];}}).length;
+    const _trainStaffCount = _staffList.filter(s=>{ 
+      try{ 
+        // staff TRAIN can be in s.train, s.fields.TRAIN, s.fields['TRAIN STAFF']
+        const f=s.fields||{};
+        return !!(s.train || f['TRAIN'] || f['SPEEDTRAIN'] || f['TRAIN STAFF'] || s['TRAIN']);
+      }catch(e){return false;}
+    }).length;
     const _totalTrainWithStaff = _trainJemaahCount + _trainStaffCount;
     const _insJ = allRoomingJemaah.filter(j=>{ try{return getInsuranArray(j.fields).length>0;}catch(e){return false;}}).length;
-    const _insS = _staffList.filter(s=>{ try{return getInsuranArray(s.fields).length>0;}catch(e){return false;}}).length;
+    const _insS = _staffList.filter(s=>{ try{const f=s.fields||{}; return (f['INSURAN'] && f['INSURAN'].length>0) || (typeof getInsuranArray==='function' && getInsuranArray(f).length>0) || !!s.insuran; }catch(e){return false;}}).length;
     const _totalInsuranUnique = _insJ + _insS;
     const namelistOverviewHTML = '<div style="margin-top:12px;border:1px solid #000;padding:8px 10px;background:#f9fafb"><div style="font-weight:bold;font-size:10px;margin-bottom:6px">TRIP OVERVIEW</div><div style="display:flex;flex-wrap:wrap;gap:20px;font-size:9px"><div><b>Bilangan Speedtrain:</b> ' + _totalTrainWithStaff + ' orang (Jemaah: ' + _trainJemaahCount + ' + Staff: ' + _trainStaffCount + ')</div><div><b>Bilangan Insuran:</b> ' + _totalInsuranUnique + ' orang</div><div><b>Visa:</b> ' + visaHtml + '</div><div><b>Total Jemaah:</b> ' + totalJemaahOnly + '</div><div><b>Total Staff:</b> ' + totalStaffCount + '</div></div></div>';
 
