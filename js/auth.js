@@ -1,12 +1,12 @@
 (function(){
 'use strict';
-// Security PIN Utama - Effah Travel - AUTO LOCK 3 JAM + 5 MINIT WARNING
+// Security PIN Utama - Effah Travel - AUTO LOCK 3 JAM + 5 MINIT WARNING - V3 NO CLASH
 const DEFAULT_PIN = "5822";
 let _memLogin = false;
 
-// Config
-const EFFAH_EFFAH_IDLE_LIMIT_MS = 3 * 60 * 60 * 1000; // 3 jam = 10,800,000 ms
-const EFFAH_EFFAH_WARN_DURATION_MS = 5 * 60 * 1000; // 5 minit warning
+// Config - unique name to avoid clash with router.js
+const EFFAH_IDLE_LIMIT = 3 * 60 * 60 * 1000; // 3 jam
+const EFFAH_WARN_DURATION = 5 * 60 * 1000; // 5 minit
 
 let idleTimer = null;
 let warnTimer = null;
@@ -23,7 +23,6 @@ function safeSet(key,val){
   _memLogin = true;
 }
 function safeGet(key){
-  // Check expiry for login
   if(key==='effah_logged_in'){
     let lastAct = 0;
     try{ lastAct = parseInt(localStorage.getItem('effah_last_activity')||'0'); }catch(e){}
@@ -32,8 +31,7 @@ function safeGet(key){
     }
     if(lastAct){
       const diff = Date.now() - lastAct;
-      if(diff > EFFAH_IDLE_LIMIT_MS){
-        // Lebih 3 jam, force logout
+      if(diff > EFFAH_IDLE_LIMIT){
         try{ localStorage.removeItem('effah_logged_in'); }catch(e){}
         try{ sessionStorage.removeItem('effah_logged_in'); }catch(e){}
         try{ localStorage.removeItem('effah_last_activity'); }catch(e){}
@@ -55,12 +53,10 @@ function updateLastActivity(){
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    // Check if still valid (3 jam)
     if (safeGet('effah_logged_in')) {
         unlockPortal();
         startIdleWatcher();
     } else {
-        // Ensure locked
         lockPortal();
     }
 });
@@ -70,7 +66,6 @@ function verifyPin(e) {
     const inputEl = document.getElementById('pinInput');
     const pinInput = (inputEl?.value || '').trim();
     const errorMsg = document.getElementById('pinErrorMsg');
-    //
     if (pinInput === DEFAULT_PIN || pinInput === "5822") {
         safeSet('effah_logged_in','true');
         updateLastActivity();
@@ -116,7 +111,6 @@ function logoutPortal() {
     location.reload();
 }
 
-// bypass for file:// - allow Enter key
 document.addEventListener('keydown', (e)=>{
   if(e.key==='Enter'){
     const overlay=document.getElementById('loginOverlay');
@@ -126,15 +120,12 @@ document.addEventListener('keydown', (e)=>{
   }
 });
 
-// ================= IDLE WATCHER 3 JAM =================
 function startIdleWatcher(){
   stopIdleWatcher();
   lastActivityTime = Date.now();
-  // Listen activity
   ['mousemove','mousedown','keydown','touchstart','scroll','click'].forEach(evt=>{
     document.addEventListener(evt, onUserActivity, {passive:true});
   });
-  // Check every 30 sec if idle > 3 jam
   idleTimer = setInterval(checkIdle, 30000);
 }
 
@@ -148,28 +139,20 @@ function stopIdleWatcher(){
 }
 
 function onUserActivity(){
-  // If warning popup is open, don't auto reset - user must click Teruskan
   const warnOverlay = document.getElementById('idleWarningOverlay');
-  if(warnOverlay && !warnOverlay.classList.contains('hidden')){
-    return;
-  }
+  if(warnOverlay && !warnOverlay.classList.contains('hidden')){ return; }
   const now = Date.now();
-  // Throttle update to 1 min to avoid spamming localStorage
-  if(now - lastActivityTime > 60000){
-    updateLastActivity();
-  }
+  if(now - lastActivityTime > 60000){ updateLastActivity(); }
   lastActivityTime = now;
 }
 
 function checkIdle(){
   const diff = Date.now() - lastActivityTime;
-  if(diff >= EFFAH_IDLE_LIMIT_MS){
-    showIdleWarning();
-  }
+  if(diff >= EFFAH_IDLE_LIMIT){ showIdleWarning(); }
 }
 
 function showIdleWarning(){
-  stopIdleWatcher(); // stop idle check, start warning countdown
+  stopIdleWatcher();
   let overlay = document.getElementById('idleWarningOverlay');
   if(!overlay){
     overlay = document.createElement('div');
@@ -188,12 +171,8 @@ function showIdleWarning(){
           <p id="idleCountdown" class="text-2xl font-black text-rose-600 tracking-widest">05:00</p>
         </div>
         <div class="flex gap-2">
-          <button onclick="continueSession()" class="flex-1 bg-brand-maroon text-white font-bold py-3 rounded-xl hover:bg-rose-900 transition text-sm">
-            Teruskan Sesi
-          </button>
-          <button onclick="logoutPortal()" class="flex-1 bg-slate-100 text-slate-700 font-bold py-3 rounded-xl hover:bg-slate-200 transition text-sm">
-            Lock Sekarang
-          </button>
+          <button onclick="window.effahContinueSession()" class="flex-1 bg-rose-900 text-white font-bold py-3 rounded-xl hover:bg-rose-800 transition text-sm">Teruskan Sesi</button>
+          <button onclick="window.effahLogoutPortal()" class="flex-1 bg-slate-100 text-slate-700 font-bold py-3 rounded-xl hover:bg-slate-200 transition text-sm">Lock Sekarang</button>
         </div>
       </div>
     `;
@@ -201,25 +180,18 @@ function showIdleWarning(){
   } else {
     overlay.classList.remove('hidden');
   }
-
-  let remaining = EFFAH_WARN_DURATION_MS;
+  let remaining = EFFAH_WARN_DURATION;
   const countdownEl = document.getElementById('idleCountdown');
-  
   function updateCountdown(){
     const m = Math.floor(remaining/60000);
     const s = Math.floor((remaining%60000)/1000);
     if(countdownEl) countdownEl.textContent = `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
   }
   updateCountdown();
-
   countdownInterval = setInterval(()=>{
     remaining -= 1000;
     updateCountdown();
-    if(remaining <= 0){
-      clearInterval(countdownInterval);
-      // Auto lock
-      forceLock();
-    }
+    if(remaining <= 0){ clearInterval(countdownInterval); forceLock(); }
   }, 1000);
 }
 
@@ -244,11 +216,16 @@ function forceLock(){
   _memLogin=false;
   lockPortal();
   stopIdleWatcher();
-  // Show message
   const pinInput = document.getElementById('pinInput');
   if(pinInput) pinInput.placeholder='Sesi tamat - Masuk PIN semula';
 }
 
+// Expose to global for HTML onclick
+window.verifyPin = verifyPin;
+window.unlockPortal = unlockPortal;
+window.logoutPortal = logoutPortal;
+window.effahLogoutPortal = logoutPortal;
+window.effahContinueSession = continueSession;
 window.continueSession = continueSession;
 window.forceLock = forceLock;
 
