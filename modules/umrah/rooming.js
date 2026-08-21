@@ -401,7 +401,7 @@ function renderRoomingHTML(){
       <div class="flex items-center gap-1.5 text-[11px]">
         <span id="belumAssignTop" class="px-2 py-0.5 bg-amber-100 rounded-full font-bold text-[10px]">0 Unassigned</span>
         <span id="assignedTop" class="px-2 py-0.5 bg-emerald-50 rounded-full font-bold text-[10px]">0 Assigned</span>
-        <button onclick="fetchRoomingData()" class="w-6 h-6 rounded-full border bg-white hover:bg-slate-50 text-[10px]"><i class="fa-solid fa-rotate"></i></button>
+        <button onclick="fetchRoomingData(true)" title="Reload data dari Airtable" class="w-6 h-6 rounded-full border bg-white hover:bg-slate-50 text-[10px]"><i class="fa-solid fa-rotate"></i></button>
       </div>
     </div>
 
@@ -797,7 +797,7 @@ async function fetchRoomingData(forceReload=false){
     _roomingIsLoading = false;
     console.error('fetchRoomingData fatal', e); 
     const cont=document.getElementById('namelistContainer');
-    if(cont) cont.innerHTML='<div class="p-6 text-center text-[11px] text-red-400">Ralat memuatkan jemaah: '+e.message+'<br><button onclick="fetchRoomingData()" class="mt-2 px-3 py-1 bg-[#7A0C2E] text-white rounded-full text-[10px]">Retry</button></div>';
+    if(cont) cont.innerHTML='<div class="p-6 text-center text-[11px] text-red-400">Ralat memuatkan jemaah: '+e.message+'<br><button onclick="fetchRoomingData(true)" class="mt-2 px-3 py-1 bg-[#7A0C2E] text-white rounded-full text-[10px]">Retry</button></div>';
     if(typeof hideRoomingLoading==='function') hideRoomingLoading();
   }
 }
@@ -2318,7 +2318,7 @@ function createMissingRoomingStructure(){
           <h2 class="text-sm font-bold">Rooming List - V80 Auto-Created (Full Base)</h2>
           <div class="flex gap-2">
             <select id="roomingTripSelect" class="text-[11px] border rounded px-2 py-1"></select>
-            <button onclick="fetchRoomingData()" class="text-[11px] bg-[#7A0C2E] text-white px-3 py-1 rounded-full">Reload</button>
+            <button onclick="fetchRoomingData(true)" class="text-[11px] bg-[#7A0C2E] text-white px-3 py-1 rounded-full">Reload</button>
           </div>
         </div>
         <div id="locationTabs" class="flex gap-2 mt-3"></div>
