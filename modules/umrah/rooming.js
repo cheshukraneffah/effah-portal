@@ -14,11 +14,18 @@ window._autoScrollInterval = _autoScrollInterval;
 var allRoomingRecords = window.allRoomingRecords || [];
 var allRoomingJemaah = window.allRoomingJemaah || [];
 var activeLocation = window.activeLocation || localStorage.getItem('effah_active_location') || 'MEKAH';
-// CACHE FIX FOR TAB SWITCH - prevent reload when switching tabs - V103.28 PATCH
+// CACHE FIX FOR TAB SWITCH - prevent reload when switching tabs - V103.28 PATCH V4
 var _roomingLastTripId = window._roomingLastTripId || null;
 var _roomingCacheTime = window._roomingCacheTime || 0;
 var _roomingIsLoading = false;
+var _roomingFirstLoadDone = window._roomingFirstLoadDone || false;
 window._roomingLastTripId = _roomingLastTripId;
+window._roomingFirstLoadDone = _roomingFirstLoadDone;
+// On page reload, clear cache time to force first fetch with spinner
+if(!_roomingFirstLoadDone){
+  _roomingCacheTime = 0;
+  window._roomingCacheTime = 0;
+}
 var roomingDefaultCap = 4;
 var customLocations = window.customLocations || JSON.parse(localStorage.getItem('effah_custom_locations')||'[]');
 var staffList = window.staffList || [];
@@ -520,7 +527,9 @@ function renderRoomingHTML(){
   `;
   populateRoomingTripDropdown();
   renderLocationTabs();
-  fetchRoomingData();
+  // First render: always show loading spinner before fetch
+  try{ showRoomingLoading(); }catch(e){}
+  setTimeout(()=>fetchRoomingData(), 100);
 }
 
 function getRoomOrderKey(){ const tripId=window.selectedTripRecord?.id||localStorage.getItem('effah_active_trip_id')||'default'; return `effah_room_order_${tripId}_${activeLocation}`; }
@@ -719,7 +728,9 @@ async function fetchRoomingData(forceReload=false){
     }
     const now = Date.now();
     const cacheValid = (now - _roomingCacheTime) < 300000;
-    if(!forceReload && tripId && tripId===_roomingLastTripId && allRoomingJemaah.length>0 && cacheValid && !_roomingIsLoading){
+    // Only use cache if first load already done and not initial page load
+    const canUseCache = _roomingFirstLoadDone && !forceReload && tripId && tripId===_roomingLastTripId && allRoomingJemaah.length>0 && cacheValid && !_roomingIsLoading;
+    if(canUseCache){
       console.log('ROOMING CACHE HIT V103.28 - using cached data for trip', tripId);
       try{ populateRoomingTripDropdown(); }catch(e){}
       try{ renderNamelist(); }catch(e){}
@@ -785,8 +796,10 @@ async function fetchRoomingData(forceReload=false){
     console.log('filtered for trip', tripId, 'rooms', allRoomingRecords.length, 'jemaah', allRoomingJemaah.length);
     _roomingLastTripId = tripId;
     _roomingCacheTime = Date.now();
+    _roomingFirstLoadDone = true;
     window._roomingLastTripId = _roomingLastTripId;
     window._roomingCacheTime = _roomingCacheTime;
+    window._roomingFirstLoadDone = true;
     try{ await loadStaffList(); }catch(e){ console.warn('staff list fail', e); }
     renderNamelist(); 
     renderRoomingGrid(); 
@@ -809,7 +822,7 @@ function hideRoomingLoading(){
   if(cont && cont.innerHTML.includes('Memuatkan jemaah')){
     // Will be overwritten by renderNamelist, but if no data, show empty
     if(allRoomingJemaah.length===0){
-      cont.innerHTML='<div class="p-6 text-center text-[11px] text-slate-400">Tiada jemaah untuk trip ini</div>';
+      cont.innerHTML='<div class="p-6 text-center text-[11px] text-slate-400">Tiada jemaah untuk trip ini<br><button onclick="fetchRoomingData(true)" class="mt-2 px-3 py-1 bg-[#7A0C2E] text-white rounded-full text-[10px]">Retry Load</button></div>';
     }
   }
 }
