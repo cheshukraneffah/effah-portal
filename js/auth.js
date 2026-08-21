@@ -1,10 +1,12 @@
+(function(){
+'use strict';
 // Security PIN Utama - Effah Travel - AUTO LOCK 3 JAM + 5 MINIT WARNING
 const DEFAULT_PIN = "5822";
 let _memLogin = false;
 
 // Config
-const IDLE_LIMIT_MS = 3 * 60 * 60 * 1000; // 3 jam = 10,800,000 ms
-const WARN_DURATION_MS = 5 * 60 * 1000; // 5 minit warning
+const EFFAH_EFFAH_IDLE_LIMIT_MS = 3 * 60 * 60 * 1000; // 3 jam = 10,800,000 ms
+const EFFAH_EFFAH_WARN_DURATION_MS = 5 * 60 * 1000; // 5 minit warning
 
 let idleTimer = null;
 let warnTimer = null;
@@ -30,7 +32,7 @@ function safeGet(key){
     }
     if(lastAct){
       const diff = Date.now() - lastAct;
-      if(diff > IDLE_LIMIT_MS){
+      if(diff > EFFAH_IDLE_LIMIT_MS){
         // Lebih 3 jam, force logout
         try{ localStorage.removeItem('effah_logged_in'); }catch(e){}
         try{ sessionStorage.removeItem('effah_logged_in'); }catch(e){}
@@ -161,7 +163,7 @@ function onUserActivity(){
 
 function checkIdle(){
   const diff = Date.now() - lastActivityTime;
-  if(diff >= IDLE_LIMIT_MS){
+  if(diff >= EFFAH_IDLE_LIMIT_MS){
     showIdleWarning();
   }
 }
@@ -200,7 +202,7 @@ function showIdleWarning(){
     overlay.classList.remove('hidden');
   }
 
-  let remaining = WARN_DURATION_MS;
+  let remaining = EFFAH_WARN_DURATION_MS;
   const countdownEl = document.getElementById('idleCountdown');
   
   function updateCountdown(){
@@ -249,3 +251,5 @@ function forceLock(){
 
 window.continueSession = continueSession;
 window.forceLock = forceLock;
+
+})();
