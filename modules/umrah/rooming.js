@@ -14,6 +14,11 @@ window._autoScrollInterval = _autoScrollInterval;
 var allRoomingRecords = window.allRoomingRecords || [];
 var allRoomingJemaah = window.allRoomingJemaah || [];
 var activeLocation = window.activeLocation || localStorage.getItem('effah_active_location') || 'MEKAH';
+// CACHE FIX FOR TAB SWITCH - prevent reload when switching tabs - V103.28 PATCH
+var _roomingLastTripId = window._roomingLastTripId || null;
+var _roomingCacheTime = window._roomingCacheTime || 0;
+var _roomingIsLoading = false;
+window._roomingLastTripId = _roomingLastTripId;
 var roomingDefaultCap = 4;
 var customLocations = window.customLocations || JSON.parse(localStorage.getItem('effah_custom_locations')||'[]');
 var staffList = window.staffList || [];
@@ -705,12 +710,32 @@ function renderLocationTabs(){
   html+=`<button onclick="openAddLocationModal()" class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-slate-100 border border-slate-200 text-slate-600 hover:bg-slate-200">+ Lokasi</button>`;
   container.innerHTML=html;
 }
-async function fetchRoomingData(){
+async function fetchRoomingData(forceReload=false){
   try{
+    let tripId=window.selectedTripRecord?.id||localStorage.getItem('effah_active_trip_id')||localStorage.getItem('effah_last_selected_trip')||localStorage.getItem('selectedTripId')||'';
+    if(!tripId){
+      const sel=document.getElementById('roomingTripSelect');
+      if(sel && sel.value) tripId=sel.value;
+    }
+    const now = Date.now();
+    const cacheValid = (now - _roomingCacheTime) < 300000;
+    if(!forceReload && tripId && tripId===_roomingLastTripId && allRoomingJemaah.length>0 && cacheValid && !_roomingIsLoading){
+      console.log('ROOMING CACHE HIT V103.28 - using cached data for trip', tripId);
+      try{ populateRoomingTripDropdown(); }catch(e){}
+      try{ renderNamelist(); }catch(e){}
+      try{ renderRoomingGrid(); }catch(e){}
+      try{ renderLocationTabs(); }catch(e){}
+      try{ hideRoomingLoading(); }catch(e){}
+      return;
+    }
+    if(_roomingIsLoading && !forceReload){
+      console.log('ROOMING already loading, skipping duplicate fetch');
+      return;
+    }
+    _roomingIsLoading = true;
     showRoomingLoading(); 
     populateRoomingTripDropdown();
-    let tripId=window.selectedTripRecord?.id||localStorage.getItem('effah_active_trip_id')||localStorage.getItem('effah_last_selected_trip')||localStorage.getItem('selectedTripId')||'';
-    // Fallback: try to get from dropdown if localStorage blocked by Tracking Prevention
+    // tripId already resolved above for cache check
     if(!tripId){
       const sel=document.getElementById('roomingTripSelect');
       if(sel && sel.value) tripId=sel.value;
@@ -758,12 +783,18 @@ async function fetchRoomingData(){
     allRoomingRecords=allRooms.filter(r=>{ const tf=r.fields['TRIP']||[]; return Array.isArray(tf)?tf.includes(tripId):String(tf).includes(tripId); });
     allRoomingJemaah=allJems.filter(r=>{ const tf=r.fields['TRIP']||[]; return Array.isArray(tf)?tf.includes(tripId):String(tf).includes(tripId); });
     console.log('filtered for trip', tripId, 'rooms', allRoomingRecords.length, 'jemaah', allRoomingJemaah.length);
+    _roomingLastTripId = tripId;
+    _roomingCacheTime = Date.now();
+    window._roomingLastTripId = _roomingLastTripId;
+    window._roomingCacheTime = _roomingCacheTime;
     try{ await loadStaffList(); }catch(e){ console.warn('staff list fail', e); }
     renderNamelist(); 
     renderRoomingGrid(); 
     renderLocationTabs();
     if(typeof hideRoomingLoading==='function') hideRoomingLoading();
+    _roomingIsLoading = false;
   }catch(e){ 
+    _roomingIsLoading = false;
     console.error('fetchRoomingData fatal', e); 
     const cont=document.getElementById('namelistContainer');
     if(cont) cont.innerHTML='<div class="p-6 text-center text-[11px] text-red-400">Ralat memuatkan jemaah: '+e.message+'<br><button onclick="fetchRoomingData()" class="mt-2 px-3 py-1 bg-[#7A0C2E] text-white rounded-full text-[10px]">Retry</button></div>';
@@ -796,7 +827,7 @@ function populateRoomingTripDropdown(){
   sel.innerHTML='<option value="">Pilih Trip...</option>'+trips.map(t=>{ const raw=t.fields?.Trip||t.fields?.['TRIP NAME']||t.id; const clean=cleanTripNameForRooming(raw); return `<option value="${t.id}" ${t.id===currentId?'selected':''}>${clean}</option>`; }).join('');
   if(currentId) sel.value=currentId; else if(trips.length>0){ sel.value=trips[0].id; onRoomingTripChange(trips[0].id); }
 }
-function onRoomingTripChange(tripId){ if(!tripId) return; const trips=window.allTripUmrahRecords||window.allTripRecords||[]; const found=trips.find(t=>t.id===tripId); if(found) window.selectedTripRecord=found; localStorage.setItem('effah_active_trip_id',tripId); localStorage.setItem('selectedTripId',tripId); localStorage.setItem('effah_last_selected_trip',tripId); fetchRoomingData(); }
+function onRoomingTripChange(tripId){ if(!tripId) return; const trips=window.allTripUmrahRecords||window.allTripRecords||[]; const found=trips.find(t=>t.id===tripId); if(found) window.selectedTripRecord=found; localStorage.setItem('effah_active_trip_id',tripId); localStorage.setItem('selectedTripId',tripId); localStorage.setItem('effah_last_selected_trip',tripId); fetchRoomingData(true); }
 function isJemaahAssignedInLocation(jId, location){
   const loc = (location||activeLocation).toUpperCase();
   return allRoomingRecords.some(r=> (r.fields['LOKASI / CITY']||'MEKAH').toUpperCase()===loc && (r.fields['JEMAAH']||[]).includes(jId));
@@ -2823,3 +2854,6 @@ console.log('Drag room handlers injected');
   document.head.appendChild(style);
   console.log('V103.22 CSS overlap fix applied');
 })();
+
+window.fetchRoomingData = fetchRoomingData;
+window.onRoomingTripChange = onRoomingTripChange;
