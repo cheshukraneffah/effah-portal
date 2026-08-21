@@ -2180,9 +2180,16 @@ function generateRoomingPrint(orientation){ orientation = orientation || 'landsc
       const v=(j.fields['STATUS VISA']||j.fields['VISA']||'').toString().trim().toUpperCase();
       if(v && v!=='-' && v!=='- VISA'){ visaCounts[v]=(visaCounts[v]||0)+1; }
     });
-    let visaHtml = `TOURIST ${visaCounts['TOURIST']||0} TOURIST VALID ${visaCounts['TOURIST (VALID)']||visaCounts['TOURIST VALID']||0} UMRAH ${visaCounts['UMRAH']||0} UMRAH (VALID) ${visaCounts['UMRAH (VALID)']||0} IQAMA (VALID) ${visaCounts['IQAMA (VALID)']||0}`;
-    const _trainJemaahCount = allRoomingJemaah.filter(j=>{ try{return !!j.fields['TRAIN'];}catch(e){return false;}}).length;
-    const _trainStaffCount = _staffList.filter(s=>{ try{return !!s.fields['TRAIN'];}catch(e){return false;}}).length;
+    // Visa - bahagikan setiap jenis, jangan bersambung
+    let visaHtml = `
+      <span style="display:inline-block;margin-right:12px;"><b>TOURIST:</b> ${visaCounts['TOURIST']||0}</span>
+      <span style="display:inline-block;margin-right:12px;"><b>TOURIST VALID:</b> ${visaCounts['TOURIST (VALID)']||visaCounts['TOURIST VALID']||0}</span>
+      <span style="display:inline-block;margin-right:12px;"><b>UMRAH:</b> ${visaCounts['UMRAH']||0}</span>
+      <span style="display:inline-block;margin-right:12px;"><b>UMRAH (VALID):</b> ${visaCounts['UMRAH (VALID)']||0}</span>
+      <span style="display:inline-block;margin-right:12px;"><b>IQAMA (VALID):</b> ${visaCounts['IQAMA (VALID)']||0}</span>
+    `;
+    const _trainJemaahCount = allRoomingJemaah.filter(j=>{ try{return !!j.fields['TRAIN'] || !!j.fields['SPEEDTRAIN'];}catch(e){return false;}}).length;
+    const _trainStaffCount = _staffList.filter(s=>{ try{ const f=s.fields; return !!f['TRAIN'] || !!f['SPEEDTRAIN'] || !!f['TRAIN STAFF'] || !!f['SPEEDTRAIN STAFF'] || !!f['SPEEDTRAIN_STAFF']; }catch(e){return false;}}).length;
     const _totalTrainWithStaff = _trainJemaahCount + _trainStaffCount;
     const _insJ = allRoomingJemaah.filter(j=>{ try{return getInsuranArray(j.fields).length>0;}catch(e){return false;}}).length;
     const _insS = _staffList.filter(s=>{ try{return getInsuranArray(s.fields).length>0;}catch(e){return false;}}).length;
