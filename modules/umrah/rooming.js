@@ -2188,8 +2188,12 @@ function generateRoomingPrint(orientation){ orientation = orientation || 'landsc
       <span style="display:inline-block;margin-right:12px;"><b>UMRAH (VALID):</b> ${visaCounts['UMRAH (VALID)']||0}</span>
       <span style="display:inline-block;margin-right:12px;"><b>IQAMA (VALID):</b> ${visaCounts['IQAMA (VALID)']||0}</span>
     `;
-    const _trainJemaahCount = allRoomingJemaah.filter(j=>{ try{return !!j.fields['TRAIN'] || !!j.fields['SPEEDTRAIN'];}catch(e){return false;}}).length;
-    const _trainStaffCount = _staffList.filter(s=>{ try{ const f=s.fields; return !!f['TRAIN'] || !!f['SPEEDTRAIN'] || !!f['TRAIN STAFF'] || !!f['SPEEDTRAIN STAFF'] || !!f['SPEEDTRAIN_STAFF']; }catch(e){return false;}}).length;
+    const _trainJemaahCount = allRoomingJemaah.filter(j=>{ try{ return typeof isTrainChecked==='function' ? isTrainChecked(j.fields) : !!j.fields['TRAIN']; }catch(e){return false;}}).length;
+    const _trainStaffCount = _staffList.filter(s=>{ try{ 
+      const f=s.fields; 
+      if(typeof isTrainChecked==='function' && isTrainChecked(f)) return true;
+      return !!f['TRAIN'] || !!f['SPEEDTRAIN'] || !!f['TRAIN STAFF'] || !!f['SPEEDTRAIN STAFF'] || !!f['SPEEDTRAIN_STAFF'] || !!f['SPEED TRAIN'] || f['TRAIN']==true || f['TRAIN']=='1' || f['TRAIN']=='true' || f['TRAIN']=='TRUE';
+    }catch(e){return false;}}).length;
     const _totalTrainWithStaff = _trainJemaahCount + _trainStaffCount;
     const _insJ = allRoomingJemaah.filter(j=>{ try{return getInsuranArray(j.fields).length>0;}catch(e){return false;}}).length;
     const _insS = _staffList.filter(s=>{ try{return getInsuranArray(s.fields).length>0;}catch(e){return false;}}).length;
