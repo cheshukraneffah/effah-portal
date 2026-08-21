@@ -1,22 +1,65 @@
-
-// Security PIN Utama - Effah Travel - FIX FILE:// STORAGE BLOCK
+// Security PIN Utama - Effah Travel - AUTO LOCK 3 JAM + 5 MINIT WARNING
 const DEFAULT_PIN = "5822";
 let _memLogin = false;
+
+// Config
+const IDLE_LIMIT_MS = 3 * 60 * 60 * 1000; // 3 jam = 10,800,000 ms
+const WARN_DURATION_MS = 5 * 60 * 1000; // 5 minit warning
+
+let idleTimer = null;
+let warnTimer = null;
+let countdownInterval = null;
+let lastActivityTime = Date.now();
 
 function safeSet(key,val){
   try{ sessionStorage.setItem(key,val); }catch(e){}
   try{ localStorage.setItem(key,val); }catch(e){}
+  if(key==='effah_logged_in' && val==='true'){
+    try{ localStorage.setItem('effah_last_activity', String(Date.now())); }catch(e){}
+    try{ sessionStorage.setItem('effah_last_activity', String(Date.now())); }catch(e){}
+  }
   _memLogin = true;
 }
 function safeGet(key){
+  // Check expiry for login
+  if(key==='effah_logged_in'){
+    let lastAct = 0;
+    try{ lastAct = parseInt(localStorage.getItem('effah_last_activity')||'0'); }catch(e){}
+    if(!lastAct){
+      try{ lastAct = parseInt(sessionStorage.getItem('effah_last_activity')||'0'); }catch(e){}
+    }
+    if(lastAct){
+      const diff = Date.now() - lastAct;
+      if(diff > IDLE_LIMIT_MS){
+        // Lebih 3 jam, force logout
+        try{ localStorage.removeItem('effah_logged_in'); }catch(e){}
+        try{ sessionStorage.removeItem('effah_logged_in'); }catch(e){}
+        try{ localStorage.removeItem('effah_last_activity'); }catch(e){}
+        try{ sessionStorage.removeItem('effah_last_activity'); }catch(e){}
+        _memLogin = false;
+        return false;
+      }
+    }
+  }
   try{ if(sessionStorage.getItem(key)==='true') return true; }catch(e){}
   try{ if(localStorage.getItem(key)==='1' || localStorage.getItem(key)==='true') return true; }catch(e){}
   return _memLogin;
 }
 
+function updateLastActivity(){
+  lastActivityTime = Date.now();
+  try{ localStorage.setItem('effah_last_activity', String(lastActivityTime)); }catch(e){}
+  try{ sessionStorage.setItem('effah_last_activity', String(lastActivityTime)); }catch(e){}
+}
+
 document.addEventListener('DOMContentLoaded', () => {
+    // Check if still valid (3 jam)
     if (safeGet('effah_logged_in')) {
         unlockPortal();
+        startIdleWatcher();
+    } else {
+        // Ensure locked
+        lockPortal();
     }
 });
 
@@ -28,8 +71,10 @@ function verifyPin(e) {
     //
     if (pinInput === DEFAULT_PIN || pinInput === "5822") {
         safeSet('effah_logged_in','true');
+        updateLastActivity();
         if(errorMsg) errorMsg.classList.add('hidden');
         unlockPortal();
+        startIdleWatcher();
         if (typeof loadApiSettings === 'function') loadApiSettings();
         if (typeof fetchTripUmrahData === 'function') fetchTripUmrahData();
         if (typeof fetchJemaahUmrahData === 'function') fetchJemaahUmrahData();
@@ -45,13 +90,27 @@ function unlockPortal() {
     const mainPortalWrapper = document.getElementById('mainPortalWrapper');
     if (loginOverlay) loginOverlay.classList.add('hidden');
     if (mainPortalWrapper) mainPortalWrapper.classList.remove('hidden');
+    updateLastActivity();
     if (typeof loadApiSettings === 'function') loadApiSettings();
+}
+
+function lockPortal(){
+    const loginOverlay = document.getElementById('loginOverlay');
+    const mainPortalWrapper = document.getElementById('mainPortalWrapper');
+    if (loginOverlay) loginOverlay.classList.remove('hidden');
+    if (mainPortalWrapper) mainPortalWrapper.classList.add('hidden');
+    const pinInput = document.getElementById('pinInput');
+    if(pinInput) pinInput.value='';
+    hideIdleWarning();
 }
 
 function logoutPortal() {
     try{ sessionStorage.removeItem('effah_logged_in'); }catch(e){}
     try{ localStorage.removeItem('effah_logged_in'); }catch(e){}
+    try{ sessionStorage.removeItem('effah_last_activity'); }catch(e){}
+    try{ localStorage.removeItem('effah_last_activity'); }catch(e){}
     _memLogin=false;
+    stopIdleWatcher();
     location.reload();
 }
 
@@ -64,3 +123,129 @@ document.addEventListener('keydown', (e)=>{
     }
   }
 });
+
+// ================= IDLE WATCHER 3 JAM =================
+function startIdleWatcher(){
+  stopIdleWatcher();
+  lastActivityTime = Date.now();
+  // Listen activity
+  ['mousemove','mousedown','keydown','touchstart','scroll','click'].forEach(evt=>{
+    document.addEventListener(evt, onUserActivity, {passive:true});
+  });
+  // Check every 30 sec if idle > 3 jam
+  idleTimer = setInterval(checkIdle, 30000);
+}
+
+function stopIdleWatcher(){
+  if(idleTimer){ clearInterval(idleTimer); idleTimer=null; }
+  if(warnTimer){ clearTimeout(warnTimer); warnTimer=null; }
+  if(countdownInterval){ clearInterval(countdownInterval); countdownInterval=null; }
+  ['mousemove','mousedown','keydown','touchstart','scroll','click'].forEach(evt=>{
+    document.removeEventListener(evt, onUserActivity);
+  });
+}
+
+function onUserActivity(){
+  // If warning popup is open, don't auto reset - user must click Teruskan
+  const warnOverlay = document.getElementById('idleWarningOverlay');
+  if(warnOverlay && !warnOverlay.classList.contains('hidden')){
+    return;
+  }
+  const now = Date.now();
+  // Throttle update to 1 min to avoid spamming localStorage
+  if(now - lastActivityTime > 60000){
+    updateLastActivity();
+  }
+  lastActivityTime = now;
+}
+
+function checkIdle(){
+  const diff = Date.now() - lastActivityTime;
+  if(diff >= IDLE_LIMIT_MS){
+    showIdleWarning();
+  }
+}
+
+function showIdleWarning(){
+  stopIdleWatcher(); // stop idle check, start warning countdown
+  let overlay = document.getElementById('idleWarningOverlay');
+  if(!overlay){
+    overlay = document.createElement('div');
+    overlay.id = 'idleWarningOverlay';
+    overlay.className = 'fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-[60] flex items-center justify-center p-4';
+    overlay.innerHTML = `
+      <div class="bg-white rounded-3xl shadow-2xl p-8 max-w-sm w-full text-center border border-slate-100">
+        <div class="w-16 h-16 bg-amber-100 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-amber-200">
+          <i class="fa-solid fa-clock text-2xl text-amber-600"></i>
+        </div>
+        <h3 class="text-lg font-extrabold text-slate-900">Sesi Hampir Tamat</h3>
+        <p class="text-xs text-slate-500 mt-2 mb-1">Tiada aktiviti dikesan selama 3 jam.</p>
+        <p class="text-xs text-slate-500 mb-4">Anda ingin meneruskan sesi?</p>
+        <div class="bg-slate-100 rounded-xl py-2 mb-5">
+          <p class="text-[10px] text-slate-500 uppercase font-bold tracking-wider">Auto-lock dalam</p>
+          <p id="idleCountdown" class="text-2xl font-black text-rose-600 tracking-widest">05:00</p>
+        </div>
+        <div class="flex gap-2">
+          <button onclick="continueSession()" class="flex-1 bg-brand-maroon text-white font-bold py-3 rounded-xl hover:bg-rose-900 transition text-sm">
+            Teruskan Sesi
+          </button>
+          <button onclick="logoutPortal()" class="flex-1 bg-slate-100 text-slate-700 font-bold py-3 rounded-xl hover:bg-slate-200 transition text-sm">
+            Lock Sekarang
+          </button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+  } else {
+    overlay.classList.remove('hidden');
+  }
+
+  let remaining = WARN_DURATION_MS;
+  const countdownEl = document.getElementById('idleCountdown');
+  
+  function updateCountdown(){
+    const m = Math.floor(remaining/60000);
+    const s = Math.floor((remaining%60000)/1000);
+    if(countdownEl) countdownEl.textContent = `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+  }
+  updateCountdown();
+
+  countdownInterval = setInterval(()=>{
+    remaining -= 1000;
+    updateCountdown();
+    if(remaining <= 0){
+      clearInterval(countdownInterval);
+      // Auto lock
+      forceLock();
+    }
+  }, 1000);
+}
+
+function hideIdleWarning(){
+  const overlay = document.getElementById('idleWarningOverlay');
+  if(overlay) overlay.classList.add('hidden');
+  if(countdownInterval){ clearInterval(countdownInterval); countdownInterval=null; }
+}
+
+function continueSession(){
+  hideIdleWarning();
+  updateLastActivity();
+  startIdleWatcher();
+}
+
+function forceLock(){
+  hideIdleWarning();
+  try{ localStorage.removeItem('effah_logged_in'); }catch(e){}
+  try{ sessionStorage.removeItem('effah_logged_in'); }catch(e){}
+  try{ localStorage.removeItem('effah_last_activity'); }catch(e){}
+  try{ sessionStorage.removeItem('effah_last_activity'); }catch(e){}
+  _memLogin=false;
+  lockPortal();
+  stopIdleWatcher();
+  // Show message
+  const pinInput = document.getElementById('pinInput');
+  if(pinInput) pinInput.placeholder='Sesi tamat - Masuk PIN semula';
+}
+
+window.continueSession = continueSession;
+window.forceLock = forceLock;
