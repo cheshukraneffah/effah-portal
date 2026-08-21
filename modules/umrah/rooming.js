@@ -19,8 +19,10 @@ var _roomingLastTripId = window._roomingLastTripId || null;
 var _roomingCacheTime = window._roomingCacheTime || 0;
 var _roomingIsLoading = false;
 var _roomingFirstLoadDone = window._roomingFirstLoadDone || false;
+var _staffCache = window._staffCache || {};
 window._roomingLastTripId = _roomingLastTripId;
 window._roomingFirstLoadDone = _roomingFirstLoadDone;
+window._staffCache = _staffCache;
 // On page reload, clear cache time to force first fetch with spinner
 if(!_roomingFirstLoadDone){
   _roomingCacheTime = 0;
@@ -78,6 +80,8 @@ async function loadStaffList(){
       const local=JSON.parse(localStorage.getItem(getStaffStorageKey())||'[]');
       if(local.length>0) staffList=local;
     }
+    // Save to cache for trip
+    try{ const cacheKey = tripId || 'default'; _staffCache[cacheKey] = JSON.parse(JSON.stringify(staffList)); window._staffCache = _staffCache; }catch(e){}
     renderStaffList();
     renderRoomingGrid();
     try{ renderRoomingOverview(allRoomingRecords.filter(r=>(r.fields['LOKASI / CITY']||'MEKAH').toUpperCase()===activeLocation.toUpperCase())); }catch(e){}
@@ -731,9 +735,18 @@ async function fetchRoomingData(forceReload=false){
     // Only use cache if first load already done and not initial page load
     const canUseCache = _roomingFirstLoadDone && !forceReload && tripId && tripId===_roomingLastTripId && allRoomingJemaah.length>0 && cacheValid && !_roomingIsLoading;
     if(canUseCache){
-      console.log('ROOMING CACHE HIT V103.28 - using cached data for trip', tripId);
+      console.log('ROOMING CACHE HIT V103.28 - using cached data for trip', tripId, 'staff', staffList.length);
+      // Restore staff from cache if empty
+      try{
+        if((!staffList || staffList.length===0) && _staffCache[tripId] && _staffCache[tripId].length>0){
+          staffList = _staffCache[tripId];
+          window.staffList = staffList;
+          console.log('STAFF CACHE RESTORED', staffList.length);
+        }
+      }catch(e){}
       try{ populateRoomingTripDropdown(); }catch(e){}
       try{ renderNamelist(); }catch(e){}
+      try{ renderStaffList(); }catch(e){ console.warn('renderStaffList cache fail', e); }
       try{ renderRoomingGrid(); }catch(e){}
       try{ renderLocationTabs(); }catch(e){}
       try{ hideRoomingLoading(); }catch(e){}
