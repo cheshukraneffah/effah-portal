@@ -566,68 +566,13 @@ function handleRoomDragStart(e, roomId){
   try{ e.target.closest('[data-room-id]')?.classList.add('opacity-50'); }catch(err){}
   console.log('DRAG START ROOM', roomId);
   e.stopPropagation();
-}catch(err){}
-  e.dataTransfer.effectAllowed='move'; 
-  e.target.closest('[data-room-id]')?.classList.add('opacity-50'); 
-  console.log('DRAG START ROOM', roomId);
 }
 function handleRoomDragEnd(e){ 
   try{ e.target.closest('[data-room-id]')?.classList.remove('opacity-50'); }catch(err){}
   setTimeout(()=>{ draggedRoomId=null; window.draggedRoomId=null; window._draggedRoomId=null; }, 200);
   console.log('DRAG END ROOM');
-}catch(err){}
-  // Don't clear immediately, let drop read it, clear after delay
-  setTimeout(()=>{ draggedRoomId=null; window.draggedRoomId=null; }, 100);
-  console.log('DRAG END ROOM');
 }
-async function dropRoomReorder(e, targetRoomId){
-  e.preventDefault(); e.stopPropagation();
-  try{ e.currentTarget.classList.remove('ring-2','ring-[#7A0C2E]/30','ring-2','ring-amber-300','drag-over','ring-[#7A0C2E]/40'); }catch(err){}
-  let srcId = draggedRoomId || window.draggedRoomId || window._draggedRoomId;
-  try{
-    const dtRoom = e.dataTransfer.getData('text/room-id') || e.dataTransfer.getData('text/plain');
-    if(dtRoom && dtRoom.startsWith('rec')) srcId = dtRoom;
-  }catch(err){}
-  console.log('DROP ROOM REORDER src', srcId, 'target', targetRoomId);
-  if(!srcId || srcId===targetRoomId){
-    console.log('DROP ABORT - src missing or same as target');
-    return;
-  }
-  // Check if srcId is actually a room (not jemaah)
-  const isRoom = allRoomingRecords.some(r=>r.id===srcId);
-  if(!isRoom){
-    console.log('DROP ABORT - srcId not a room', srcId);
-    return;
-  }
-  const rooms=[...allRoomingRecords].filter(r=>(r.fields['LOKASI / CITY']||'MEKAH').toUpperCase()===activeLocation.toUpperCase());
-  const ordered=getRoomOrderedList(rooms);
-  const draggedIdx=ordered.findIndex(r=>r.id===srcId);
-  const targetIdx=ordered.findIndex(r=>r.id===targetRoomId);
-  console.log('draggedIdx', draggedIdx, 'targetIdx', targetIdx);
-  if(draggedIdx===-1 || targetIdx===-1) return;
-  const moved=ordered.splice(draggedIdx,1)[0];
-  ordered.splice(targetIdx,0,moved);
-  ordered.forEach((r,i)=>{ r.fields['SORT ORDER']=i+1; });
-  saveRoomOrder(ordered.map(r=>r.id));
-  console.log('ROOM ORDER SAVED', ordered.map((r,i)=>`${i+1}:${r.fields['SORT ORDER']}`));
-  draggedRoomId = null; window.draggedRoomId = null; window._draggedRoomId = null;
-  try{ e.dataTransfer.clearData(); }catch(err){}
-  try{ e.stopImmediatePropagation(); }catch(err){}
-  renderRoomingGrid();
-  // Background Airtable update
-  try{
-    const base=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base')||localStorage.getItem('effah_base_id'); 
-    const pat=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
-    for(let i=0;i<ordered.length;i++){
-      const rec=ordered[i];
-      fetch(`https://api.airtable.com/v0/${base}/ROOMING%20LIST/${rec.id}`,{
-        method:'PATCH',
-        headers:{'Authorization':`Bearer ${pat}`,'Content-Type':'application/json'},
-        body: JSON.stringify({fields:{'SORT ORDER': i+1}})
-      }).then(()=>console.log('SORT ORDER updated', rec.id, i+1)).catch(err=>console.error('SORT ORDER fail', err));
-    }
-  }catch(err){ console.error('Airtable SORT ORDER update failed', err); }
-}
+
 
 async function updateRoomCatatan(roomId, value){
   const rec=allRoomingRecords.find(r=>r.id===roomId);
@@ -1486,31 +1431,6 @@ function allowDropRoom(e){
   try{ _startAutoScroll(); }catch(err){}
   const el=e.currentTarget;
   if(el && el.classList) el.classList.add('drag-over','ring-2','ring-[#7A0C2E]/40');
-}
-function leaveDropRoom(e){ e.currentTarget.classList.remove('ring-2','ring-amber-300'); }
-async function dropRoom(e,targetRoomId){
-  e.preventDefault();
-  e.currentTarget.classList.remove('ring-2','ring-amber-300');
-  _stopAutoScroll();
-  const srcId=e.dataTransfer.getData('text/room-id');
-  if(!srcId || srcId===targetRoomId) return;
-  // Swap SORT ORDER
-  const srcRec=allRoomingRecords.find(r=>r.id===srcId);
-  const tgtRec=allRoomingRecords.find(r=>r.id===targetRoomId);
-  if(!srcRec||!tgtRec) return;
-  const srcOrder=srcRec.fields['SORT ORDER']||0;
-  const tgtOrder=tgtRec.fields['SORT ORDER']||0;
-  // Optimistic UI
-  srcRec.fields['SORT ORDER']=tgtOrder;
-  tgtRec.fields['SORT ORDER']=srcOrder;
-  renderRoomingGrid();
-  // Save to Airtable
-  const base=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base')||localStorage.getItem('effah_base_id');
-  const pat=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
-  try{
-    await fetch(`https://api.airtable.com/v0/${base}/ROOMING%20LIST/${srcId}`,{method:'PATCH',headers:{Authorization:`Bearer ${pat}`,'Content-Type':'application/json'},body:JSON.stringify({fields:{'SORT ORDER':tgtOrder}})});
-    await fetch(`https://api.airtable.com/v0/${base}/ROOMING%20LIST/${targetRoomId}`,{method:'PATCH',headers:{Authorization:`Bearer ${pat}`,'Content-Type':'application/json'},body:JSON.stringify({fields:{'SORT ORDER':srcOrder}})});
-  }catch(err){ console.error('swap room order failed',err); }
 }
 
 function dropJemaah(e,roomId){
@@ -2874,11 +2794,6 @@ function allowDropRoom(e){
   try{ _startAutoScroll(); }catch(err){}
   const el=e.currentTarget;
   if(el && el.classList) el.classList.add('drag-over','ring-2','ring-[#7A0C2E]/40');
-} catch(err){}
-  window._lastDragY=e.clientY;
-  _startAutoScroll();
-  const el=e.currentTarget;
-  if(el && el.classList) el.classList.add('drag-over','ring-2','ring-[#7A0C2E]/40');
 }
 function leaveDropRoom(e){
   handleRoomDragLeave(e);
@@ -2970,42 +2885,31 @@ window.fetchRoomingData = fetchRoomingData;
 window.onRoomingTripChange = onRoomingTripChange;
 
 
-// OVERRIDE FINAL - ROOM REORDER FIX V9
 async function dropRoomReorder(e, targetRoomId){
   e.preventDefault(); e.stopPropagation();
-  try{ e.currentTarget.classList.remove('ring-2','ring-[#7A0C2E]/30','ring-2','ring-amber-300','drag-over','ring-[#7A0C2E]/40'); }catch(err){}
+  try{ e.currentTarget.classList.remove('ring-2','ring-[#7A0C2E]/30','ring-amber-300','drag-over','ring-[#7A0C2E]/40'); }catch(err){}
   let srcId = draggedRoomId || window.draggedRoomId || window._draggedRoomId;
   try{
     const dtRoom = e.dataTransfer.getData('text/room-id') || e.dataTransfer.getData('text/plain');
     if(dtRoom && dtRoom.startsWith('rec')) srcId = dtRoom;
   }catch(err){}
   console.log('DROP ROOM REORDER src', srcId, 'target', targetRoomId);
-  if(!srcId || srcId===targetRoomId){
-    console.log('DROP ABORT - src missing or same as target');
-    return;
-  }
-  // Check if srcId is actually a room (not jemaah)
-  const isRoom = allRoomingRecords.some(r=>r.id===srcId);
-  if(!isRoom){
-    console.log('DROP ABORT - srcId not a room', srcId);
-    return;
-  }
+  if(!srcId || srcId===targetRoomId) return;
+  if(!allRoomingRecords.some(r=>r.id===srcId)) return;
   const rooms=[...allRoomingRecords].filter(r=>(r.fields['LOKASI / CITY']||'MEKAH').toUpperCase()===activeLocation.toUpperCase());
   const ordered=getRoomOrderedList(rooms);
   const draggedIdx=ordered.findIndex(r=>r.id===srcId);
   const targetIdx=ordered.findIndex(r=>r.id===targetRoomId);
-  console.log('draggedIdx', draggedIdx, 'targetIdx', targetIdx);
   if(draggedIdx===-1 || targetIdx===-1) return;
   const moved=ordered.splice(draggedIdx,1)[0];
   ordered.splice(targetIdx,0,moved);
   ordered.forEach((r,i)=>{ r.fields['SORT ORDER']=i+1; });
   saveRoomOrder(ordered.map(r=>r.id));
-  console.log('ROOM ORDER SAVED', ordered.map((r,i)=>`${i+1}:${r.fields['SORT ORDER']}`));
-  draggedRoomId = null; window.draggedRoomId = null; window._draggedRoomId = null;
+  console.log('ROOM ORDER SAVED', ordered.map((r,i)=>`${i+1}`));
+  draggedRoomId=null; window.draggedRoomId=null; window._draggedRoomId=null;
   try{ e.dataTransfer.clearData(); }catch(err){}
   try{ e.stopImmediatePropagation(); }catch(err){}
   renderRoomingGrid();
-  // Background Airtable update
   try{
     const base=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base')||localStorage.getItem('effah_base_id'); 
     const pat=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
@@ -3015,7 +2919,7 @@ async function dropRoomReorder(e, targetRoomId){
         method:'PATCH',
         headers:{'Authorization':`Bearer ${pat}`,'Content-Type':'application/json'},
         body: JSON.stringify({fields:{'SORT ORDER': i+1}})
-      }).then(()=>console.log('SORT ORDER updated', rec.id, i+1)).catch(err=>console.error('SORT ORDER fail', err));
+      }).then(()=>console.log('SORT ORDER updated', rec.id.substring(0,6), i+1));
     }
-  }catch(err){ console.error('Airtable SORT ORDER update failed', err); }
+  }catch(err){ console.error(err); }
 }
