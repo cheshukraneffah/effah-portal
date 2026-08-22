@@ -538,9 +538,21 @@ function renderRoomingHTML(){
 
 function getRoomOrderKey(){ const tripId=window.selectedTripRecord?.id||localStorage.getItem('effah_active_trip_id')||'default'; return `effah_room_order_${tripId}_${activeLocation}`; }
 function getRoomOrderedList(rooms){
-  const key=getRoomOrderKey(); const localOrder=JSON.parse(localStorage.getItem(key)||'[]');
-  if(localOrder.length>0){ const map={}; rooms.forEach(r=>map[r.id]=r); const ordered=[]; localOrder.forEach(id=>{ if(map[id]){ ordered.push(map[id]); delete map[id]; } }); Object.values(map).forEach(r=>ordered.push(r)); return ordered; }
-  return [...rooms].sort((a,b)=>(a.fields['SORT ORDER']||9999)-(b.fields['SORT ORDER']||9999));
+  const key=getRoomOrderKey(); 
+  const localOrder=JSON.parse(localStorage.getItem(key)||'[]');
+  // If local order exists and matches room count, use it (user dragged in portal)
+  if(localOrder.length>0 && localOrder.length>=rooms.length*0.8){ 
+    const map={}; rooms.forEach(r=>map[r.id]=r); 
+    const ordered=[]; 
+    localOrder.forEach(id=>{ if(map[id]){ ordered.push(map[id]); delete map[id]; } }); 
+    Object.values(map).forEach(r=>ordered.push(r)); 
+    console.log('getRoomOrderedList: using LOCAL order', key, ordered.map(r=>r.fields['SORT ORDER']));
+    return ordered; 
+  }
+  // Otherwise use Airtable SORT ORDER field (as in screenshot)
+  const sorted = [...rooms].sort((a,b)=>(a.fields['SORT ORDER']||9999)-(b.fields['SORT ORDER']||9999));
+  console.log('getRoomOrderedList: using AIRTABLE SORT ORDER', sorted.map(r=>r.fields['SORT ORDER']+'='+r.id.substring(0,6)));
+  return sorted;
 }
 function saveRoomOrder(ids){ localStorage.setItem(getRoomOrderKey(), JSON.stringify(ids)); }
 
@@ -580,9 +592,14 @@ async function dropRoomReorder(e, targetRoomId){
   // Update local sort order and save to localStorage
   ordered.forEach((r,i)=>{ r.fields['SORT ORDER']=i+1; });
   saveRoomOrder(ordered.map(r=>r.id));
-  console.log('ROOM ORDER SAVED', ordered.map(r=>r.id));
-  // Re-render immediately without refresh
+  console.log('ROOM ORDER SAVED LOCAL', ordered.map((r,i)=>`${i+1}:${r.fields['SORT ORDER']}=${r.id.substring(0,6)}`));
+  // Clear drag state to prevent dropJemaah from firing as room assignment
+  draggedRoomId = null; window.draggedRoomId = null;
+  try{ e.dataTransfer.clearData(); }catch(err){}
+  // Re-render immediately without refresh - badge No will update to new SORT ORDER
   renderRoomingGrid();
+  // Stop propagation so dropJemaah doesn't trigger Bilik Penuh
+  try{ e.stopImmediatePropagation(); }catch(err){}
   // Auto update Airtable in background
   for(let i=0;i<ordered.length;i++){
     const rec=ordered[i];
@@ -1178,11 +1195,11 @@ const emptyCount=Math.max(0,cap-count); const emptySlots=Array.from({length:empt
     const localCatatan = (typeof loadLocalCatatan==='function'? loadLocalCatatan(rec.id) : '') || '';
     const catatanVal = f['CATATAN BILIK'] || f['CATATAN'] || f['NOTES'] || f['REMARK'] || localCatatan || '';
     const catatanField = `<div class="mt-2"><div class="text-[8px] font-bold text-slate-500 mb-1">CATATAN BILIK</div><textarea id="catatan-${rec.id}" placeholder="Catatan bilik..." onblur="updateRoomCatatan('${rec.id}', this.value)" oninput="clearTimeout(window._catatanTimer); window._catatanTimer=setTimeout(()=>updateRoomCatatan('${rec.id}', this.value), 1000)" class="w-full text-[10px] px-2.5 py-1.5 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:outline-none focus:border-[#7A0C2E]/30 resize-none" rows="2">${catatanVal}</textarea></div>`;
-    return `<div data-room-id="${rec.id}" data-sort="${f['SORT ORDER']||0}" ondragover="allowDropRoom(event)" ondragleave="handleRoomDragLeave(event)" ondrop="dropJemaah(event,'${rec.id}'); dropRoomReorder(event,'${rec.id}')" class="bg-white rounded-2xl border border-slate-200 p-2.5 shadow-sm flex flex-col gap-2 h-fit">
+    return `<div data-room-id="${rec.id}" data-sort="${f['SORT ORDER']||0}" ondragover="allowDropRoom(event)" ondragleave="handleRoomDragLeave(event)" ondrop="dropRoomReorder(event,'${rec.id}'); dropJemaah(event,'${rec.id}')" class="bg-white rounded-2xl border border-slate-200 p-2.5 shadow-sm flex flex-col gap-2 h-fit">
       <div class="flex items-center justify-between gap-1.5">
         <div class="flex items-center gap-1.5 flex-1 min-w-0">
           <button class="w-6 h-6 rounded-full bg-slate-100 border flex items-center justify-center cursor-grab shrink-0" draggable="true" ondragstart="handleRoomDragStart(event,'${rec.id}')" ondragend="handleRoomDragEnd(event)"><i class="fa-solid fa-grip-lines text-[9px]"></i></button>
-          <span class="flex items-center gap-1.5 shrink-0"><span class="w-5 h-5 rounded-full bg-[#7A0C2E] text-white flex items-center justify-center text-[9px] font-bold">${roomIdx+1}</span><span class="font-bold text-[11px]">${roomId}</span></span>
+          <span class="flex items-center gap-1.5 shrink-0"><span class="w-5 h-5 rounded-full bg-[#7A0C2E] text-white flex items-center justify-center text-[9px] font-bold" title="SORT ORDER: ${f['SORT ORDER']||roomIdx+1} (Airtable)">${f['SORT ORDER']||roomIdx+1}</span><span class="font-bold text-[11px]">${roomId}</span></span>
           <input id="hotelInput-${rec.id}" value="${hotel}" placeholder="Nama Hotel" onchange="updateHotelInline('${rec.id}', this.value)" onfocus="this.select()" class="flex-1 min-w-0 px-2 py-1 bg-slate-50 border border-slate-200 rounded-full text-[11px] font-bold truncate focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#7A0C2E]/30" title="Klik untuk tukar nama hotel">
         </div>
         <button onclick="deleteRoom('${rec.id}','${roomId}')" class="w-6 h-6 rounded-full bg-slate-50 hover:bg-red-50 border text-[10px] shrink-0"><i class="fa-solid fa-trash"></i></button>
@@ -1476,8 +1493,29 @@ async function dropRoom(e,targetRoomId){
 }
 
 function dropJemaah(e,roomId){
-  e.preventDefault(); e.currentTarget.classList.remove('ring-2','ring-[#7A0C2E]/20');
+  e.preventDefault(); 
+  try{ e.currentTarget.classList.remove('ring-2','ring-[#7A0C2E]/20'); }catch(err){}
   document.querySelectorAll('[draggable="true"]').forEach(el=>el.style.opacity='1');
+  // If this is a room reorder drag (text/room-id), ignore here - let dropRoomReorder handle it
+  try{
+    const roomDragId = e.dataTransfer.getData('text/room-id');
+    if(roomDragId && roomDragId.startsWith('rec')){
+      const isRoom = allRoomingRecords.some(r=>r.id===roomDragId);
+      if(isRoom){
+        console.log('dropJemaah ignored - this is room reorder drag', roomDragId);
+        return;
+      }
+    }
+    // Also check if plain text is actually a room id
+    const plain = e.dataTransfer.getData('text/plain');
+    if(plain && plain.startsWith('rec') && allRoomingRecords.some(r=>r.id===plain)){
+      // If draggedRoomId is set, this is definitely a room reorder
+      if(draggedRoomId || window.draggedRoomId){
+        console.log('dropJemaah ignored - plain is room id and room drag active', plain);
+        return;
+      }
+    }
+  }catch(err){}
   const staffId=e.dataTransfer.getData('text/staff-id'); const jId=e.dataTransfer.getData('text/plain');
   const id=staffId||jId; if(!id) return;
   const rec=allRoomingRecords.find(r=>r.id===roomId);
