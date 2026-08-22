@@ -560,58 +560,73 @@ var draggedRoomId = window.draggedRoomId || null;
 function handleRoomDragStart(e, roomId){ 
   draggedRoomId=roomId; 
   window.draggedRoomId=roomId;
+  window._draggedRoomId=roomId;
   try{ e.dataTransfer.setData('text/room-id', roomId); e.dataTransfer.setData('text/plain', roomId); }catch(err){}
+  e.dataTransfer.effectAllowed='move'; 
+  try{ e.target.closest('[data-room-id]')?.classList.add('opacity-50'); }catch(err){}
+  console.log('DRAG START ROOM', roomId);
+  e.stopPropagation();
+}catch(err){}
   e.dataTransfer.effectAllowed='move'; 
   e.target.closest('[data-room-id]')?.classList.add('opacity-50'); 
   console.log('DRAG START ROOM', roomId);
 }
 function handleRoomDragEnd(e){ 
   try{ e.target.closest('[data-room-id]')?.classList.remove('opacity-50'); }catch(err){}
+  setTimeout(()=>{ draggedRoomId=null; window.draggedRoomId=null; window._draggedRoomId=null; }, 200);
+  console.log('DRAG END ROOM');
+}catch(err){}
   // Don't clear immediately, let drop read it, clear after delay
   setTimeout(()=>{ draggedRoomId=null; window.draggedRoomId=null; }, 100);
   console.log('DRAG END ROOM');
 }
 async function dropRoomReorder(e, targetRoomId){
   e.preventDefault(); e.stopPropagation();
-  try{ e.currentTarget.classList.remove('ring-2','ring-[#7A0C2E]/30','ring-2','ring-amber-300','drag-over'); }catch(err){}
-  let srcId = draggedRoomId || window.draggedRoomId;
+  try{ e.currentTarget.classList.remove('ring-2','ring-[#7A0C2E]/30','ring-2','ring-amber-300','drag-over','ring-[#7A0C2E]/40'); }catch(err){}
+  let srcId = draggedRoomId || window.draggedRoomId || window._draggedRoomId;
   try{
     const dtRoom = e.dataTransfer.getData('text/room-id') || e.dataTransfer.getData('text/plain');
     if(dtRoom && dtRoom.startsWith('rec')) srcId = dtRoom;
   }catch(err){}
-  console.log('DROP ROOM REORDER src', srcId, 'target', targetRoomId, 'draggedRoomId', draggedRoomId);
-  if(!srcId || srcId===targetRoomId) return;
+  console.log('DROP ROOM REORDER src', srcId, 'target', targetRoomId);
+  if(!srcId || srcId===targetRoomId){
+    console.log('DROP ABORT - src missing or same as target');
+    return;
+  }
+  // Check if srcId is actually a room (not jemaah)
+  const isRoom = allRoomingRecords.some(r=>r.id===srcId);
+  if(!isRoom){
+    console.log('DROP ABORT - srcId not a room', srcId);
+    return;
+  }
   const rooms=[...allRoomingRecords].filter(r=>(r.fields['LOKASI / CITY']||'MEKAH').toUpperCase()===activeLocation.toUpperCase());
   const ordered=getRoomOrderedList(rooms);
   const draggedIdx=ordered.findIndex(r=>r.id===srcId);
   const targetIdx=ordered.findIndex(r=>r.id===targetRoomId);
-  console.log('draggedIdx', draggedIdx, 'targetIdx', targetIdx, 'ordered len', ordered.length);
+  console.log('draggedIdx', draggedIdx, 'targetIdx', targetIdx);
   if(draggedIdx===-1 || targetIdx===-1) return;
   const moved=ordered.splice(draggedIdx,1)[0];
   ordered.splice(targetIdx,0,moved);
-  // Update local sort order and save to localStorage
   ordered.forEach((r,i)=>{ r.fields['SORT ORDER']=i+1; });
   saveRoomOrder(ordered.map(r=>r.id));
-  console.log('ROOM ORDER SAVED LOCAL', ordered.map((r,i)=>`${i+1}:${r.fields['SORT ORDER']}=${r.id.substring(0,6)}`));
-  // Clear drag state to prevent dropJemaah from firing as room assignment
-  draggedRoomId = null; window.draggedRoomId = null;
+  console.log('ROOM ORDER SAVED', ordered.map((r,i)=>`${i+1}:${r.fields['SORT ORDER']}`));
+  draggedRoomId = null; window.draggedRoomId = null; window._draggedRoomId = null;
   try{ e.dataTransfer.clearData(); }catch(err){}
-  // Re-render immediately without refresh - badge No will update to new SORT ORDER
-  renderRoomingGrid();
-  // Stop propagation so dropJemaah doesn't trigger Bilik Penuh
   try{ e.stopImmediatePropagation(); }catch(err){}
-  // Auto update Airtable in background
-  for(let i=0;i<ordered.length;i++){
-    const rec=ordered[i];
-    try{
-      const base=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base')||localStorage.getItem('effah_base_id'); const pat=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
-      await fetch(`https://api.airtable.com/v0/${base}/ROOMING%20LIST/${rec.id}`,{
+  renderRoomingGrid();
+  // Background Airtable update
+  try{
+    const base=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base')||localStorage.getItem('effah_base_id'); 
+    const pat=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
+    for(let i=0;i<ordered.length;i++){
+      const rec=ordered[i];
+      fetch(`https://api.airtable.com/v0/${base}/ROOMING%20LIST/${rec.id}`,{
         method:'PATCH',
         headers:{'Authorization':`Bearer ${pat}`,'Content-Type':'application/json'},
         body: JSON.stringify({fields:{'SORT ORDER': i+1}})
-      });
-    }catch(err){ console.error('Sort update failed', rec.id, err); }
-  }
+      }).then(()=>console.log('SORT ORDER updated', rec.id, i+1)).catch(err=>console.error('SORT ORDER fail', err));
+    }
+  }catch(err){ console.error('Airtable SORT ORDER update failed', err); }
 }
 
 async function updateRoomCatatan(roomId, value){
@@ -1465,7 +1480,13 @@ function dragRoomEnd(e){
   if(el) el.style.opacity='1';
   _stopAutoScroll();
 }
-function allowDropRoom(e){ e.preventDefault(); window._lastDragY=e.clientY; _startAutoScroll(); e.currentTarget.classList.add('ring-2','ring-amber-300'); }
+function allowDropRoom(e){
+  try { e.preventDefault(); e.dataTransfer.dropEffect='move'; } catch(err){}
+  window._lastDragY=e.clientY;
+  try{ _startAutoScroll(); }catch(err){}
+  const el=e.currentTarget;
+  if(el && el.classList) el.classList.add('drag-over','ring-2','ring-[#7A0C2E]/40');
+}
 function leaveDropRoom(e){ e.currentTarget.classList.remove('ring-2','ring-amber-300'); }
 async function dropRoom(e,targetRoomId){
   e.preventDefault();
@@ -2850,6 +2871,11 @@ function handleRoomDragEnter(e){
 function allowDropRoom(e){
   try { e.preventDefault(); e.dataTransfer.dropEffect='move'; } catch(err){}
   window._lastDragY=e.clientY;
+  try{ _startAutoScroll(); }catch(err){}
+  const el=e.currentTarget;
+  if(el && el.classList) el.classList.add('drag-over','ring-2','ring-[#7A0C2E]/40');
+} catch(err){}
+  window._lastDragY=e.clientY;
   _startAutoScroll();
   const el=e.currentTarget;
   if(el && el.classList) el.classList.add('drag-over','ring-2','ring-[#7A0C2E]/40');
@@ -2942,3 +2968,54 @@ console.log('Drag room handlers injected');
 
 window.fetchRoomingData = fetchRoomingData;
 window.onRoomingTripChange = onRoomingTripChange;
+
+
+// OVERRIDE FINAL - ROOM REORDER FIX V9
+async function dropRoomReorder(e, targetRoomId){
+  e.preventDefault(); e.stopPropagation();
+  try{ e.currentTarget.classList.remove('ring-2','ring-[#7A0C2E]/30','ring-2','ring-amber-300','drag-over','ring-[#7A0C2E]/40'); }catch(err){}
+  let srcId = draggedRoomId || window.draggedRoomId || window._draggedRoomId;
+  try{
+    const dtRoom = e.dataTransfer.getData('text/room-id') || e.dataTransfer.getData('text/plain');
+    if(dtRoom && dtRoom.startsWith('rec')) srcId = dtRoom;
+  }catch(err){}
+  console.log('DROP ROOM REORDER src', srcId, 'target', targetRoomId);
+  if(!srcId || srcId===targetRoomId){
+    console.log('DROP ABORT - src missing or same as target');
+    return;
+  }
+  // Check if srcId is actually a room (not jemaah)
+  const isRoom = allRoomingRecords.some(r=>r.id===srcId);
+  if(!isRoom){
+    console.log('DROP ABORT - srcId not a room', srcId);
+    return;
+  }
+  const rooms=[...allRoomingRecords].filter(r=>(r.fields['LOKASI / CITY']||'MEKAH').toUpperCase()===activeLocation.toUpperCase());
+  const ordered=getRoomOrderedList(rooms);
+  const draggedIdx=ordered.findIndex(r=>r.id===srcId);
+  const targetIdx=ordered.findIndex(r=>r.id===targetRoomId);
+  console.log('draggedIdx', draggedIdx, 'targetIdx', targetIdx);
+  if(draggedIdx===-1 || targetIdx===-1) return;
+  const moved=ordered.splice(draggedIdx,1)[0];
+  ordered.splice(targetIdx,0,moved);
+  ordered.forEach((r,i)=>{ r.fields['SORT ORDER']=i+1; });
+  saveRoomOrder(ordered.map(r=>r.id));
+  console.log('ROOM ORDER SAVED', ordered.map((r,i)=>`${i+1}:${r.fields['SORT ORDER']}`));
+  draggedRoomId = null; window.draggedRoomId = null; window._draggedRoomId = null;
+  try{ e.dataTransfer.clearData(); }catch(err){}
+  try{ e.stopImmediatePropagation(); }catch(err){}
+  renderRoomingGrid();
+  // Background Airtable update
+  try{
+    const base=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base')||localStorage.getItem('effah_base_id'); 
+    const pat=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
+    for(let i=0;i<ordered.length;i++){
+      const rec=ordered[i];
+      fetch(`https://api.airtable.com/v0/${base}/ROOMING%20LIST/${rec.id}`,{
+        method:'PATCH',
+        headers:{'Authorization':`Bearer ${pat}`,'Content-Type':'application/json'},
+        body: JSON.stringify({fields:{'SORT ORDER': i+1}})
+      }).then(()=>console.log('SORT ORDER updated', rec.id, i+1)).catch(err=>console.error('SORT ORDER fail', err));
+    }
+  }catch(err){ console.error('Airtable SORT ORDER update failed', err); }
+}
