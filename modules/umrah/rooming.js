@@ -83,7 +83,7 @@ async function loadStaffList(){
     // Save to cache for trip
     try{ const cacheKey = tripId || 'default'; _staffCache[cacheKey] = JSON.parse(JSON.stringify(staffList)); window._staffCache = _staffCache; }catch(e){}
     renderStaffList();
-    renderRoomingGrid();
+    renderRoomingGrid(); try{ updateVisaCountBadge(); }catch(e){}
     try{ renderRoomingOverview(allRoomingRecords.filter(r=>(r.fields['LOKASI / CITY']||'MEKAH').toUpperCase()===activeLocation.toUpperCase())); }catch(e){}
   }catch(e){
     console.error('loadStaffList Airtable failed', e);
@@ -476,7 +476,7 @@ function renderRoomingHTML(){
               <div class="hidden" id="roomingBadgesHidden"></div>
             </div>
             <div class="flex items-center gap-1 flex-wrap">
-              <div class="flex gap-1"><button onclick="generateRoomingPrint('landscape')" class="px-2.5 py-1 bg-white border border-slate-200 rounded-full text-[10px] font-bold hover:bg-slate-50">Print Landscape</button><button onclick="generateRoomingPrint('portrait')" class="px-2.5 py-1 bg-white border border-slate-200 rounded-full text-[10px] font-bold hover:bg-slate-50">Print Portrait</button></div>
+              <div class="flex gap-1"><button onclick="generateRoomingPrint('landscape')" class="px-2.5 py-1 bg-white border border-slate-200 rounded-full text-[10px] font-bold hover:bg-slate-50">Print Landscape</button><button onclick="generateRoomingPrint('portrait')" class="px-2.5 py-1 bg-white border border-slate-200 rounded-full text-[10px] font-bold hover:bg-slate-50">Print Portrait</button><button onclick="downloadAllVisas()" id="btnDownloadVisas" class="px-2.5 py-1 bg-[#064E3B] text-white border border-emerald-700 rounded-full text-[10px] font-bold hover:bg-emerald-800 flex items-center gap-1"><span>⬇</span> Download Visas (<span id="visaCountBadge">0</span>)</button></div>
               <button onclick="openCopyRoomsModal()" class="px-2.5 py-1 bg-white border border-slate-200 rounded-full text-[10px] font-bold hover:bg-slate-50">Copy Bilik</button>
               <button onclick="autoAssignRooming()" class="px-2.5 py-1 bg-slate-100 border border-slate-200 text-slate-700 rounded-full text-[10px] font-bold hover:bg-slate-200">Auto Assign</button>
               <button onclick="openNewRoomModal()" class="px-2.5 py-1 bg-[#7A0C2E] text-white rounded-full text-[10px] font-bold hover:bg-[#5a0922]">+ Bilik Baru</button>
@@ -3005,3 +3005,223 @@ async function dropRoomReorder(e, targetRoomId){
     }
   }catch(err){ console.error(err); }
 }
+
+
+// ===== V16 DOWNLOAD ALL VISAS - COMPILE TO ONE PDF =====
+async function loadPdfLib(){
+  if(window.PDFLib) return window.PDFLib;
+  return new Promise((resolve, reject)=>{
+    const script=document.createElement('script');
+    script.src='https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js';
+    script.onload=()=>{ window.PDFLib=window.pdfLib; resolve(window.pdfLib); };
+    script.onerror=()=>reject(new Error('Failed to load pdf-lib'));
+    document.head.appendChild(script);
+  });
+}
+
+async function fetchWithRetry(url, retries=2){
+  for(let i=0;i<=retries;i++){
+    try{
+      const res=await fetch(url, {mode:'cors'});
+      if(!res.ok) throw new Error('HTTP '+res.status);
+      return await res.arrayBuffer();
+    }catch(e){
+      if(i===retries) throw e;
+      await new Promise(r=>setTimeout(r, 500));
+    }
+  }
+}
+
+async function downloadAllVisas(){
+  const btn=document.getElementById('btnDownloadVisas');
+  const originalText=btn?.innerHTML;
+  try{
+    // Filter jemaah with VISA COPY
+    let withVisa = allRoomingJemaah.filter(j=> j.fields && j.fields['VISA COPY'] && Array.isArray(j.fields['VISA COPY']) && j.fields['VISA COPY'].length>0);
+    if(withVisa.length===0){
+      alert('Tiada VISA COPY dalam trip ini.\n\nPastikan field VISA COPY ada attachment PDF/Image.');
+      return;
+    }
+    // Sort by NAMA
+    withVisa = withVisa.sort((a,b)=>{
+      const na=getJemaahName(a.fields).toUpperCase();
+      const nb=getJemaahName(b.fields).toUpperCase();
+      return na.localeCompare(nb);
+    });
+
+    // Create progress modal
+    let modal=document.getElementById('visaDownloadModal');
+    if(!modal){
+      modal=document.createElement('div');
+      modal.id='visaDownloadModal';
+      modal.className='fixed inset-0 bg-black/60 z-[99999] flex items-center justify-center p-4';
+      modal.innerHTML=`
+        <div class="bg-white rounded-2xl p-5 max-w-md w-full shadow-2xl">
+          <h3 class="font-bold text-[13px] mb-3">Downloading Visas...</h3>
+          <div class="w-full bg-slate-100 rounded-full h-3 mb-3 overflow-hidden"><div id="visaProgressBar" class="h-3 bg-emerald-600 rounded-full transition-all" style="width:0%"></div></div>
+          <div id="visaProgressText" class="text-[11px] text-slate-600 mb-1">0 / 0</div>
+          <div id="visaProgressName" class="text-[10px] text-slate-500 truncate">-</div>
+          <div id="visaProgressLog" class="mt-3 max-h-[15vh] overflow-y-auto text-[9px] text-slate-400 space-y-0.5"></div>
+        </div>
+      `;
+      document.body.appendChild(modal);
+    } else modal.classList.remove('hidden');
+
+    const updateProgress=(curr,total,name,log)=>{
+      const pct=Math.round(curr/total*100);
+      document.getElementById('visaProgressBar').style.width=pct+'%';
+      document.getElementById('visaProgressText').textContent=curr+' / '+total+' ('+pct+'%)';
+      document.getElementById('visaProgressName').textContent=name||'-';
+      if(log){
+        const logEl=document.getElementById('visaProgressLog');
+        const div=document.createElement('div');
+        div.textContent=log;
+        logEl.appendChild(div);
+        logEl.scrollTop=logEl.scrollHeight;
+      }
+    };
+
+    if(btn){ btn.disabled=true; btn.innerHTML='⏳ Loading pdf-lib...'; }
+
+    const pdfLib=await loadPdfLib();
+    const {PDFDocument}=pdfLib;
+    const mergedPdf=await PDFDocument.create();
+
+    let successCount=0;
+    let failList=[];
+
+    for(let i=0;i<withVisa.length;i++){
+      const jRec=withVisa[i];
+      const nama=getJemaahName(jRec.fields);
+      const mId=jRec.fields['M_ID']||jRec.fields['NO KP']||'';
+      updateProgress(i, withVisa.length, nama, `Fetching: ${nama}`);
+
+      const attachments=jRec.fields['VISA COPY']||[];
+      // Take all attachments for this jemaah (could be 1-3 files)
+      for(let attIdx=0; attIdx<attachments.length; attIdx++){
+        const att=attachments[attIdx];
+        if(!att||!att.url) continue;
+        const url=att.url;
+        const filename=att.filename||'';
+        const isPdf = filename.toLowerCase().endsWith('.pdf') || (att.type && att.type.includes('pdf'));
+
+        try{
+          if(btn) btn.innerHTML=`⏳ ${i+1}/${withVisa.length} ${nama.substring(0,12)}...`;
+          const buffer=await fetchWithRetry(url);
+          
+          if(isPdf){
+            try{
+              const srcPdf=await PDFDocument.load(buffer, {ignoreEncryption:true});
+              const pages=await mergedPdf.copyPages(srcPdf, srcPdf.getPageIndices());
+              pages.forEach((p, idx)=>{
+                // Add footer text via drawing? pdf-lib can't easily add text to existing page, so we add new page with overlay label
+                mergedPdf.addPage(p);
+              });
+              // Add label page before? Actually we will add footer by creating new page and embedding? Simpler: add a small text in console
+              successCount++;
+              updateProgress(i+1, withVisa.length, nama, `✓ PDF ${filename} - ${srcPdf.getPageCount()} pages`);
+            }catch(pdfErr){
+              console.error('PDF load failed', filename, pdfErr);
+              failList.push(`${nama} - ${filename}: PDF corrupt`);
+              updateProgress(i+1, withVisa.length, nama, `✗ PDF failed ${filename}`);
+            }
+          } else {
+            // Image - JPG/PNG
+            try{
+              let img;
+              const lower=filename.toLowerCase();
+              if(lower.endsWith('.png')){
+                img=await mergedPdf.embedPng(buffer);
+              } else {
+                img=await mergedPdf.embedJpg(buffer);
+              }
+              const page=mergedPdf.addPage([595.28, 841.89]); // A4
+              const {width, height}=page.getSize();
+              // Scale image to fit
+              const imgDims=img.scaleToFit(width-60, height-100);
+              page.drawImage(img, {x: (width-imgDims.width)/2, y: (height-imgDims.height)/2 + 10, width: imgDims.width, height: imgDims.height});
+              // Footer nama
+              page.drawText(`${i+1}. ${nama} ${mId? '('+mId+')':''} - ${filename}`, {x:30, y:20, size:8, color: pdfLib.rgb(0.3,0.3,0.3)});
+              successCount++;
+              updateProgress(i+1, withVisa.length, nama, `✓ Image ${filename}`);
+            }catch(imgErr){
+              console.error('Image embed failed', filename, imgErr);
+              failList.push(`${nama} - ${filename}: Image failed`);
+              updateProgress(i+1, withVisa.length, nama, `✗ Image failed ${filename}`);
+            }
+          }
+        }catch(fetchErr){
+          console.error('Fetch failed', url, fetchErr);
+          failList.push(`${nama} - ${filename}: Fetch failed ${fetchErr.message}`);
+          updateProgress(i+1, withVisa.length, nama, `✗ Fetch failed ${filename}`);
+        }
+      }
+    }
+
+    updateProgress(withVisa.length, withVisa.length, 'Merging PDF...', 'Compiling final PDF...');
+    if(btn) btn.innerHTML='⏳ Compiling PDF...';
+
+    const pdfBytes=await mergedPdf.save();
+    const blob=new Blob([pdfBytes], {type:'application/pdf'});
+    const tripName=(window.selectedTripRecord?.fields?.['TRIP NAME']||window.selectedTripRecord?.fields?.['NAMA TRIP']||localStorage.getItem('effah_active_trip_id')||'TRIP').replace(/[^a-zA-Z0-9_-]/g,'_');
+    const fileName=`VISAS_${tripName}_${withVisa.length}pax_${new Date().toISOString().slice(0,10)}.pdf`;
+    
+    // Download
+    const link=document.createElement('a');
+    link.href=URL.createObjectURL(blob);
+    link.download=fileName;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(()=>URL.revokeObjectURL(link.href), 10000);
+
+    document.getElementById('visaProgressLog').innerHTML+=`<div class="text-emerald-600 font-bold mt-2">✓ Done! ${successCount} files merged, ${failList.length} failed</div>`;
+    if(failList.length>0){
+      document.getElementById('visaProgressLog').innerHTML+=`<div class="text-red-500">${failList.join('<br>')}</div>`;
+    }
+    updateProgress(withVisa.length, withVisa.length, `Saved: ${fileName}`, `Total size: ${(blob.size/1024/1024).toFixed(2)} MB`);
+
+    setTimeout(()=>{
+      const m=document.getElementById('visaDownloadModal');
+      if(m) m.classList.add('hidden');
+    }, 4000);
+
+    if(btn){ btn.disabled=false; btn.innerHTML=originalText; }
+
+    if(failList.length>0){
+      console.warn('Failed visas', failList);
+      alert(`Selesai! ${successCount} visa berjaya, ${failList.length} gagal.\n\nGagal:\n${failList.slice(0,10).join('\n')}${failList.length>10?'\n...and '+(failList.length-10)+' more':''}`);
+    } else {
+      console.log(`Download All Visas OK: ${fileName} ${(blob.size/1024/1024).toFixed(2)}MB`);
+    }
+
+  }catch(e){
+    console.error('downloadAllVisas error', e);
+    alert('Gagal download visas: '+e.message);
+    const m=document.getElementById('visaDownloadModal');
+    if(m) m.classList.add('hidden');
+    if(btn){ btn.disabled=false; btn.innerHTML=originalText; }
+  }
+}
+
+function updateVisaCountBadge(){
+  try{
+    const count=allRoomingJemaah.filter(j=> j.fields && j.fields['VISA COPY'] && j.fields['VISA COPY'].length>0).length;
+    const badge=document.getElementById('visaCountBadge');
+    if(badge) badge.textContent=count;
+  }catch(e){}
+}
+
+// Update badge after fetchRoomingData
+const origFetchRoomingData=window.fetchRoomingData;
+if(typeof fetchRoomingData==='function'){
+  const original=fetchRoomingData;
+  window.fetchRoomingData=async function(...args){
+    const res=await original.apply(this, args);
+    setTimeout(updateVisaCountBadge, 1000);
+    return res;
+  };
+}
+window.downloadAllVisas=downloadAllVisas;
+window.updateVisaCountBadge=updateVisaCountBadge;
+setTimeout(updateVisaCountBadge, 2000);
