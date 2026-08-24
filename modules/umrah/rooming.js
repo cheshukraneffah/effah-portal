@@ -1588,10 +1588,15 @@ async function updateJemaahBoardMulti(jemaahId, selectedArr){
     let res=await fetch(`https://api.airtable.com/v0/${base}/DATA%20JEMAAH%20UMRAH/${jemaahId}`,{method:'PATCH',headers:{Authorization:`Bearer ${pat}`,'Content-Type':'application/json'},body:JSON.stringify({fields: {'BOARD BASIS': selectedArr.length?selectedArr:[]}})});
     let data=await res.json();
     if(data.error){
-      console.warn('BOARD BASIS array save failed, trying string', data.error);
-      // Fallback save as string in BOARD field
-      res=await fetch(`https://api.airtable.com/v0/${base}/DATA%20JEMAAH%20UMRAH/${jemaahId}`,{method:'PATCH',headers:{Authorization:`Bearer ${pat}`,'Content-Type':'application/json'},body:JSON.stringify({fields: {'BOARD': selectedArr.join(', ')}})});
-      data=await res.json();
+      console.error('BOARD BASIS save failed', data.error);
+      // Check if BOARD is formula - don't try BOARD fallback if error is about BOARD
+      if(data.error.type!=='INVALID_VALUE_FOR_COLUMN'){
+        // Try BOARD as fallback only if BOARD BASIS field error is about type
+        try{
+          res=await fetch(`https://api.airtable.com/v0/${base}/DATA%20JEMAAH%20UMRAH/${jemaahId}`,{method:'PATCH',headers:{Authorization:`Bearer ${pat}`,'Content-Type':'application/json'},body:JSON.stringify({fields: {'BOARD BASIS': selectedArr}})});
+          data=await res.json();
+        }catch(e){}
+      }
       if(data.error) throw new Error(data.error.message);
     }
   }catch(e){ console.error(e); alert('Gagal update BOARD: '+e.message+'\n\nPastikan field BOARD BASIS di Airtable sudah tukar ke Multiple Select, bukan Single Select.'); fetchRoomingData(); }
@@ -1622,8 +1627,8 @@ function clearBoardMulti(jemaahId){
   const base = window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base')||localStorage.getItem('effah_base_id');
   const pat = window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
   if(base&&pat){
-    // BOARD BASIS is Multiple Select -> use [] to clear, BOARD is text -> use ''
-    fetch(`https://api.airtable.com/v0/${base}/DATA%20JEMAAH%20UMRAH/${jemaahId}`,{method:'PATCH',headers:{'Authorization':`Bearer ${pat}`,'Content-Type':'application/json'},body:JSON.stringify({fields:{'BOARD': '', 'BOARD BASIS': []}})}).then(r=>r.json()).then(d=>{ console.log('Clear jemaah board OK', d.id); }).catch(e=>console.error(e));
+    // BOARD might be formula/lookup - only patch BOARD BASIS (Multiple Select)
+    fetch(`https://api.airtable.com/v0/${base}/DATA%20JEMAAH%20UMRAH/${jemaahId}`,{method:'PATCH',headers:{'Authorization':`Bearer ${pat}`,'Content-Type':'application/json'},body:JSON.stringify({fields:{'BOARD BASIS': []}})}).then(async r=>{ const d=await r.json(); if(d.error){ console.error('Clear jemaah board FAIL', d.error); } else { console.log('Clear jemaah board OK', d.id); } }).catch(e=>console.error(e));
   }
 }
 window.clearBoardMulti = clearBoardMulti;
