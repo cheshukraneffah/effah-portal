@@ -1552,7 +1552,7 @@ async function updateJemaahField(jemaahId, field, value){
       } else payloadValue=null;
     }
     if(field==='BOARD BASIS' || field==='BOARD'){
-      if(Array.isArray(value)) payloadValue = value.length?value:[],
+      if(Array.isArray(value)) payloadValue = value.length?value:[];
       else if(typeof value==='string' && value.includes(',')){
         payloadValue = value.split(',').map(s=>s.trim()).filter(Boolean);
       }
