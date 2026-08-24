@@ -3316,8 +3316,24 @@ async function _downloadAllDocs(fieldName, label){
 
     const pdfBytes=await mergedPdf.save();
     const blob=new Blob([pdfBytes], {type:'application/pdf'});
-    const tripName=(window.selectedTripRecord?.fields?.['TRIP NAME']||window.selectedTripRecord?.fields?.['NAMA TRIP']||localStorage.getItem('effah_active_trip_id')||'TRIP').replace(/[^a-zA-Z0-9_-]/g,'_');
-    const fileName=`${label.toUpperCase()}_${tripName}_${withVisa.length}pax_${new Date().toISOString().slice(0,10)}.pdf`;
+    let rawTripName = window.selectedTripRecord?.fields?.['TRIP NAME'] || window.selectedTripRecord?.fields?.['NAMA TRIP'] || window.selectedTripRecord?.fields?.['Name'] || '';
+    if(!rawTripName || rawTripName.startsWith('rec')){
+      const sel = document.getElementById('roomingTripSelect');
+      if(sel && sel.options[sel.selectedIndex]){
+        rawTripName = sel.options[sel.selectedIndex].textContent.trim();
+      }
+    }
+    if(!rawTripName || rawTripName.startsWith('rec')){
+      rawTripName = localStorage.getItem('effah_active_trip_name') || localStorage.getItem('effah_trip_name') || 'TRIP';
+    }
+    let tripName = rawTripName.replace(/[^a-zA-Z0-9 \-_]/g,'').replace(/\s+/g,'_').substring(0,50);
+    if(!tripName || tripName.startsWith('rec')) tripName = 'TRIP';
+    const now = new Date();
+    const dd = String(now.getDate()).padStart(2,'0');
+    const mm = String(now.getMonth()+1).padStart(2,'0');
+    const yy = String(now.getFullYear()).slice(-2);
+    const dateStr = `${dd}-${mm}-${yy}`;
+    const fileName=`${label.toUpperCase()}_${tripName}_${dateStr}.pdf`;
     
     // Download
     const link=document.createElement('a');
