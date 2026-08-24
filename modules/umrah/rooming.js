@@ -1943,27 +1943,78 @@ function generateRoomingPrint(orientation){ orientation = orientation || 'landsc
       // Sort by SORT ORDER for print
       rooms = [...rooms].sort((a,b)=>(a.fields['SORT ORDER']||9999)-(b.fields['SORT ORDER']||9999));
       
-      // FIXED LOGIC: Determine board makan per location - INCLUDING STAFF
+      // FIXED LOGIC V11 - Filter by spec: MEKAH: FULLBOARD, FULLBOARD MEKAH, BB MEKAH / MADINAH: FULLBOARD, FULLBOARD MADINAH, BB MADINAH / TAIF: FULLBOARD only
+      function normalizeBoard(b){
+        if(!b) return '';
+        const s = (Array.isArray(b)? b.join(', ') : String(b)).toUpperCase().trim();
+        return s;
+      }
       function isStaffBoardMatch(sObj, locUpper){
-        const fbRawRaw = sObj.boardBasis||sObj.fields?.['BOARD']||sObj.board||''; const fbRaw = (Array.isArray(fbRawRaw)? fbRawRaw.join(', ') : fbRawRaw).toString().trim();
-        if(!fbRaw) return false;
-        const up=(Array.isArray(fbRaw)? (fbRaw[0]||'') : fbRaw).toString().toUpperCase();
-        if(up==='-'||up==='NO BOARD') return false;
-        if(locUpper==='MEKAH') return up.includes('MEKAH')||up==='FULLBOARD'||up==='BOARD'||up.includes('FULLBOARD');
-        if(locUpper==='MADINAH') return up.includes('MADINAH')||up==='FULLBOARD'||up==='BOARD'||up.includes('FULLBOARD');
-        return up.includes('FULLBOARD')||up==='FULLBOARD'||up==='BOARD';
+        const fbRawRaw = sObj.boardBasis||sObj.board||sObj.fields?.['BOARD']||sObj.fields?.['BOARD BASIS']||'';
+        const up = normalizeBoard(fbRawRaw);
+        if(!up || up==='-'||up==='NO BOARD'||up==='NO FULLBOARD') return false;
+        const isFullboard = up.includes('FULLBOARD');
+        const isBB = up.includes('BB');
+        const hasMekah = up.includes('MEKAH');
+        const hasMadinah = up.includes('MADINAH');
+        const isExactFullboard = up==='FULLBOARD';
+        
+        if(locUpper==='MEKAH'){
+          // MEKAH: FULLBOARD, FULLBOARD MEKAH, BB MEKAH - EXCLUDE MADINAH
+          if(hasMadinah) return false; // FULLBOARD MADINAH or BB MADINAH not allowed in MEKAH
+          if(isExactFullboard) return true;
+          if(isFullboard && hasMekah) return true; // FULLBOARD (MEKAH)
+          if(isBB && hasMekah) return true; // BB (MEKAH)
+          if(isFullboard && !hasMekah && !hasMadinah) return true; // plain FULLBOARD
+          return false;
+        }
+        if(locUpper==='MADINAH'){
+          // MADINAH: FULLBOARD, FULLBOARD MADINAH, BB MADINAH - EXCLUDE MEKAH
+          if(hasMekah) return false; // FULLBOARD MEKAH or BB MEKAH not allowed in MADINAH
+          if(isExactFullboard) return true;
+          if(isFullboard && hasMadinah) return true; // FULLBOARD (MADINAH)
+          if(isBB && hasMadinah) return true; // BB (MADINAH)
+          if(isFullboard && !hasMekah && !hasMadinah) return true; // plain FULLBOARD
+          return false;
+        }
+        // TAIF AND OTHER: FULLBOARD SHJ
+        if(isExactFullboard) return true;
+        // Allow FULLBOARD without location qualifier only
+        if(isFullboard && !hasMekah && !hasMadinah) return true;
+        return false;
       }
       let fbListForLoc = [];
       function jHasBoardForLoc(r, locUp){
-        const arr=getBoardArray(r.fields).map(x=>x.toUpperCase());
+        const arr=getBoardArray(r.fields).map(x=>x.toUpperCase().trim());
         if(arr.length===0) return false;
-        if(locUp==='MEKAH'){
-          return arr.some(x=> x==='FULLBOARD' || x==='FULLBOARD (MEKAH)' || x==='BB (MEKAH)' || (x.includes('MEKAH') && (x.includes('FULLBOARD')||x.includes('BB'))));
-        } else if(locUp==='MADINAH'){
-          return arr.some(x=> x==='FULLBOARD' || x==='FULLBOARD (MADINAH)' || x==='BB (MADINAH)' || (x.includes('MADINAH') && (x.includes('FULLBOARD')||x.includes('BB'))));
-        } else {
-          return arr.some(x=> x==='FULLBOARD');
-        }
+        const check = (x)=>{
+          const hasMekah = x.includes('MEKAH');
+          const hasMadinah = x.includes('MADINAH');
+          const isFB = x.includes('FULLBOARD');
+          const isBB = x.includes('BB');
+          const exactFB = x==='FULLBOARD';
+          if(locUp==='MEKAH'){
+            if(hasMadinah) return false; // exclude MADINAH boards in MEKAH
+            if(exactFB) return true;
+            if(isFB && hasMekah) return true;
+            if(isBB && hasMekah) return true;
+            if(isFB && !hasMekah && !hasMadinah) return true;
+            return false;
+          } else if(locUp==='MADINAH'){
+            if(hasMekah) return false; // exclude MEKAH boards in MADINAH
+            if(exactFB) return true;
+            if(isFB && hasMadinah) return true;
+            if(isBB && hasMadinah) return true;
+            if(isFB && !hasMekah && !hasMadinah) return true;
+            return false;
+          } else {
+            // TAIF AND OTHER: FULLBOARD SHJ
+            if(exactFB) return true;
+            if(isFB && !hasMekah && !hasMadinah) return true;
+            return false;
+          }
+        };
+        return arr.some(check);
       }
       if(loc==='MEKAH'){
         fbListForLoc = allRoomingJemaah.filter(r=> jHasBoardForLoc(r,'MEKAH'));
