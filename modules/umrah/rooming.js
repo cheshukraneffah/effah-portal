@@ -3106,7 +3106,11 @@ async function downloadAllPassports(){
 }
 async function _downloadAllDocs(fieldName, label){
   try{
-    let withVisa = allRoomingJemaah.filter(j=> j.fields && j.fields[fieldName] && Array.isArray(j.fields[fieldName]) && j.fields[fieldName].length>0);
+    const fieldAliases = fieldName==='VISA COPY' ? ['VISA COPY','VISA','VISA_COPY'] : ['PASSPORT COPY','PASSPORT','PASSPORT_COPY','PASSPORT SCAN'];
+    let withVisa = allRoomingJemaah.filter(j=> {
+      const att = getFieldAttachments(j.fields||{}, fieldAliases);
+      return !!att;
+    });
     if(withVisa.length===0){
       alert(`Tiada ${fieldName} dalam trip ini.\n\nPastikan field ${fieldName} ada attachment PDF/Image.`);
       return;
@@ -3194,7 +3198,7 @@ async function _downloadAllDocs(fieldName, label){
       const mId=jRec.fields['M_ID']||jRec.fields['NO KP']||'';
       updateProgress(i, withVisa.length, nama, `Fetching: ${nama}`);
 
-      const attachments=jRec.fields[fieldName]||[];
+      const attachments=getFieldAttachments(jRec.fields||{}, fieldAliases)||[];
       for(let attIdx=0; attIdx<attachments.length; attIdx++){
         const att=attachments[attIdx];
         if(!att||!att.url) continue;
@@ -3283,8 +3287,27 @@ async function _downloadAllDocs(fieldName, label){
 
     const pdfBytes=await mergedPdf.save();
     const blob=new Blob([pdfBytes], {type:'application/pdf'});
-    const tripName=(window.selectedTripRecord?.fields?.['TRIP NAME']||window.selectedTripRecord?.fields?.['NAMA TRIP']||localStorage.getItem('effah_active_trip_id')||'TRIP').replace(/[^a-zA-Z0-9_-]/g,'_');
-    const fileName=`${label.toUpperCase()}_${tripName}_${withVisa.length}pax_${new Date().toISOString().slice(0,10)}.pdf`;
+    // Get Trip Name properly - not recId
+    let rawTripName = window.selectedTripRecord?.fields?.['TRIP NAME'] || window.selectedTripRecord?.fields?.['NAMA TRIP'] || window.selectedTripRecord?.fields?.['Name'] || '';
+    if(!rawTripName || rawTripName.startsWith('rec')){
+      const sel = document.getElementById('roomingTripSelect');
+      if(sel && sel.options[sel.selectedIndex]){
+        rawTripName = sel.options[sel.selectedIndex].textContent.trim();
+      }
+    }
+    if(!rawTripName || rawTripName.startsWith('rec')){
+      rawTripName = localStorage.getItem('effah_active_trip_name') || localStorage.getItem('effah_trip_name') || 'TRIP';
+    }
+    // Clean trip name for filename - keep readable
+    let tripName = rawTripName.replace(/[^a-zA-Z0-9 \-_]/g,'').replace(/\s+/g,'_').substring(0,50);
+    if(!tripName || tripName.startsWith('rec')) tripName = 'TRIP';
+    // Date dd-mm-yy
+    const now = new Date();
+    const dd = String(now.getDate()).padStart(2,'0');
+    const mm = String(now.getMonth()+1).padStart(2,'0');
+    const yy = String(now.getFullYear()).slice(-2);
+    const dateStr = `${dd}-${mm}-${yy}`;
+    const fileName=`${label.toUpperCase()}_${tripName}_${dateStr}.pdf`;
     
     const link=document.createElement('a');
     link.href=URL.createObjectURL(blob);
@@ -3336,15 +3359,45 @@ async function _downloadAllDocs(fieldName, label){
   }
 }
 
+function getFieldAttachments(jemaahFields, possibleNames){
+  // Robust detection - case insensitive, trim
+  for(let name of possibleNames){
+    if(jemaahFields[name] && Array.isArray(jemaahFields[name]) && jemaahFields[name].length>0) return jemaahFields[name];
+  }
+  // Try case-insensitive search
+  const keys = Object.keys(jemaahFields||{});
+  for(let k of keys){
+    const upper = k.toUpperCase().trim();
+    for(let target of possibleNames){
+      if(upper === target.toUpperCase().trim() || upper.includes(target.toUpperCase().trim())){
+        const val = jemaahFields[k];
+        if(Array.isArray(val) && val.length>0) return val;
+      }
+    }
+  }
+  return null;
+}
 function updateVisaCountBadge(){
   try{
-    const visaCount=allRoomingJemaah.filter(j=> j.fields && j.fields['VISA COPY'] && j.fields['VISA COPY'].length>0).length;
-    const passCount=allRoomingJemaah.filter(j=> j.fields && j.fields['PASSPORT COPY'] && j.fields['PASSPORT COPY'].length>0).length;
+    const visaFieldNames = ['VISA COPY', 'VISA', 'VISA_COPY'];
+    const passFieldNames = ['PASSPORT COPY', 'PASSPORT', 'PASSPORT_COPY', 'PASSPORT SCAN'];
+    let visaCount=0, passCount=0;
+    let debugPassSample=null;
+    allRoomingJemaah.forEach(j=>{
+      const f=j.fields||{};
+      if(getFieldAttachments(f, visaFieldNames)) visaCount++;
+      const passAtt = getFieldAttachments(f, passFieldNames);
+      if(passAtt){
+        passCount++;
+        if(!debugPassSample) debugPassSample = {name: getJemaahName(f), fields: Object.keys(f).filter(k=>k.toUpperCase().includes('PASS'))};
+      }
+    });
     const vBadge=document.getElementById('visaCountBadge');
     const pBadge=document.getElementById('passportCountBadge');
     if(vBadge) vBadge.textContent=visaCount;
     if(pBadge) pBadge.textContent=passCount;
-  }catch(e){}
+    console.log(`Badge counts - Visa: ${visaCount}, Passport: ${passCount}`, debugPassSample?`Sample passport fields: ${JSON.stringify(debugPassSample)}`:'No passport found - available fields sample: '+(allRoomingJemaah[0]?Object.keys(allRoomingJemaah[0].fields||{}).filter(k=>k.includes('PASS')||k.includes('COPY')).join(', '):'none'));
+  }catch(e){ console.error('updateVisaCountBadge error', e); }
 }
 
 
