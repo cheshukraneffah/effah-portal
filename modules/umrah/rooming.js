@@ -2880,19 +2880,6 @@ function allowDropRoom(e){
 function leaveDropRoom(e){
   handleRoomDragLeave(e);
 }
-function dropRoomReorder(e, roomId){
-  // placeholder - if reordering logic exists, keep
-  if(typeof window.dropRoomReorderOriginal==='function') return window.dropRoomReorderOriginal(e, roomId);
-}
-window.handleRoomDragLeave = handleRoomDragLeave;
-window.handleRoomDragEnter = handleRoomDragEnter;
-window.allowDropRoom = allowDropRoom;
-window.leaveDropRoom = leaveDropRoom;
-window.dropRoomReorder = dropRoomReorder;
-console.log('Drag room handlers injected');
-
-
-
 // PATCH V103.17 - Fix STATUS VISA Single Select clear - SINGLE SELECT needs null, not ""
 (function(){
   const originalUpdate = window.updateJemaahField;
@@ -2967,7 +2954,7 @@ window.fetchRoomingData = fetchRoomingData;
 window.onRoomingTripChange = onRoomingTripChange;
 
 
-async function dropRoomReorder(e, targetRoomId){
+window.dropRoomReorder = async function dropRoomReorder(e, targetRoomId){
   e.preventDefault(); e.stopPropagation();
   try{ e.currentTarget.classList.remove('ring-2','ring-[#7A0C2E]/30','ring-amber-300','drag-over','ring-[#7A0C2E]/40'); }catch(err){}
   let srcId = draggedRoomId || window.draggedRoomId || window._draggedRoomId;
