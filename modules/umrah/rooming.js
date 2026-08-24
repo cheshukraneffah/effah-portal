@@ -231,14 +231,22 @@ function cleanTripNameForRooming(name){
   if(typeof cleanTripName==='function') return cleanTripName(name);
   return name.replace(/^\s*\d+\/\d+\s*\|\s*/i, '').replace(/^\s*\d+\/\d+\s*/i,'').trim();
 }
-function getJemaahName(f){ if(!f) return '-'; return f['NAMA'] || f['NAME'] || f['NAMA JEMAAH'] || f['NAMA PENUH'] || f['Name'] || '-'; }
+function getJemaahName(f){ 
+  if(!f) return '-'; 
+  try{
+    return f['NAMA'] || f['NAME'] || f['NAMA JEMAAH'] || f['NAMA PENUH'] || f['Name'] || f['M_ID'] || '-'; 
+  }catch(e){ return '-'; }
+}
 function generateRoomIdFromCap(cap){ return `B${parseInt(cap)||4}`; }
 function getBoardArray(f){
   if(!f) return [];
-  const raw = f['BOARD BASIS'] || f['BOARD'] || '';
-  if(Array.isArray(raw)) return raw.filter(Boolean).map(s=>String(s).trim()).filter(Boolean);
-  if(typeof raw === 'string' && raw.includes(',')) return raw.split(',').map(s=>s.trim()).filter(Boolean);
-  if(raw && raw!=='-' && raw!=='' && raw!=='NO BOARD' && raw!=='NO FULLBOARD') return [String(raw).trim()];
+  try{
+    const raw = f['BOARD BASIS'] || f['BOARD'] || '';
+    if(!raw) return [];
+    if(Array.isArray(raw)) return raw.filter(Boolean).map(s=>String(s).trim()).filter(Boolean);
+    if(typeof raw === 'string' && raw.includes(',')) return raw.split(',').map(s=>s.trim()).filter(Boolean);
+    if(raw && raw!=='-' && raw!=='' && raw!=='NO BOARD' && raw!=='NO FULLBOARD') return [String(raw).trim()];
+  }catch(e){ console.warn('getBoardArray error', e, f); }
   return [];
 }
 function getNameForAnyId(id){
@@ -538,21 +546,31 @@ function renderRoomingHTML(){
 
 function getRoomOrderKey(){ const tripId=window.selectedTripRecord?.id||localStorage.getItem('effah_active_trip_id')||'default'; return `effah_room_order_${tripId}_${activeLocation}`; }
 function getRoomOrderedList(rooms){
-  const key=getRoomOrderKey(); 
-  const localOrder=JSON.parse(localStorage.getItem(key)||'[]');
-  // If local order exists and matches room count, use it (user dragged in portal)
-  if(localOrder.length>0 && localOrder.length>=rooms.length*0.8){ 
-    const map={}; rooms.forEach(r=>map[r.id]=r); 
-    const ordered=[]; 
-    localOrder.forEach(id=>{ if(map[id]){ ordered.push(map[id]); delete map[id]; } }); 
-    Object.values(map).forEach(r=>ordered.push(r)); 
-    console.log('getRoomOrderedList: using LOCAL order', key, ordered.map(r=>r.fields['SORT ORDER']));
-    return ordered; 
+  try{
+    if(!rooms || rooms.length===0){
+      console.log('getRoomOrderedList: no rooms for location', activeLocation);
+      return [];
+    }
+    const key=getRoomOrderKey(); 
+    let localOrder=[];
+    try{ localOrder=JSON.parse(localStorage.getItem(key)||'[]'); }catch(e){ localOrder=[]; }
+    // If local order exists and matches room count, use it (user dragged in portal)
+    if(localOrder.length>0 && localOrder.length>=rooms.length*0.8){ 
+      const map={}; rooms.forEach(r=>{ if(r&&r.id) map[r.id]=r; }); 
+      const ordered=[]; 
+      localOrder.forEach(id=>{ if(map[id]){ ordered.push(map[id]); delete map[id]; } }); 
+      Object.values(map).forEach(r=>ordered.push(r)); 
+      console.log('getRoomOrderedList: using LOCAL order', key, ordered.length);
+      return ordered; 
+    }
+    // Otherwise use Airtable SORT ORDER field
+    const sorted = [...rooms].filter(r=>r&&r.fields).sort((a,b)=>(a.fields['SORT ORDER']||9999)-(b.fields['SORT ORDER']||9999));
+    console.log('getRoomOrderedList: using AIRTABLE SORT ORDER', sorted.length, sorted.map(r=>r.fields['SORT ORDER']+'='+r.id.substring(0,6)).slice(0,7));
+    return sorted;
+  }catch(e){
+    console.error('getRoomOrderedList error', e);
+    return rooms||[];
   }
-  // Otherwise use Airtable SORT ORDER field (as in screenshot)
-  const sorted = [...rooms].sort((a,b)=>(a.fields['SORT ORDER']||9999)-(b.fields['SORT ORDER']||9999));
-  console.log('getRoomOrderedList: using AIRTABLE SORT ORDER', sorted.map(r=>r.fields['SORT ORDER']+'='+r.id.substring(0,6)));
-  return sorted;
 }
 function saveRoomOrder(ids){ localStorage.setItem(getRoomOrderKey(), JSON.stringify(ids)); }
 
@@ -1950,6 +1968,8 @@ function generateRoomingPrint(orientation){ orientation = orientation || 'landsc
         return s;
       }
       function isStaffBoardMatch(sObj, locUpper){
+        try{
+        if(!sObj) return false;
         const fbRawRaw = sObj.boardBasis||sObj.board||sObj.fields?.['BOARD']||sObj.fields?.['BOARD BASIS']||'';
         const up = normalizeBoard(fbRawRaw);
         if(!up || up==='-'||up==='NO BOARD'||up==='NO FULLBOARD') return false;
@@ -1979,12 +1999,14 @@ function generateRoomingPrint(orientation){ orientation = orientation || 'landsc
         }
         // TAIF AND OTHER: FULLBOARD SHJ
         if(isExactFullboard) return true;
-        // Allow FULLBOARD without location qualifier only
         if(isFullboard && !hasMekah && !hasMadinah) return true;
         return false;
+        }catch(e){ console.warn('isStaffBoardMatch error', e); return false; }
       }
       let fbListForLoc = [];
       function jHasBoardForLoc(r, locUp){
+        if(!r || !r.fields) return false;
+
         const arr=getBoardArray(r.fields).map(x=>x.toUpperCase().trim());
         if(arr.length===0) return false;
         const check = (x)=>{
