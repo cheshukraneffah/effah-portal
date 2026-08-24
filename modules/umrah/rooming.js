@@ -314,8 +314,8 @@ function clearStaffBoardMulti(staffId){
   if(base&&pat&&s.airtableId){
     fetch(`https://api.airtable.com/v0/${base}/STAFF%20LIST%20%28ROOMING%29/${s.airtableId}`,{
       method:'PATCH', headers:{'Authorization':`Bearer ${pat}`,'Content-Type':'application/json'},
-      body: JSON.stringify({fields:{'BOARD BASIS': null}})
-    }).then(r=>r.json()).then(d=>console.log('Clear board', d)).catch(e=>console.error(e));
+      body: JSON.stringify({fields:{'BOARD BASIS': []}})
+    }).then(r=>r.json()).then(d=>console.log('Clear staff board OK', d.id)).catch(e=>console.error(e));
   }
 }
 window.clearStaffBoardMulti = clearStaffBoardMulti;
@@ -1552,7 +1552,7 @@ async function updateJemaahField(jemaahId, field, value){
       } else payloadValue=null;
     }
     if(field==='BOARD BASIS' || field==='BOARD'){
-      if(Array.isArray(value)) payloadValue = value.length?value:null;
+      if(Array.isArray(value)) payloadValue = value.length?value:[],
       else if(typeof value==='string' && value.includes(',')){
         payloadValue = value.split(',').map(s=>s.trim()).filter(Boolean);
       }
@@ -1584,8 +1584,8 @@ async function updateJemaahBoardMulti(jemaahId, selectedArr){
   rec.fields['BOARD']=selectedArr.join(', ');
   renderNamelist();
   try{
-    // Try save as array (for  select field)
-    let res=await fetch(`https://api.airtable.com/v0/${base}/DATA%20JEMAAH%20UMRAH/${jemaahId}`,{method:'PATCH',headers:{Authorization:`Bearer ${pat}`,'Content-Type':'application/json'},body:JSON.stringify({fields: {'BOARD BASIS': selectedArr.length?selectedArr:null}})});
+    // For Multiple Select, empty must be [] not null (null = 422)
+    let res=await fetch(`https://api.airtable.com/v0/${base}/DATA%20JEMAAH%20UMRAH/${jemaahId}`,{method:'PATCH',headers:{Authorization:`Bearer ${pat}`,'Content-Type':'application/json'},body:JSON.stringify({fields: {'BOARD BASIS': selectedArr.length?selectedArr:[]}})});
     let data=await res.json();
     if(data.error){
       console.warn('BOARD BASIS array save failed, trying string', data.error);
@@ -1615,11 +1615,15 @@ function closeBoardDropdown(jemaahId){ const el=document.getElementById('boardDr
 // Close on outside click
 if(!window._boardDropListener){ window._boardDropListener=true; document.addEventListener('click', (e)=>{ if(!e.target.closest('[id^="boardDrop-"]') && !e.target.closest('button[onclick*="toggleBoardDropdown"]')){ document.querySelectorAll('[id^="boardDrop-"]').forEach(d=>d.classList.add('hidden')); } }); }
 function clearBoardMulti(jemaahId){
-  updateJemaahBoardMulti(jemaahId, []);
+  // First update local to empty
+  const rec=allRoomingJemaah.find(r=>r.id===jemaahId);
+  if(rec){ rec.fields['BOARD BASIS']=[]; rec.fields['BOARD']=''; }
+  if(typeof renderNamelist==='function') renderNamelist();
   const base = window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base')||localStorage.getItem('effah_base_id');
   const pat = window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
   if(base&&pat){
-    fetch(`https://api.airtable.com/v0/${base}/DATA%20JEMAAH%20UMRAH/${jemaahId}`,{method:'PATCH',headers:{'Authorization':`Bearer ${pat}`,'Content-Type':'application/json'},body:JSON.stringify({fields:{'BOARD': null, 'BOARD BASIS': null}})}).then(r=>r.json()).then(d=>console.log('Clear jemaah board', d)).catch(e=>console.error(e));
+    // BOARD BASIS is Multiple Select -> use [] to clear, BOARD is text -> use ''
+    fetch(`https://api.airtable.com/v0/${base}/DATA%20JEMAAH%20UMRAH/${jemaahId}`,{method:'PATCH',headers:{'Authorization':`Bearer ${pat}`,'Content-Type':'application/json'},body:JSON.stringify({fields:{'BOARD': '', 'BOARD BASIS': []}})}).then(r=>r.json()).then(d=>{ console.log('Clear jemaah board OK', d.id); }).catch(e=>console.error(e));
   }
 }
 window.clearBoardMulti = clearBoardMulti;
