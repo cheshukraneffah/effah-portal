@@ -3419,6 +3419,40 @@ if(typeof fetchRoomingData==='function'){
     return res;
   };
 }
+
+// Patch to also fetch directly from DATA JEMAAH for passport count if allRoomingJemaah missing field
+async function updatePassportCountFromDirectFetch(){
+  try{
+    const base=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base')||localStorage.getItem('effah_base_id');
+    const pat=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
+    const tripId = localStorage.getItem('effah_active_trip_id') || window.selectedTripRecord?.id;
+    if(!base||!pat) return;
+    // Try to fetch jemaah for this trip directly to count passports
+    let url = `https://api.airtable.com/v0/${base}/DATA%20JEMAAH%20UMRAH?filterByFormula=FIND("${tripId}",ARRAYJOIN({TRIP}))&pageSize=100`;
+    const res = await fetch(url, {headers:{Authorization:`Bearer ${pat}`}});
+    if(!res.ok) return;
+    const data = await res.json();
+    if(data.records){
+      const visaCount = data.records.filter(r=> r.fields && (r.fields['VISA COPY']||r.fields['VISA'])).length;
+      const passCount = data.records.filter(r=> r.fields && (r.fields['PASSPORT COPY']||r.fields['PASSPORT']||r.fields['PASSPORT COPY'])).length;
+      console.log(`Direct fetch counts - Visa: ${visaCount}, Passport: ${passCount} from ${data.records.length} records for trip ${tripId}`);
+      console.log('Sample record fields:', data.records[0]?Object.keys(data.records[0].fields).filter(k=>k.toUpperCase().includes('PASS')||k.toUpperCase().includes('VISA')||k.toUpperCase().includes('COPY')).join(', '):'none');
+      // Update badges if higher than current
+      const vBadge=document.getElementById('visaCountBadge');
+      const pBadge=document.getElementById('passportCountBadge');
+      if(vBadge && visaCount>0) vBadge.textContent=visaCount;
+      if(pBadge && passCount>0) pBadge.textContent=passCount;
+      if(passCount>0){
+        // Store for download
+        window._allJemaahForTripDirect = data.records;
+      }
+    }
+  }catch(e){ console.error('Direct passport count fetch error', e); }
+}
+// Call direct fetch after 3s
+setTimeout(updatePassportCountFromDirectFetch, 3000);
+window.updatePassportCountFromDirectFetch = updatePassportCountFromDirectFetch;
+
 window.downloadAllVisas=downloadAllVisas;
 window.updateVisaCountBadge=updateVisaCountBadge;
 setTimeout(updateVisaCountBadge, 2000);
