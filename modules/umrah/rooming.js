@@ -3217,14 +3217,51 @@ async function _downloadAllDocs(fieldName, label){
           if(isPdf){
             try{
               const srcPdf=await PDFDocument.load(buffer, {ignoreEncryption:true});
-              const pages=await mergedPdf.copyPages(srcPdf, srcPdf.getPageIndices());
-              pages.forEach((p, idx)=>{
-                // Add footer text via drawing? pdf-lib can't easily add text to existing page, so we add new page with overlay label
-                mergedPdf.addPage(p);
-              });
-              // Add label page before? Actually we will add footer by creating new page and embedding? Simpler: add a small text in console
+              const srcPages = srcPdf.getPages();
+              // Standard size - A4 (595.28 x 841.89) or Letter (612 x 792) - using A4 as requested
+              const A4_WIDTH = 595.28;
+              const A4_HEIGHT = 841.89;
+              // If user wants Letter: const LETTER_WIDTH=612, LETTER_HEIGHT=792
+              
+              for(let pIdx=0; pIdx<srcPdf.getPageCount(); pIdx++){
+                const srcPage = srcPages[pIdx];
+                const {width: origW, height: origH} = srcPage.getSize();
+                
+                // Copy page
+                const [copiedPage] = await mergedPdf.copyPages(srcPdf, [pIdx]);
+                
+                // Standardize: if original not A4, create new A4 page and scale embed
+                const needsResize = Math.abs(origW - A4_WIDTH) > 5 || Math.abs(origH - A4_HEIGHT) > 5;
+                
+                if(needsResize){
+                  // Create new A4 page and embed copied page scaled to fit
+                  const newPage = mergedPdf.addPage([A4_WIDTH, A4_HEIGHT]);
+                  // Calculate scale to fit with margin
+                  const margin = 20;
+                  const availW = A4_WIDTH - margin*2;
+                  const availH = A4_HEIGHT - 40; // leave footer space
+                  const scale = Math.min(availW/origW, availH/origH);
+                  const drawW = origW * scale;
+                  const drawH = origH * scale;
+                  const x = (A4_WIDTH - drawW)/2;
+                  const y = (A4_HEIGHT - drawH)/2 + 10;
+                  
+                  // Embed the copied page as XObject
+                  const embeddedPage = await mergedPdf.embedPage(copiedPage);
+                  newPage.drawPage(embeddedPage, {x, y, width: drawW, height: drawH});
+                  // Footer
+                  newPage.drawText(`${i+1}. ${nama} ${mId? '('+mId+')':''} - ${filename} p${pIdx+1}`, {x:30, y:15, size:7, color: pdfLib.rgb(0.3,0.3,0.3)});
+                } else {
+                  // Already A4-ish, just add with footer
+                  const newPage = mergedPdf.addPage(copiedPage);
+                  // Add footer overlay - draw on top
+                  try{
+                    newPage.drawText(`${i+1}. ${nama} ${mId? '('+mId+')':''} - ${filename} p${pIdx+1}`, {x:30, y:15, size:7, color: pdfLib.rgb(0.3,0.3,0.3)});
+                  }catch(e){}
+                }
+              }
               successCount++;
-              updateProgress(i+1, withVisa.length, nama, `✓ PDF ${filename} - ${srcPdf.getPageCount()} pages`);
+              updateProgress(i+1, withVisa.length, nama, `✓ PDF ${filename} - ${srcPdf.getPageCount()} pages → A4 standardized`);
             }catch(pdfErr){
               console.error('PDF load failed', filename, pdfErr);
               failList.push(`${nama} - ${filename}: PDF corrupt`);
@@ -3240,13 +3277,24 @@ async function _downloadAllDocs(fieldName, label){
               } else {
                 img=await mergedPdf.embedJpg(buffer);
               }
-              const page=mergedPdf.addPage([595.28, 841.89]); // A4
+              // Standardize to A4 (or Letter) - user requested A4/Letter fit
+              const A4_WIDTH = 595.28;
+              const A4_HEIGHT = 841.89;
+              const page=mergedPdf.addPage([A4_WIDTH, A4_HEIGHT]); // A4 standardized
               const {width, height}=page.getSize();
-              // Scale image to fit
-              const imgDims=img.scaleToFit(width-60, height-100);
-              page.drawImage(img, {x: (width-imgDims.width)/2, y: (height-imgDims.height)/2 + 10, width: imgDims.width, height: imgDims.height});
-              // Footer nama
-              page.drawText(`${i+1}. ${nama} ${mId? '('+mId+')':''} - ${filename}`, {x:30, y:20, size:8, color: pdfLib.rgb(0.3,0.3,0.3)});
+              // Scale image to fit A4 with margins - maintain aspect ratio
+              const margin = 30;
+              const footerSpace = 30;
+              const availW = width - margin*2;
+              const availH = height - margin*2 - footerSpace;
+              const imgDims=img.scaleToFit(availW, availH);
+              page.drawImage(img, {x: (width-imgDims.width)/2, y: (height-imgDims.height)/2 + footerSpace/2 + 5, width: imgDims.width, height: imgDims.height});
+              // Footer with name + border
+              page.drawText(`${i+1}. ${nama} ${mId? '('+mId+')':''} - ${filename}`, {x:30, y:15, size:7, color: pdfLib.rgb(0.3,0.3,0.3)});
+              // Optional thin border for neat look
+              try{
+                page.drawRectangle({x: margin-5, y: footerSpace, width: availW+10, height: availH+10, borderColor: pdfLib.rgb(0.9,0.9,0.9), borderWidth: 0.5});
+              }catch(e){}
               successCount++;
               updateProgress(i+1, withVisa.length, nama, `✓ Image ${filename}`);
             }catch(imgErr){
