@@ -3106,11 +3106,18 @@ async function downloadAllPassports(){
 }
 async function _downloadAllDocs(fieldName, label){
   try{
-    const fieldAliases = fieldName==='VISA COPY' ? ['VISA COPY','VISA','VISA_COPY'] : ['PASSPORT COPY','PASSPORT','PASSPORT_COPY','PASSPORT SCAN'];
-    let withVisa = allRoomingJemaah.filter(j=> {
-      const att = getFieldAttachments(j.fields||{}, fieldAliases);
-      return !!att;
-    });
+    const fieldAliases = fieldName==='VISA COPY' ? ['VISA COPY','VISA'] : ['PASSPORT COPY','PASSPORT','PASSPORT_COPY','PASSPORT SCAN'];
+    let sourceList = (window._allJemaahDirect && window._allJemaahDirect.length>0) ? window._allJemaahDirect : allRoomingJemaah;
+    console.log('Using sourceList: '+sourceList.length+' records, direct available: '+(window._allJemaahDirect?window._allJemaahDirect.length:0));
+    let withVisa = sourceList.filter(j=>{ const att=getFieldAttachments(j.fields||{}, fieldAliases); return !!att; });
+    // If still 0 and we haven't fetched direct, try direct now
+    if(withVisa.length===0 && (!window._allJemaahDirect || window._allJemaahDirect.length===0)){
+      console.log('No docs in sourceList, trying direct fetch now...');
+      await updatePassportCountFromDirectFetch();
+      sourceList = (window._allJemaahDirect && window._allJemaahDirect.length>0) ? window._allJemaahDirect : allRoomingJemaah;
+      withVisa = sourceList.filter(j=>{ const att=getFieldAttachments(j.fields||{}, fieldAliases); return !!att; });
+      console.log('After direct fetch, withVisa: '+withVisa.length);
+    }
     if(withVisa.length===0){
       alert(`Tiada ${fieldName} dalam trip ini.\n\nPastikan field ${fieldName} ada attachment PDF/Image.`);
       return;
@@ -3287,27 +3294,12 @@ async function _downloadAllDocs(fieldName, label){
 
     const pdfBytes=await mergedPdf.save();
     const blob=new Blob([pdfBytes], {type:'application/pdf'});
-    // Get Trip Name properly - not recId
     let rawTripName = window.selectedTripRecord?.fields?.['TRIP NAME'] || window.selectedTripRecord?.fields?.['NAMA TRIP'] || window.selectedTripRecord?.fields?.['Name'] || '';
-    if(!rawTripName || rawTripName.startsWith('rec')){
-      const sel = document.getElementById('roomingTripSelect');
-      if(sel && sel.options[sel.selectedIndex]){
-        rawTripName = sel.options[sel.selectedIndex].textContent.trim();
-      }
-    }
-    if(!rawTripName || rawTripName.startsWith('rec')){
-      rawTripName = localStorage.getItem('effah_active_trip_name') || localStorage.getItem('effah_trip_name') || 'TRIP';
-    }
-    // Clean trip name for filename - keep readable
-    let tripName = rawTripName.replace(/[^a-zA-Z0-9 \-_]/g,'').replace(/\s+/g,'_').substring(0,50);
-    if(!tripName || tripName.startsWith('rec')) tripName = 'TRIP';
-    // Date dd-mm-yy
-    const now = new Date();
-    const dd = String(now.getDate()).padStart(2,'0');
-    const mm = String(now.getMonth()+1).padStart(2,'0');
-    const yy = String(now.getFullYear()).slice(-2);
-    const dateStr = `${dd}-${mm}-${yy}`;
-    const fileName=`${label.toUpperCase()}_${tripName}_${dateStr}.pdf`;
+    if(!rawTripName || rawTripName.startsWith('rec')){ const sel=document.getElementById('roomingTripSelect'); if(sel && sel.options[sel.selectedIndex]) rawTripName=sel.options[sel.selectedIndex].textContent.trim(); }
+    if(!rawTripName || rawTripName.startsWith('rec')) rawTripName=localStorage.getItem('effah_active_trip_name')||'TRIP';
+    let tripName = rawTripName.replace(/[^a-zA-Z0-9 \-_]/g,'').replace(/\s+/g,'_').substring(0,50); if(!tripName || tripName.startsWith('rec')) tripName='TRIP';
+    const now=new Date(); const dd=String(now.getDate()).padStart(2,'0'); const mm=String(now.getMonth()+1).padStart(2,'0'); const yy=String(now.getFullYear()).slice(-2); const dateStr=dd+'-'+mm+'-'+yy;
+    const fileName=label.toUpperCase()+'_'+tripName+'_'+dateStr+'.pdf';
     
     const link=document.createElement('a');
     link.href=URL.createObjectURL(blob);
@@ -3359,46 +3351,9 @@ async function _downloadAllDocs(fieldName, label){
   }
 }
 
-function getFieldAttachments(jemaahFields, possibleNames){
-  // Robust detection - case insensitive, trim
-  for(let name of possibleNames){
-    if(jemaahFields[name] && Array.isArray(jemaahFields[name]) && jemaahFields[name].length>0) return jemaahFields[name];
-  }
-  // Try case-insensitive search
-  const keys = Object.keys(jemaahFields||{});
-  for(let k of keys){
-    const upper = k.toUpperCase().trim();
-    for(let target of possibleNames){
-      if(upper === target.toUpperCase().trim() || upper.includes(target.toUpperCase().trim())){
-        const val = jemaahFields[k];
-        if(Array.isArray(val) && val.length>0) return val;
-      }
-    }
-  }
-  return null;
-}
-function updateVisaCountBadge(){
-  try{
-    const visaFieldNames = ['VISA COPY', 'VISA', 'VISA_COPY'];
-    const passFieldNames = ['PASSPORT COPY', 'PASSPORT', 'PASSPORT_COPY', 'PASSPORT SCAN'];
-    let visaCount=0, passCount=0;
-    let debugPassSample=null;
-    allRoomingJemaah.forEach(j=>{
-      const f=j.fields||{};
-      if(getFieldAttachments(f, visaFieldNames)) visaCount++;
-      const passAtt = getFieldAttachments(f, passFieldNames);
-      if(passAtt){
-        passCount++;
-        if(!debugPassSample) debugPassSample = {name: getJemaahName(f), fields: Object.keys(f).filter(k=>k.toUpperCase().includes('PASS'))};
-      }
-    });
-    const vBadge=document.getElementById('visaCountBadge');
-    const pBadge=document.getElementById('passportCountBadge');
-    if(vBadge) vBadge.textContent=visaCount;
-    if(pBadge) pBadge.textContent=passCount;
-    console.log(`Badge counts - Visa: ${visaCount}, Passport: ${passCount}`, debugPassSample?`Sample passport fields: ${JSON.stringify(debugPassSample)}`:'No passport found - available fields sample: '+(allRoomingJemaah[0]?Object.keys(allRoomingJemaah[0].fields||{}).filter(k=>k.includes('PASS')||k.includes('COPY')).join(', '):'none'));
-  }catch(e){ console.error('updateVisaCountBadge error', e); }
-}
+function getFieldAttachments(jFields, names){ for(let n of names){ if(jFields[n] && Array.isArray(jFields[n]) && jFields[n].length>0) return jFields[n]; } const keys=Object.keys(jFields||{}); for(let k of keys){ const up=k.toUpperCase().trim(); for(let t of names){ if(up===t.toUpperCase() || up.includes(t.toUpperCase())){ const v=jFields[k]; if(Array.isArray(v)&&v.length>0) return v; } } } return null; }
+function updateVisaCountBadge(){ try{ const visaNames=['VISA COPY','VISA','VISA_COPY']; const passNames=['PASSPORT COPY','PASSPORT','PASSPORT_COPY','PASSPORT SCAN']; let v=0,p=0; (allRoomingJemaah||[]).forEach(j=>{ if(getFieldAttachments(j.fields||{}, visaNames)) v++; if(getFieldAttachments(j.fields||{}, passNames)) p++; }); const vb=document.getElementById('visaCountBadge'); const pb=document.getElementById('passportCountBadge'); if(vb) vb.textContent=v; if(pb) pb.textContent=p; console.log('Badge from allRoomingJemaah - Visa:'+v+' Passport:'+p+' total:'+(allRoomingJemaah||[]).length); if(p===0){ setTimeout(updatePassportCountFromDirectFetch, 1000); } }catch(e){ console.error(e); } }
+async function updatePassportCountFromDirectFetch(){ try{ const base=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base')||localStorage.getItem('effah_base_id'); const pat=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat'); const tripId=localStorage.getItem('effah_active_trip_id')||window.selectedTripRecord?.id||document.getElementById('roomingTripSelect')?.value; if(!base||!pat||!tripId) { console.log('Direct fetch missing base/pat/tripId', {base:!!base, pat:!!pat, tripId}); return; } let allRecs=[]; let offset=''; do{ const filter='FIND("'+tripId+'",ARRAYJOIN({TRIP}))'; const url='https://api.airtable.com/v0/'+base+'/DATA%20JEMAAH%20UMRAH?filterByFormula='+encodeURIComponent(filter)+'&pageSize=100'+(offset?'&offset='+offset:''); console.log('Direct fetching: '+url); const res=await fetch(url,{headers:{Authorization:'Bearer '+pat}}); if(!res.ok){ console.error('Direct fetch fail '+res.status); const txt=await res.text(); console.error(txt); break; } const data=await res.json(); if(data.records) allRecs=allRecs.concat(data.records); offset=data.offset||''; }while(offset); console.log('Direct fetch total records: '+allRecs.length); if(allRecs.length>0){ console.log('Sample keys: '+Object.keys(allRecs[0].fields).join(',')); } const vCount=allRecs.filter(r=> r.fields['VISA COPY']||r.fields['VISA']).length; const pCount=allRecs.filter(r=> r.fields['PASSPORT COPY']||r.fields['PASSPORT']).length; console.log('Direct counts Visa:'+vCount+' Passport:'+pCount); const vb=document.getElementById('visaCountBadge'); const pb=document.getElementById('passportCountBadge'); if(vb && vCount>0) vb.textContent=vCount; if(pb){ pb.textContent=pCount; if(pCount===0){ pb.textContent='0 - check console'; pb.style.color='red'; } } window._allJemaahDirect=allRecs; }catch(e){ console.error('Direct fetch error',e); } }
 
 
 function updateVisaCountBadge(){
@@ -3419,40 +3374,6 @@ if(typeof fetchRoomingData==='function'){
     return res;
   };
 }
-
-// Patch to also fetch directly from DATA JEMAAH for passport count if allRoomingJemaah missing field
-async function updatePassportCountFromDirectFetch(){
-  try{
-    const base=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base')||localStorage.getItem('effah_base_id');
-    const pat=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
-    const tripId = localStorage.getItem('effah_active_trip_id') || window.selectedTripRecord?.id;
-    if(!base||!pat) return;
-    // Try to fetch jemaah for this trip directly to count passports
-    let url = `https://api.airtable.com/v0/${base}/DATA%20JEMAAH%20UMRAH?filterByFormula=FIND("${tripId}",ARRAYJOIN({TRIP}))&pageSize=100`;
-    const res = await fetch(url, {headers:{Authorization:`Bearer ${pat}`}});
-    if(!res.ok) return;
-    const data = await res.json();
-    if(data.records){
-      const visaCount = data.records.filter(r=> r.fields && (r.fields['VISA COPY']||r.fields['VISA'])).length;
-      const passCount = data.records.filter(r=> r.fields && (r.fields['PASSPORT COPY']||r.fields['PASSPORT']||r.fields['PASSPORT COPY'])).length;
-      console.log(`Direct fetch counts - Visa: ${visaCount}, Passport: ${passCount} from ${data.records.length} records for trip ${tripId}`);
-      console.log('Sample record fields:', data.records[0]?Object.keys(data.records[0].fields).filter(k=>k.toUpperCase().includes('PASS')||k.toUpperCase().includes('VISA')||k.toUpperCase().includes('COPY')).join(', '):'none');
-      // Update badges if higher than current
-      const vBadge=document.getElementById('visaCountBadge');
-      const pBadge=document.getElementById('passportCountBadge');
-      if(vBadge && visaCount>0) vBadge.textContent=visaCount;
-      if(pBadge && passCount>0) pBadge.textContent=passCount;
-      if(passCount>0){
-        // Store for download
-        window._allJemaahForTripDirect = data.records;
-      }
-    }
-  }catch(e){ console.error('Direct passport count fetch error', e); }
-}
-// Call direct fetch after 3s
-setTimeout(updatePassportCountFromDirectFetch, 3000);
-window.updatePassportCountFromDirectFetch = updatePassportCountFromDirectFetch;
-
 window.downloadAllVisas=downloadAllVisas;
 window.updateVisaCountBadge=updateVisaCountBadge;
 setTimeout(updateVisaCountBadge, 2000);
