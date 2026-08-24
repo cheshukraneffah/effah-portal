@@ -3055,16 +3055,51 @@ async function loadPdfLib(){
 
 async function fetchWithRetry(url, retries=2){
   for(let i=0;i<=retries;i++){
+    if(window._visaDownloadCancelled) throw new Error('Cancelled by user');
     try{
-      const res=await fetch(url, {mode:'cors'});
+      const signal=window._visaAbortController?window._visaAbortController.signal:undefined;
+      const res=await fetch(url, {mode:'cors', signal});
       if(!res.ok) throw new Error('HTTP '+res.status);
       return await res.arrayBuffer();
     }catch(e){
+      if(e.name==='AbortError' || window._visaDownloadCancelled) throw new Error('Cancelled by user');
       if(i===retries) throw e;
       await new Promise(r=>setTimeout(r, 500));
     }
   }
 }
+
+
+window._visaDownloadCancelled=false;
+window._visaAbortController=null;
+function cancelVisaDownload(){
+  window._visaDownloadCancelled=true;
+  if(window._visaAbortController) window._visaAbortController.abort();
+  const logEl=document.getElementById('visaProgressLog');
+  if(logEl){
+    const div=document.createElement('div');
+    div.className='text-red-500 font-bold';
+    div.textContent='✕ Cancelled by user';
+    logEl.appendChild(div);
+  }
+  document.getElementById('visaProgressName').textContent='Cancelled';
+  const cancelBtn=document.getElementById('visaCancelBtn');
+  const cancelBtn2=document.getElementById('visaCancelBtn2');
+  const closeBtn=document.getElementById('visaCloseBtn');
+  if(cancelBtn) cancelBtn.classList.add('hidden');
+  if(cancelBtn2) cancelBtn2.classList.add('hidden');
+  if(closeBtn) closeBtn.classList.remove('hidden');
+  // Reset main button
+  const mainBtn=document.getElementById('btnDownloadVisas');
+  if(mainBtn){ mainBtn.disabled=false; mainBtn.innerHTML=mainBtn.getAttribute('data-original')||'⬇ Download Visas (<span id="visaCountBadge">0</span>)'; }
+  setTimeout(()=>{ closeVisaModal(); }, 1500);
+}
+function closeVisaModal(){
+  const m=document.getElementById('visaDownloadModal');
+  if(m) m.classList.add('hidden');
+  window._visaDownloadCancelled=false;
+}
+
 
 async function downloadAllVisas(){
   const btn=document.getElementById('btnDownloadVisas');
@@ -3084,6 +3119,8 @@ async function downloadAllVisas(){
     });
 
     // Create progress modal
+    window._visaDownloadCancelled=false;
+    window._visaAbortController=new AbortController();
     let modal=document.getElementById('visaDownloadModal');
     if(!modal){
       modal=document.createElement('div');
@@ -3091,15 +3128,34 @@ async function downloadAllVisas(){
       modal.className='fixed inset-0 bg-black/60 z-[99999] flex items-center justify-center p-4';
       modal.innerHTML=`
         <div class="bg-white rounded-2xl p-5 max-w-md w-full shadow-2xl">
-          <h3 class="font-bold text-[13px] mb-3">Downloading Visas...</h3>
+          <div class="flex justify-between items-center mb-3">
+            <h3 class="font-bold text-[13px]">Downloading Visas...</h3>
+            <button id="visaCancelBtn" onclick="cancelVisaDownload()" class="px-3 py-1 bg-red-50 border border-red-200 text-red-600 rounded-full text-[10px] font-bold hover:bg-red-100">✕ Cancel</button>
+          </div>
           <div class="w-full bg-slate-100 rounded-full h-3 mb-3 overflow-hidden"><div id="visaProgressBar" class="h-3 bg-emerald-600 rounded-full transition-all" style="width:0%"></div></div>
           <div id="visaProgressText" class="text-[11px] text-slate-600 mb-1">0 / 0</div>
           <div id="visaProgressName" class="text-[10px] text-slate-500 truncate">-</div>
           <div id="visaProgressLog" class="mt-3 max-h-[15vh] overflow-y-auto text-[9px] text-slate-400 space-y-0.5"></div>
+          <div class="flex gap-2 mt-4">
+            <button id="visaCancelBtn2" onclick="cancelVisaDownload()" class="flex-1 py-2 bg-slate-100 border border-slate-200 rounded-xl font-bold text-[11px] hover:bg-slate-200">Cancel Download</button>
+            <button id="visaCloseBtn" onclick="closeVisaModal()" class="flex-1 py-2 bg-[#064E3B] text-white rounded-xl font-bold text-[11px] hidden">Close</button>
+          </div>
         </div>
       `;
       document.body.appendChild(modal);
-    } else modal.classList.remove('hidden');
+    } else {
+      modal.classList.remove('hidden');
+      window._visaDownloadCancelled=false;
+      window._visaAbortController=new AbortController();
+      const cancelBtn=document.getElementById('visaCancelBtn');
+      const cancelBtn2=document.getElementById('visaCancelBtn2');
+      const closeBtn=document.getElementById('visaCloseBtn');
+      if(cancelBtn) cancelBtn.classList.remove('hidden');
+      if(cancelBtn2) cancelBtn2.classList.remove('hidden');
+      if(closeBtn) closeBtn.classList.add('hidden');
+      document.getElementById('visaProgressLog').innerHTML='';
+      document.getElementById('visaProgressBar').style.width='0%';
+    }
 
     const updateProgress=(curr,total,name,log)=>{
       const pct=Math.round(curr/total*100);
@@ -3115,7 +3171,7 @@ async function downloadAllVisas(){
       }
     };
 
-    if(btn){ btn.disabled=true; btn.innerHTML='⏳ Loading pdf-lib...'; }
+    if(btn){ btn.setAttribute('data-original', btn.innerHTML); btn.disabled=true; btn.innerHTML='⏳ Loading pdf-lib...'; }
 
     const pdfLib=await loadPdfLib();
     const {PDFDocument}=pdfLib;
@@ -3125,6 +3181,7 @@ async function downloadAllVisas(){
     let failList=[];
 
     for(let i=0;i<withVisa.length;i++){
+      if(window._visaDownloadCancelled){ throw new Error('Cancelled by user'); }
       const jRec=withVisa[i];
       const nama=getJemaahName(jRec.fields);
       const mId=jRec.fields['M_ID']||jRec.fields['NO KP']||'';
