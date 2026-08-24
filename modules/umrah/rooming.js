@@ -3008,7 +3008,6 @@ async function dropRoomReorder(e, targetRoomId){
 
 
 // ===== V16 DOWNLOAD ALL VISAS - COMPILE TO ONE PDF =====
-
 async function loadPdfLib(){
   if(window.PDFLib && window.PDFLib.PDFDocument) return window.PDFLib;
   return new Promise((resolve, reject)=>{
@@ -3020,11 +3019,13 @@ async function loadPdfLib(){
     const script=document.createElement('script');
     script.src='https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js';
     script.onload=()=>{
-      const lib = window.PDFLib || window.pdfLib;
+      // UMD exposes window.PDFLib (capital L)
+      const lib = window.PDFLib || window.pdfLib || window.pdf_lib;
       if(lib && lib.PDFDocument){
         window.PDFLib = lib;
         resolve(lib);
       } else {
+        // Try unpkg fallback
         const script2=document.createElement('script');
         script2.src='https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js';
         script2.onload=()=>{
@@ -3037,6 +3038,7 @@ async function loadPdfLib(){
       }
     };
     script.onerror=()=>{
+      // Try unpkg
       const script2=document.createElement('script');
       script2.src='https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js';
       script2.onload=()=>{
@@ -3067,6 +3069,7 @@ async function fetchWithRetry(url, retries=2){
   }
 }
 
+
 window._visaDownloadCancelled=false;
 window._visaAbortController=null;
 function cancelVisaDownload(){
@@ -3079,14 +3082,16 @@ function cancelVisaDownload(){
     div.textContent='✕ Cancelled by user';
     logEl.appendChild(div);
   }
-  const nameEl=document.getElementById('visaProgressName');
-  if(nameEl) nameEl.textContent='Cancelled';
+  document.getElementById('visaProgressName').textContent='Cancelled';
   const cancelBtn=document.getElementById('visaCancelBtn');
   const cancelBtn2=document.getElementById('visaCancelBtn2');
   const closeBtn=document.getElementById('visaCloseBtn');
   if(cancelBtn) cancelBtn.classList.add('hidden');
   if(cancelBtn2) cancelBtn2.classList.add('hidden');
   if(closeBtn) closeBtn.classList.remove('hidden');
+  // Reset main button
+  const mainBtn=document.getElementById('btnDownloadVisas');
+  if(mainBtn){ mainBtn.disabled=false; mainBtn.innerHTML=mainBtn.getAttribute('data-original')||'⬇ Download Visas (<span id="visaCountBadge">0</span>)'; }
   setTimeout(()=>{ closeVisaModal(); }, 1500);
 }
 function closeVisaModal(){
@@ -3095,8 +3100,12 @@ function closeVisaModal(){
   window._visaDownloadCancelled=false;
 }
 
+
+
 async function downloadAllDocs(fieldName, label){
-  return _downloadAllDocs(fieldName||'VISA COPY', label||fieldName);
+  const field = fieldName || 'VISA COPY';
+  const badgeLabel = label || field;
+  return _downloadAllDocs(field, badgeLabel);
 }
 async function downloadAllVisas(){
   return _downloadAllDocs('VISA COPY', 'Visas');
@@ -3105,29 +3114,24 @@ async function downloadAllPassports(){
   return _downloadAllDocs('PASSPORT COPY', 'Passports');
 }
 async function _downloadAllDocs(fieldName, label){
+
+  const btn=document.getElementById('btnDownloadVisas');
+  const originalText=btn?.innerHTML;
   try{
-    const fieldAliases = fieldName==='VISA COPY' ? ['VISA COPY','VISA'] : ['PASSPORT COPY','PASSPORT','PASSPORT_COPY','PASSPORT SCAN'];
-    let sourceList = (window._allJemaahDirect && window._allJemaahDirect.length>0) ? window._allJemaahDirect : allRoomingJemaah;
-    console.log('Using sourceList: '+sourceList.length+' records, direct available: '+(window._allJemaahDirect?window._allJemaahDirect.length:0));
-    let withVisa = sourceList.filter(j=>{ const att=getFieldAttachments(j.fields||{}, fieldAliases); return !!att; });
-    // If still 0 and we haven't fetched direct, try direct now
-    if(withVisa.length===0 && (!window._allJemaahDirect || window._allJemaahDirect.length===0)){
-      console.log('No docs in sourceList, trying direct fetch now...');
-      await updatePassportCountFromDirectFetch();
-      sourceList = (window._allJemaahDirect && window._allJemaahDirect.length>0) ? window._allJemaahDirect : allRoomingJemaah;
-      withVisa = sourceList.filter(j=>{ const att=getFieldAttachments(j.fields||{}, fieldAliases); return !!att; });
-      console.log('After direct fetch, withVisa: '+withVisa.length);
-    }
+    // Filter jemaah with VISA COPY
+    let withVisa = allRoomingJemaah.filter(j=> j.fields && j.fields[fieldName] && Array.isArray(j.fields[fieldName]) && j.fields[fieldName].length>0);
     if(withVisa.length===0){
       alert(`Tiada ${fieldName} dalam trip ini.\n\nPastikan field ${fieldName} ada attachment PDF/Image.`);
       return;
     }
+    // Sort by NAMA
     withVisa = withVisa.sort((a,b)=>{
       const na=getJemaahName(a.fields).toUpperCase();
       const nb=getJemaahName(b.fields).toUpperCase();
       return na.localeCompare(nb);
     });
 
+    // Create progress modal
     window._visaDownloadCancelled=false;
     window._visaAbortController=new AbortController();
     let modal=document.getElementById('visaDownloadModal');
@@ -3162,32 +3166,26 @@ async function _downloadAllDocs(fieldName, label){
       if(cancelBtn) cancelBtn.classList.remove('hidden');
       if(cancelBtn2) cancelBtn2.classList.remove('hidden');
       if(closeBtn) closeBtn.classList.add('hidden');
-      const logEl2=document.getElementById('visaProgressLog');
-      if(logEl2) logEl2.innerHTML='';
-      const bar=document.getElementById('visaProgressBar');
-      if(bar) bar.style.width='0%';
-      const titleEl=document.getElementById('visaModalTitle');
-      if(titleEl) titleEl.textContent=`Downloading ${label}...`;
+      document.getElementById('visaProgressLog').innerHTML='';
+      document.getElementById('visaProgressBar').style.width='0%';
+      const titleEl=document.getElementById('visaModalTitle'); if(titleEl) titleEl.textContent=`Downloading ${label}...`;
     }
 
     const updateProgress=(curr,total,name,log)=>{
       const pct=Math.round(curr/total*100);
-      const bar=document.getElementById('visaProgressBar');
-      if(bar) bar.style.width=pct+'%';
-      const txt=document.getElementById('visaProgressText');
-      if(txt) txt.textContent=curr+' / '+total+' ('+pct+'%)';
-      const nameEl=document.getElementById('visaProgressName');
-      if(nameEl) nameEl.textContent=name||'-';
+      document.getElementById('visaProgressBar').style.width=pct+'%';
+      document.getElementById('visaProgressText').textContent=curr+' / '+total+' ('+pct+'%)';
+      document.getElementById('visaProgressName').textContent=name||'-';
       if(log){
         const logEl=document.getElementById('visaProgressLog');
-        if(logEl){
-          const div=document.createElement('div');
-          div.textContent=log;
-          logEl.appendChild(div);
-          logEl.scrollTop=logEl.scrollHeight;
-        }
+        const div=document.createElement('div');
+        div.textContent=log;
+        logEl.appendChild(div);
+        logEl.scrollTop=logEl.scrollHeight;
       }
     };
+
+    if(btn){ btn.setAttribute('data-original', btn.innerHTML); btn.disabled=true; btn.innerHTML='⏳ Loading pdf-lib...'; }
 
     const pdfLib=await loadPdfLib();
     const {PDFDocument}=pdfLib;
@@ -3195,8 +3193,6 @@ async function _downloadAllDocs(fieldName, label){
 
     let successCount=0;
     let failList=[];
-    const A4_WIDTH = 595.28;
-    const A4_HEIGHT = 841.89;
 
     for(let i=0;i<withVisa.length;i++){
       if(window._visaDownloadCancelled){ throw new Error('Cancelled by user'); }
@@ -3205,7 +3201,8 @@ async function _downloadAllDocs(fieldName, label){
       const mId=jRec.fields['M_ID']||jRec.fields['NO KP']||'';
       updateProgress(i, withVisa.length, nama, `Fetching: ${nama}`);
 
-      const attachments=getFieldAttachments(jRec.fields||{}, fieldAliases)||[];
+      const attachments=jRec.fields[fieldName]||[];
+      // Take all attachments for this jemaah (could be 1-3 files)
       for(let attIdx=0; attIdx<attachments.length; attIdx++){
         const att=attachments[attIdx];
         if(!att||!att.url) continue;
@@ -3214,46 +3211,64 @@ async function _downloadAllDocs(fieldName, label){
         const isPdf = filename.toLowerCase().endsWith('.pdf') || (att.type && att.type.includes('pdf'));
 
         try{
+          if(btn) btn.innerHTML=`⏳ ${i+1}/${withVisa.length} ${nama.substring(0,12)}...`;
           const buffer=await fetchWithRetry(url);
           
           if(isPdf){
             try{
               const srcPdf=await PDFDocument.load(buffer, {ignoreEncryption:true});
               const srcPages = srcPdf.getPages();
+              // Standard size - A4 (595.28 x 841.89) or Letter (612 x 792) - using A4 as requested
+              const A4_WIDTH = 595.28;
+              const A4_HEIGHT = 841.89;
+              // If user wants Letter: const LETTER_WIDTH=612, LETTER_HEIGHT=792
+              
               for(let pIdx=0; pIdx<srcPdf.getPageCount(); pIdx++){
-                if(window._visaDownloadCancelled) throw new Error('Cancelled by user');
                 const srcPage = srcPages[pIdx];
                 const {width: origW, height: origH} = srcPage.getSize();
+                
+                // Copy page
                 const [copiedPage] = await mergedPdf.copyPages(srcPdf, [pIdx]);
+                
+                // Standardize: if original not A4, create new A4 page and scale embed
                 const needsResize = Math.abs(origW - A4_WIDTH) > 5 || Math.abs(origH - A4_HEIGHT) > 5;
+                
                 if(needsResize){
+                  // Create new A4 page and embed copied page scaled to fit
                   const newPage = mergedPdf.addPage([A4_WIDTH, A4_HEIGHT]);
+                  // Calculate scale to fit with margin
                   const margin = 20;
                   const availW = A4_WIDTH - margin*2;
-                  const availH = A4_HEIGHT - 40;
+                  const availH = A4_HEIGHT - 40; // leave footer space
                   const scale = Math.min(availW/origW, availH/origH);
                   const drawW = origW * scale;
                   const drawH = origH * scale;
                   const x = (A4_WIDTH - drawW)/2;
                   const y = (A4_HEIGHT - drawH)/2 + 10;
+                  
+                  // Embed the copied page as XObject
                   const embeddedPage = await mergedPdf.embedPage(copiedPage);
                   newPage.drawPage(embeddedPage, {x, y, width: drawW, height: drawH});
+                  // Footer
                   newPage.drawText(`${i+1}. ${nama} ${mId? '('+mId+')':''} - ${filename} p${pIdx+1}`, {x:30, y:15, size:7, color: pdfLib.rgb(0.3,0.3,0.3)});
                 } else {
+                  // Already A4-ish, just add with footer
                   const newPage = mergedPdf.addPage(copiedPage);
+                  // Add footer overlay - draw on top
                   try{
                     newPage.drawText(`${i+1}. ${nama} ${mId? '('+mId+')':''} - ${filename} p${pIdx+1}`, {x:30, y:15, size:7, color: pdfLib.rgb(0.3,0.3,0.3)});
                   }catch(e){}
                 }
               }
               successCount++;
-              updateProgress(i+1, withVisa.length, nama, `✓ PDF ${filename} - ${srcPdf.getPageCount()} pages → A4`);
+              updateProgress(i+1, withVisa.length, nama, `✓ PDF ${filename} - ${srcPdf.getPageCount()} pages → A4 standardized`);
             }catch(pdfErr){
               console.error('PDF load failed', filename, pdfErr);
               failList.push(`${nama} - ${filename}: PDF corrupt`);
               updateProgress(i+1, withVisa.length, nama, `✗ PDF failed ${filename}`);
             }
           } else {
+            // Image - JPG/PNG
             try{
               let img;
               const lower=filename.toLowerCase();
@@ -3262,19 +3277,26 @@ async function _downloadAllDocs(fieldName, label){
               } else {
                 img=await mergedPdf.embedJpg(buffer);
               }
-              const page=mergedPdf.addPage([A4_WIDTH, A4_HEIGHT]);
+              // Standardize to A4 (or Letter) - user requested A4/Letter fit
+              const A4_WIDTH = 595.28;
+              const A4_HEIGHT = 841.89;
+              const page=mergedPdf.addPage([A4_WIDTH, A4_HEIGHT]); // A4 standardized
+              const {width, height}=page.getSize();
+              // Scale image to fit A4 with margins - maintain aspect ratio
               const margin = 30;
               const footerSpace = 30;
-              const availW = A4_WIDTH - margin*2;
-              const availH = A4_HEIGHT - margin*2 - footerSpace;
+              const availW = width - margin*2;
+              const availH = height - margin*2 - footerSpace;
               const imgDims=img.scaleToFit(availW, availH);
-              page.drawImage(img, {x: (A4_WIDTH-imgDims.width)/2, y: (A4_HEIGHT-imgDims.height)/2 + footerSpace/2 + 5, width: imgDims.width, height: imgDims.height});
+              page.drawImage(img, {x: (width-imgDims.width)/2, y: (height-imgDims.height)/2 + footerSpace/2 + 5, width: imgDims.width, height: imgDims.height});
+              // Footer with name + border
               page.drawText(`${i+1}. ${nama} ${mId? '('+mId+')':''} - ${filename}`, {x:30, y:15, size:7, color: pdfLib.rgb(0.3,0.3,0.3)});
+              // Optional thin border for neat look
               try{
                 page.drawRectangle({x: margin-5, y: footerSpace, width: availW+10, height: availH+10, borderColor: pdfLib.rgb(0.9,0.9,0.9), borderWidth: 0.5});
               }catch(e){}
               successCount++;
-              updateProgress(i+1, withVisa.length, nama, `✓ Image ${filename} → A4`);
+              updateProgress(i+1, withVisa.length, nama, `✓ Image ${filename}`);
             }catch(imgErr){
               console.error('Image embed failed', filename, imgErr);
               failList.push(`${nama} - ${filename}: Image failed`);
@@ -3282,7 +3304,6 @@ async function _downloadAllDocs(fieldName, label){
             }
           }
         }catch(fetchErr){
-          if(fetchErr.message==='Cancelled by user') throw fetchErr;
           console.error('Fetch failed', url, fetchErr);
           failList.push(`${nama} - ${filename}: Fetch failed ${fetchErr.message}`);
           updateProgress(i+1, withVisa.length, nama, `✗ Fetch failed ${filename}`);
@@ -3291,16 +3312,14 @@ async function _downloadAllDocs(fieldName, label){
     }
 
     updateProgress(withVisa.length, withVisa.length, 'Merging PDF...', 'Compiling final PDF...');
+    if(btn) btn.innerHTML='⏳ Compiling PDF...';
 
     const pdfBytes=await mergedPdf.save();
     const blob=new Blob([pdfBytes], {type:'application/pdf'});
-    let rawTripName = window.selectedTripRecord?.fields?.['TRIP NAME'] || window.selectedTripRecord?.fields?.['NAMA TRIP'] || window.selectedTripRecord?.fields?.['Name'] || '';
-    if(!rawTripName || rawTripName.startsWith('rec')){ const sel=document.getElementById('roomingTripSelect'); if(sel && sel.options[sel.selectedIndex]) rawTripName=sel.options[sel.selectedIndex].textContent.trim(); }
-    if(!rawTripName || rawTripName.startsWith('rec')) rawTripName=localStorage.getItem('effah_active_trip_name')||'TRIP';
-    let tripName = rawTripName.replace(/[^a-zA-Z0-9 \-_]/g,'').replace(/\s+/g,'_').substring(0,50); if(!tripName || tripName.startsWith('rec')) tripName='TRIP';
-    const now=new Date(); const dd=String(now.getDate()).padStart(2,'0'); const mm=String(now.getMonth()+1).padStart(2,'0'); const yy=String(now.getFullYear()).slice(-2); const dateStr=dd+'-'+mm+'-'+yy;
-    const fileName=label.toUpperCase()+'_'+tripName+'_'+dateStr+'.pdf';
+    const tripName=(window.selectedTripRecord?.fields?.['TRIP NAME']||window.selectedTripRecord?.fields?.['NAMA TRIP']||localStorage.getItem('effah_active_trip_id')||'TRIP').replace(/[^a-zA-Z0-9_-]/g,'_');
+    const fileName=`${label.toUpperCase()}_${tripName}_${withVisa.length}pax_${new Date().toISOString().slice(0,10)}.pdf`;
     
+    // Download
     const link=document.createElement('a');
     link.href=URL.createObjectURL(blob);
     link.download=fileName;
@@ -3309,58 +3328,43 @@ async function _downloadAllDocs(fieldName, label){
     link.remove();
     setTimeout(()=>URL.revokeObjectURL(link.href), 10000);
 
-    const logEl=document.getElementById('visaProgressLog');
-    if(logEl){
-      logEl.innerHTML+=`<div class="text-emerald-600 font-bold mt-2">✓ Done! ${successCount} files merged, ${failList.length} failed</div>`;
-      if(failList.length>0){
-        logEl.innerHTML+=`<div class="text-red-500">${failList.join('<br>')}</div>`;
-      }
-      logEl.innerHTML+=`<div class="mt-1">Total size: ${(blob.size/1024/1024).toFixed(2)} MB</div>`;
+    document.getElementById('visaProgressLog').innerHTML+=`<div class="text-emerald-600 font-bold mt-2">✓ Done! ${successCount} files merged, ${failList.length} failed</div>`;
+    if(failList.length>0){
+      document.getElementById('visaProgressLog').innerHTML+=`<div class="text-red-500">${failList.join('<br>')}</div>`;
     }
     updateProgress(withVisa.length, withVisa.length, `Saved: ${fileName}`, `Total size: ${(blob.size/1024/1024).toFixed(2)} MB`);
 
-    const cancelBtn=document.getElementById('visaCancelBtn');
-    const cancelBtn2=document.getElementById('visaCancelBtn2');
-    const closeBtn=document.getElementById('visaCloseBtn');
-    if(cancelBtn) cancelBtn.classList.add('hidden');
-    if(cancelBtn2) cancelBtn2.classList.add('hidden');
-    if(closeBtn) closeBtn.classList.remove('hidden');
-
     setTimeout(()=>{
-      if(!window._visaDownloadCancelled){
-        const m=document.getElementById('visaDownloadModal');
-        // keep open with Close button
-      }
-    }, 1000);
+      const m=document.getElementById('visaDownloadModal');
+      if(m) m.classList.add('hidden');
+    }, 4000);
+
+    if(btn){ btn.disabled=false; btn.innerHTML=originalText; }
 
     if(failList.length>0){
-      console.warn('Failed docs', failList);
+      console.warn('Failed visas', failList);
+      alert(`Selesai! ${successCount} visa berjaya, ${failList.length} gagal.\n\nGagal:\n${failList.slice(0,10).join('\n')}${failList.length>10?'\n...and '+(failList.length-10)+' more':''}`);
     } else {
       console.log(`Download All ${label} OK: ${fileName} ${(blob.size/1024/1024).toFixed(2)}MB`);
     }
 
   }catch(e){
-    if(e.message==='Cancelled by user'){
-      console.log('Download cancelled by user');
-      return;
-    }
-    console.error('downloadAllDocs error', e);
+    console.error('downloadAllVisas error', e);
     alert(`Gagal download ${label}: `+e.message);
     const m=document.getElementById('visaDownloadModal');
     if(m) m.classList.add('hidden');
+    if(btn){ btn.disabled=false; btn.innerHTML=originalText; }
   }
 }
 
-function getFieldAttachments(jFields, names){ for(let n of names){ if(jFields[n] && Array.isArray(jFields[n]) && jFields[n].length>0) return jFields[n]; } const keys=Object.keys(jFields||{}); for(let k of keys){ const up=k.toUpperCase().trim(); for(let t of names){ if(up===t.toUpperCase() || up.includes(t.toUpperCase())){ const v=jFields[k]; if(Array.isArray(v)&&v.length>0) return v; } } } return null; }
-function updateVisaCountBadge(){ try{ const visaNames=['VISA COPY','VISA','VISA_COPY']; const passNames=['PASSPORT COPY','PASSPORT','PASSPORT_COPY','PASSPORT SCAN']; let v=0,p=0; (allRoomingJemaah||[]).forEach(j=>{ if(getFieldAttachments(j.fields||{}, visaNames)) v++; if(getFieldAttachments(j.fields||{}, passNames)) p++; }); const vb=document.getElementById('visaCountBadge'); const pb=document.getElementById('passportCountBadge'); if(vb) vb.textContent=v; if(pb) pb.textContent=p; console.log('Badge from allRoomingJemaah - Visa:'+v+' Passport:'+p+' total:'+(allRoomingJemaah||[]).length); if(p===0){ setTimeout(updatePassportCountFromDirectFetch, 1000); } }catch(e){ console.error(e); } }
-async function updatePassportCountFromDirectFetch(){ try{ const base=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base')||localStorage.getItem('effah_base_id'); const pat=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat'); const tripId=localStorage.getItem('effah_active_trip_id')||window.selectedTripRecord?.id||document.getElementById('roomingTripSelect')?.value; if(!base||!pat||!tripId) { console.log('Direct fetch missing base/pat/tripId', {base:!!base, pat:!!pat, tripId}); return; } let allRecs=[]; let offset=''; do{ const filter='FIND("'+tripId+'",ARRAYJOIN({TRIP}))'; const url='https://api.airtable.com/v0/'+base+'/DATA%20JEMAAH%20UMRAH?filterByFormula='+encodeURIComponent(filter)+'&pageSize=100'+(offset?'&offset='+offset:''); console.log('Direct fetching: '+url); const res=await fetch(url,{headers:{Authorization:'Bearer '+pat}}); if(!res.ok){ console.error('Direct fetch fail '+res.status); const txt=await res.text(); console.error(txt); break; } const data=await res.json(); if(data.records) allRecs=allRecs.concat(data.records); offset=data.offset||''; }while(offset); console.log('Direct fetch total records: '+allRecs.length); if(allRecs.length>0){ console.log('Sample keys: '+Object.keys(allRecs[0].fields).join(',')); } const vCount=allRecs.filter(r=> r.fields['VISA COPY']||r.fields['VISA']).length; const pCount=allRecs.filter(r=> r.fields['PASSPORT COPY']||r.fields['PASSPORT']).length; console.log('Direct counts Visa:'+vCount+' Passport:'+pCount); const vb=document.getElementById('visaCountBadge'); const pb=document.getElementById('passportCountBadge'); if(vb && vCount>0) vb.textContent=vCount; if(pb){ pb.textContent=pCount; if(pCount===0){ pb.textContent='0 - check console'; pb.style.color='red'; } } window._allJemaahDirect=allRecs; }catch(e){ console.error('Direct fetch error',e); } }
-
-
 function updateVisaCountBadge(){
   try{
-    const count=allRoomingJemaah.filter(j=> j.fields && j.fields['VISA COPY'] && j.fields['VISA COPY'].length>0).length;
-    const badge=document.getElementById('visaCountBadge');
-    if(badge) badge.textContent=count;
+    const visaCount=allRoomingJemaah.filter(j=> j.fields && j.fields['VISA COPY'] && j.fields['VISA COPY'].length>0).length;
+    const passCount=allRoomingJemaah.filter(j=> j.fields && j.fields['PASSPORT COPY'] && j.fields['PASSPORT COPY'].length>0).length;
+    const vBadge=document.getElementById('visaCountBadge');
+    const pBadge=document.getElementById('passportCountBadge');
+    if(vBadge) vBadge.textContent=visaCount;
+    if(pBadge) pBadge.textContent=passCount;
   }catch(e){}
 }
 
@@ -3375,5 +3379,7 @@ if(typeof fetchRoomingData==='function'){
   };
 }
 window.downloadAllVisas=downloadAllVisas;
+window.downloadAllPassports=downloadAllPassports;
+window.downloadAllDocs=downloadAllDocs;
 window.updateVisaCountBadge=updateVisaCountBadge;
 setTimeout(updateVisaCountBadge, 2000);
