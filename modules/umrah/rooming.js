@@ -3009,12 +3009,46 @@ async function dropRoomReorder(e, targetRoomId){
 
 // ===== V16 DOWNLOAD ALL VISAS - COMPILE TO ONE PDF =====
 async function loadPdfLib(){
-  if(window.PDFLib) return window.PDFLib;
+  if(window.PDFLib && window.PDFLib.PDFDocument) return window.PDFLib;
   return new Promise((resolve, reject)=>{
+    const existing=document.querySelector('script[src*="pdf-lib"]');
+    if(existing && window.PDFLib){
+      resolve(window.PDFLib);
+      return;
+    }
     const script=document.createElement('script');
     script.src='https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js';
-    script.onload=()=>{ window.PDFLib=window.pdfLib; resolve(window.pdfLib); };
-    script.onerror=()=>reject(new Error('Failed to load pdf-lib'));
+    script.onload=()=>{
+      // UMD exposes window.PDFLib (capital L)
+      const lib = window.PDFLib || window.pdfLib || window.pdf_lib;
+      if(lib && lib.PDFDocument){
+        window.PDFLib = lib;
+        resolve(lib);
+      } else {
+        // Try unpkg fallback
+        const script2=document.createElement('script');
+        script2.src='https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js';
+        script2.onload=()=>{
+          const lib2 = window.PDFLib || window.pdfLib;
+          if(lib2) resolve(lib2);
+          else reject(new Error('pdf-lib loaded but PDFDocument undefined'));
+        };
+        script2.onerror=()=>reject(new Error('Failed to load pdf-lib from both CDNs'));
+        document.head.appendChild(script2);
+      }
+    };
+    script.onerror=()=>{
+      // Try unpkg
+      const script2=document.createElement('script');
+      script2.src='https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js';
+      script2.onload=()=>{
+        const lib2 = window.PDFLib || window.pdfLib;
+        if(lib2) resolve(lib2);
+        else reject(new Error('pdf-lib fallback loaded but undefined'));
+      };
+      script2.onerror=()=>reject(new Error('Failed to load pdf-lib'));
+      document.head.appendChild(script2);
+    };
     document.head.appendChild(script);
   });
 }
