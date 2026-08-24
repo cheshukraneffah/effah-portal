@@ -1788,11 +1788,11 @@ function changeNewRoomCap(d){ const i=document.getElementById('newRoomCap'); let
 function openNewRoomModal(){ const m=document.getElementById('newRoomModal'); if(!m) return; m.classList.remove('hidden'); document.getElementById('newRoomLokasi').value=activeLocation; document.getElementById('newRoomCap').value=roomingDefaultCap; updateNewRoomIdFromCap(); }
 function closeNewRoomModal(){ document.getElementById('newRoomModal').classList.add('hidden'); }
 async function submitNewRoom(){
-  const btn=document.getElementById('btnCiptaBilik'); if(btn){ btn.textContent='Mencipta...'; btn.disabled=true; }
+  const btn=document.getElementById('btnCiptaBilik'); // removed button loading
   const lokasi=document.getElementById('newRoomLokasi').value; const pakej=document.getElementById('newRoomPakej').value;
   const hotel=document.getElementById('newRoomHotel').value.trim(); const cap=parseInt(document.getElementById('newRoomCap').value)||4;
   const note=document.getElementById('newRoomNote').value.trim(); const tripId=window.selectedTripRecord?.id||localStorage.getItem('effah_active_trip_id')||localStorage.getItem('selectedTripId')||localStorage.getItem('effah_last_selected_trip');
-  if(!tripId){ alert('Sila pilih trip terlebih dahulu.'); if(btn){ btn.textContent='Cipta Bilik'; btn.disabled=false; } return; }
+  if(!tripId){ alert('Sila pilih trip terlebih dahulu.'); // removed button loading
   const base=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base')||localStorage.getItem('effah_base_id'); const pat=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
   const payload={fields:{'PAKEJ / HOTEL':pakej,'KAPASITI':cap,'HOTEL NAME':hotel||'','CATATAN BILIK':note||'','TRIP':[tripId],'LOKASI / CITY':lokasi}};
   try{
@@ -1813,7 +1813,7 @@ async function submitNewRoom(){
       }
     }
   }catch(e){ alert('Ralat semasa mencipta bilik: '+e.message); }
-  finally{ if(btn){ btn.textContent='Cipta Bilik'; btn.disabled=false; } }
+  finally{ // removed button loading
 }
 function openAddLocationModal(){ const loc=prompt('Sila masukkan nama lokasi baharu (contoh: TAIF, JEDDAH, KL):'); if(loc&&loc.trim()){ const up=loc.trim().toUpperCase(); if(!customLocations.includes(up)) customLocations.push(up); localStorage.setItem('effah_custom_locations',JSON.stringify(customLocations)); const sel=document.getElementById('newRoomLokasi'); if(sel){ const exists=[...sel.options].some(o=>o.value===up); if(!exists){ const opt=document.createElement('option'); opt.value=up; opt.textContent=up; sel.appendChild(opt); } } activeLocation=up; localStorage.setItem('effah_active_location',activeLocation); renderLocationTabs(); renderRoomingGrid(); renderNamelist(); alert('Lokasi "'+up+'" ditambah. PENTING: Tambah option "'+up+'" dalam Airtable > ROOMING LIST > LOKASI / CITY sekali sahaja.'); } }
 function deleteCustomLocation(loc){ if(!confirm(`Adakah anda pasti ingin memadamkan lokasi ${loc}?`)) return; customLocations=customLocations.filter(l=>l!==loc); localStorage.setItem('effah_custom_locations',JSON.stringify(customLocations)); if(activeLocation===loc) activeLocation='MEKAH'; renderLocationTabs(); renderRoomingGrid(); renderNamelist(); }
@@ -3090,8 +3090,7 @@ function cancelVisaDownload(){
   if(cancelBtn2) cancelBtn2.classList.add('hidden');
   if(closeBtn) closeBtn.classList.remove('hidden');
   // Reset main button
-  const mainBtn=document.getElementById('btnDownloadVisas');
-  if(mainBtn){ mainBtn.disabled=false; mainBtn.innerHTML=mainBtn.getAttribute('data-original')||'⬇ Download Visas (<span id="visaCountBadge">0</span>)'; }
+  // No main button reset needed - buttons never go into loading state
   setTimeout(()=>{ closeVisaModal(); }, 1500);
 }
 function closeVisaModal(){
@@ -3115,8 +3114,8 @@ async function downloadAllPassports(){
 }
 async function _downloadAllDocs(fieldName, label){
 
-  const btn=document.getElementById('btnDownloadVisas');
-  const originalText=btn?.innerHTML;
+  // Buttons no longer show loading - modal only
+  const originalText='';
   try{
     // Filter jemaah with VISA COPY
     let withVisa = allRoomingJemaah.filter(j=> j.fields && j.fields[fieldName] && Array.isArray(j.fields[fieldName]) && j.fields[fieldName].length>0);
@@ -3185,7 +3184,7 @@ async function _downloadAllDocs(fieldName, label){
       }
     };
 
-    if(btn){ btn.setAttribute('data-original', btn.innerHTML); btn.disabled=true; btn.innerHTML='⏳ Loading pdf-lib...'; }
+    // No button loading - only modal progress
 
     const pdfLib=await loadPdfLib();
     const {PDFDocument}=pdfLib;
@@ -3211,7 +3210,7 @@ async function _downloadAllDocs(fieldName, label){
         const isPdf = filename.toLowerCase().endsWith('.pdf') || (att.type && att.type.includes('pdf'));
 
         try{
-          if(btn) btn.innerHTML=`⏳ ${i+1}/${withVisa.length} ${nama.substring(0,12)}...`;
+          // Button text stays same, modal shows progress
           const buffer=await fetchWithRetry(url);
           
           if(isPdf){
@@ -3312,7 +3311,7 @@ async function _downloadAllDocs(fieldName, label){
     }
 
     updateProgress(withVisa.length, withVisa.length, 'Merging PDF...', 'Compiling final PDF...');
-    if(btn) btn.innerHTML='⏳ Compiling PDF...';
+
 
     const pdfBytes=await mergedPdf.save();
     const blob=new Blob([pdfBytes], {type:'application/pdf'});
@@ -3328,6 +3327,7 @@ async function _downloadAllDocs(fieldName, label){
     link.remove();
     setTimeout(()=>URL.revokeObjectURL(link.href), 10000);
 
+    // Done - no button text change
     document.getElementById('visaProgressLog').innerHTML+=`<div class="text-emerald-600 font-bold mt-2">✓ Done! ${successCount} files merged, ${failList.length} failed</div>`;
     if(failList.length>0){
       document.getElementById('visaProgressLog').innerHTML+=`<div class="text-red-500">${failList.join('<br>')}</div>`;
@@ -3339,7 +3339,7 @@ async function _downloadAllDocs(fieldName, label){
       if(m) m.classList.add('hidden');
     }, 4000);
 
-    if(btn){ btn.disabled=false; btn.innerHTML=originalText; }
+    // Keep buttons enabled - no loading state
 
     if(failList.length>0){
       console.warn('Failed visas', failList);
@@ -3353,7 +3353,7 @@ async function _downloadAllDocs(fieldName, label){
     alert(`Gagal download ${label}: `+e.message);
     const m=document.getElementById('visaDownloadModal');
     if(m) m.classList.add('hidden');
-    if(btn){ btn.disabled=false; btn.innerHTML=originalText; }
+    // Keep buttons enabled - no loading state
   }
 }
 
