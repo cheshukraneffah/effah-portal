@@ -476,7 +476,7 @@ function renderRoomingHTML(){
               <div class="hidden" id="roomingBadgesHidden"></div>
             </div>
             <div class="flex items-center gap-1 flex-wrap">
-              <div class="flex gap-1"><button onclick="generateRoomingPrint('landscape')" class="px-2.5 py-1 bg-white border border-slate-200 rounded-full text-[10px] font-bold hover:bg-slate-50">Print Landscape</button><button onclick="generateRoomingPrint('portrait')" class="px-2.5 py-1 bg-white border border-slate-200 rounded-full text-[10px] font-bold hover:bg-slate-50">Print Portrait</button><button onclick="downloadAllVisas()" id="btnDownloadVisas" class="px-2.5 py-1 bg-[#064E3B] text-white border border-emerald-700 rounded-full text-[10px] font-bold hover:bg-emerald-800 flex items-center gap-1"><span>⬇</span> Download Visas (<span id="visaCountBadge">0</span>)</button></div>
+              <div class="flex gap-1"><button onclick="generateRoomingPrint('landscape')" class="px-2.5 py-1 bg-white border border-slate-200 rounded-full text-[10px] font-bold hover:bg-slate-50">Print Landscape</button><button onclick="generateRoomingPrint('portrait')" class="px-2.5 py-1 bg-white border border-slate-200 rounded-full text-[10px] font-bold hover:bg-slate-50">Print Portrait</button><button onclick="downloadAllVisas()" id="btnDownloadVisas" class="px-2.5 py-1 bg-white border border-slate-200 rounded-full text-[10px] font-bold hover:bg-slate-50 flex items-center gap-1">⬇ Download Visas (<span id="visaCountBadge">0</span>)</button><button onclick="downloadAllPassports()" id="btnDownloadPassports" class="px-2.5 py-1 bg-white border border-slate-200 rounded-full text-[10px] font-bold hover:bg-slate-50 flex items-center gap-1">⬇ Download Passports (<span id="passportCountBadge">0</span>)</button></div>
               <button onclick="openCopyRoomsModal()" class="px-2.5 py-1 bg-white border border-slate-200 rounded-full text-[10px] font-bold hover:bg-slate-50">Copy Bilik</button>
               <button onclick="autoAssignRooming()" class="px-2.5 py-1 bg-slate-100 border border-slate-200 text-slate-700 rounded-full text-[10px] font-bold hover:bg-slate-200">Auto Assign</button>
               <button onclick="openNewRoomModal()" class="px-2.5 py-1 bg-[#7A0C2E] text-white rounded-full text-[10px] font-bold hover:bg-[#5a0922]">+ Bilik Baru</button>
@@ -3101,14 +3101,27 @@ function closeVisaModal(){
 }
 
 
+
+async function downloadAllDocs(fieldName, label){
+  const field = fieldName || 'VISA COPY';
+  const badgeLabel = label || field;
+  return _downloadAllDocs(field, badgeLabel);
+}
 async function downloadAllVisas(){
+  return _downloadAllDocs('VISA COPY', 'Visas');
+}
+async function downloadAllPassports(){
+  return _downloadAllDocs('PASSPORT COPY', 'Passports');
+}
+async function _downloadAllDocs(fieldName, label){
+
   const btn=document.getElementById('btnDownloadVisas');
   const originalText=btn?.innerHTML;
   try{
     // Filter jemaah with VISA COPY
-    let withVisa = allRoomingJemaah.filter(j=> j.fields && j.fields['VISA COPY'] && Array.isArray(j.fields['VISA COPY']) && j.fields['VISA COPY'].length>0);
+    let withVisa = allRoomingJemaah.filter(j=> j.fields && j.fields[fieldName] && Array.isArray(j.fields[fieldName]) && j.fields[fieldName].length>0);
     if(withVisa.length===0){
-      alert('Tiada VISA COPY dalam trip ini.\n\nPastikan field VISA COPY ada attachment PDF/Image.');
+      alert(`Tiada ${fieldName} dalam trip ini.\n\nPastikan field ${fieldName} ada attachment PDF/Image.`);
       return;
     }
     // Sort by NAMA
@@ -3129,7 +3142,7 @@ async function downloadAllVisas(){
       modal.innerHTML=`
         <div class="bg-white rounded-2xl p-5 max-w-md w-full shadow-2xl">
           <div class="flex justify-between items-center mb-3">
-            <h3 class="font-bold text-[13px]">Downloading Visas...</h3>
+            <h3 class="font-bold text-[13px]" id="visaModalTitle">Downloading ${label}...</h3>
             <button id="visaCancelBtn" onclick="cancelVisaDownload()" class="px-3 py-1 bg-red-50 border border-red-200 text-red-600 rounded-full text-[10px] font-bold hover:bg-red-100">✕ Cancel</button>
           </div>
           <div class="w-full bg-slate-100 rounded-full h-3 mb-3 overflow-hidden"><div id="visaProgressBar" class="h-3 bg-emerald-600 rounded-full transition-all" style="width:0%"></div></div>
@@ -3155,6 +3168,7 @@ async function downloadAllVisas(){
       if(closeBtn) closeBtn.classList.add('hidden');
       document.getElementById('visaProgressLog').innerHTML='';
       document.getElementById('visaProgressBar').style.width='0%';
+      const titleEl=document.getElementById('visaModalTitle'); if(titleEl) titleEl.textContent=`Downloading ${label}...`;
     }
 
     const updateProgress=(curr,total,name,log)=>{
@@ -3187,7 +3201,7 @@ async function downloadAllVisas(){
       const mId=jRec.fields['M_ID']||jRec.fields['NO KP']||'';
       updateProgress(i, withVisa.length, nama, `Fetching: ${nama}`);
 
-      const attachments=jRec.fields['VISA COPY']||[];
+      const attachments=jRec.fields[fieldName]||[];
       // Take all attachments for this jemaah (could be 1-3 files)
       for(let attIdx=0; attIdx<attachments.length; attIdx++){
         const att=attachments[attIdx];
@@ -3255,7 +3269,7 @@ async function downloadAllVisas(){
     const pdfBytes=await mergedPdf.save();
     const blob=new Blob([pdfBytes], {type:'application/pdf'});
     const tripName=(window.selectedTripRecord?.fields?.['TRIP NAME']||window.selectedTripRecord?.fields?.['NAMA TRIP']||localStorage.getItem('effah_active_trip_id')||'TRIP').replace(/[^a-zA-Z0-9_-]/g,'_');
-    const fileName=`VISAS_${tripName}_${withVisa.length}pax_${new Date().toISOString().slice(0,10)}.pdf`;
+    const fileName=`${label.toUpperCase()}_${tripName}_${withVisa.length}pax_${new Date().toISOString().slice(0,10)}.pdf`;
     
     // Download
     const link=document.createElement('a');
@@ -3283,12 +3297,12 @@ async function downloadAllVisas(){
       console.warn('Failed visas', failList);
       alert(`Selesai! ${successCount} visa berjaya, ${failList.length} gagal.\n\nGagal:\n${failList.slice(0,10).join('\n')}${failList.length>10?'\n...and '+(failList.length-10)+' more':''}`);
     } else {
-      console.log(`Download All Visas OK: ${fileName} ${(blob.size/1024/1024).toFixed(2)}MB`);
+      console.log(`Download All ${label} OK: ${fileName} ${(blob.size/1024/1024).toFixed(2)}MB`);
     }
 
   }catch(e){
     console.error('downloadAllVisas error', e);
-    alert('Gagal download visas: '+e.message);
+    alert(`Gagal download ${label}: `+e.message);
     const m=document.getElementById('visaDownloadModal');
     if(m) m.classList.add('hidden');
     if(btn){ btn.disabled=false; btn.innerHTML=originalText; }
@@ -3297,9 +3311,12 @@ async function downloadAllVisas(){
 
 function updateVisaCountBadge(){
   try{
-    const count=allRoomingJemaah.filter(j=> j.fields && j.fields['VISA COPY'] && j.fields['VISA COPY'].length>0).length;
-    const badge=document.getElementById('visaCountBadge');
-    if(badge) badge.textContent=count;
+    const visaCount=allRoomingJemaah.filter(j=> j.fields && j.fields['VISA COPY'] && j.fields['VISA COPY'].length>0).length;
+    const passCount=allRoomingJemaah.filter(j=> j.fields && j.fields['PASSPORT COPY'] && j.fields['PASSPORT COPY'].length>0).length;
+    const vBadge=document.getElementById('visaCountBadge');
+    const pBadge=document.getElementById('passportCountBadge');
+    if(vBadge) vBadge.textContent=visaCount;
+    if(pBadge) pBadge.textContent=passCount;
   }catch(e){}
 }
 
@@ -3314,5 +3331,7 @@ if(typeof fetchRoomingData==='function'){
   };
 }
 window.downloadAllVisas=downloadAllVisas;
+window.downloadAllPassports=downloadAllPassports;
+window.downloadAllDocs=downloadAllDocs;
 window.updateVisaCountBadge=updateVisaCountBadge;
 setTimeout(updateVisaCountBadge, 2000);
