@@ -3598,6 +3598,70 @@ async function downloadHotelDocs(lokasi, hotelName, fieldName, label){
 }
 window.downloadHotelDocs=downloadHotelDocs;
 
+
+function getFieldAttachments(jFields, names){
+  if(!jFields) return null;
+  for(let n of names){
+    if(jFields[n] && Array.isArray(jFields[n]) && jFields[n].length>0) return jFields[n];
+  }
+  const keys=Object.keys(jFields);
+  for(let k of keys){
+    const up=k.toUpperCase().trim();
+    for(let t of names){
+      if(up===t.toUpperCase().trim() || up.includes(t.toUpperCase().trim())){
+        const v=jFields[k];
+        if(Array.isArray(v)&&v.length>0) return v;
+      }
+    }
+  }
+  return null;
+}
+function updateVisaCountBadge(){
+  try{
+    const visaNames=['VISA COPY','VISA','VISA_COPY'];
+    const passNames=['PASSPORT COPY','PASSPORT','PASSPORT_COPY','PASSPORT SCAN'];
+    let visaCount=0, passCount=0;
+    (allRoomingJemaah||[]).forEach(j=>{
+      if(getFieldAttachments(j.fields||{}, visaNames)) visaCount++;
+      if(getFieldAttachments(j.fields||{}, passNames)) passCount++;
+    });
+    console.log(`Badge count - allRoomingJemaah: ${allRoomingJemaah?.length} Visa:${visaCount} Passport:${passCount}`);
+    // Also check direct if available
+    if(window._allJemaahDirect && window._allJemaahDirect.length>0){
+      const dv = window._allJemaahDirect.filter(r=> getFieldAttachments(r.fields||{}, visaNames)).length;
+      const dp = window._allJemaahDirect.filter(r=> getFieldAttachments(r.fields||{}, passNames)).length;
+      console.log(`Badge direct: ${window._allJemaahDirect.length} Visa:${dv} Passport:${dp}`);
+      if(dv>visaCount) visaCount=dv;
+      if(dp>passCount) passCount=dp;
+    }
+    const vBadge=document.getElementById('visaCountBadge');
+    const pBadge=document.getElementById('passportCountBadge');
+    if(vBadge) vBadge.textContent=visaCount;
+    if(pBadge) pBadge.textContent=passCount;
+  }catch(e){ console.error('updateVisaCountBadge error', e); }
+}
+async function updatePassportCountFromDirectFetch(){
+  try{
+    const base=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base')||localStorage.getItem('effah_base_id');
+    const pat=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
+    const tripId=localStorage.getItem('effah_active_trip_id')||window.selectedTripRecord?.id||document.getElementById('roomingTripSelect')?.value;
+    if(!base||!pat||!tripId){ console.log('Direct fetch missing', {base:!!base, pat:!!pat, tripId}); return; }
+    let allRecs=[]; let offset='';
+    do{
+      const filter='FIND("'+tripId+'",ARRAYJOIN({TRIP}))';
+      const url='https://api.airtable.com/v0/'+base+'/DATA%20JEMAAH%20UMRAH?filterByFormula='+encodeURIComponent(filter)+'&pageSize=100'+(offset?'&offset='+offset:'');
+      const res=await fetch(url,{headers:{Authorization:'Bearer '+pat}});
+      if(!res.ok){ console.error('Direct fetch fail', res.status); break; }
+      const data=await res.json();
+      if(data.records) allRecs=allRecs.concat(data.records);
+      offset=data.offset||'';
+    }while(offset);
+    console.log('Direct fetch total:', allRecs.length);
+    window._allJemaahDirect=allRecs;
+    updateVisaCountBadge();
+  }catch(e){ console.error('Direct fetch error', e); }
+}
+
 window.downloadAllVisas=downloadAllVisas;
 window.downloadAllPassports=downloadAllPassports;
 window.downloadAllDocs=downloadAllDocs;
