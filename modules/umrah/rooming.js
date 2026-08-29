@@ -3125,47 +3125,24 @@ async function downloadAllPassports(){
   return _downloadAllDocs('PASSPORT COPY', 'Passports');
 }
 async function _downloadAllDocs(fieldName, label){
-  try{
-    // Build jemaahId -> hotel mapping from allRoomingRecords
-    const jemaahToHotel = {};
-    const jemaahToLocation = {};
-    try{
-      (allRoomingRecords||[]).forEach(room=>{
-        const hotel = (room.fields['HOTEL NAME']||room.fields['HOTEL']||'').trim() || 'NO_HOTEL';
-        const lokasi = (room.fields['LOKASI / CITY']||room.fields['LOKASI']||'MEKAH').trim() || 'MEKAH';
-        const jemaahIds = room.fields['JEMAAH']||[];
-        jemaahIds.forEach(jId=>{
-          jemaahToHotel[jId] = hotel;
-          jemaahToLocation[jId] = lokasi;
-        });
-      });
-      console.log('Hotel mapping built:', Object.keys(jemaahToHotel).length, 'jemaah mapped');
-    }catch(e){ console.error('Hotel mapping error', e); }
 
+  const btn=document.getElementById('btnDownloadVisas');
+  const originalText=btn?.innerHTML;
+  try{
+    // Filter jemaah with VISA COPY
     let withVisa = allRoomingJemaah.filter(j=> j.fields && j.fields[fieldName] && Array.isArray(j.fields[fieldName]) && j.fields[fieldName].length>0);
     if(withVisa.length===0){
       alert(`Tiada ${fieldName} dalam trip ini.\n\nPastikan field ${fieldName} ada attachment PDF/Image.`);
       return;
     }
-    // Group by hotel
-    const grouped = {};
-    withVisa.forEach(j=>{
-      const hotel = jemaahToHotel[j.id] || j.fields['HOTEL NAME'] || 'NO_HOTEL';
-      const lokasi = jemaahToLocation[j.id] || j.fields['LOKASI / CITY'] || 'MEKAH';
-      const key = `${lokasi}__${hotel}`;
-      if(!grouped[key]) grouped[key] = {lokasi, hotel, jemaah: []};
-      grouped[key].jemaah.push(j);
-    });
-    console.log('Grouped by hotel:', Object.keys(grouped).map(k=>`${k}: ${grouped[k].jemaah.length} pax`).join(', '));
-    
-    Object.values(grouped).forEach(g=>{
-      g.jemaah = g.jemaah.sort((a,b)=>{
-        const na=getJemaahName(a.fields).toUpperCase();
-        const nb=getJemaahName(b.fields).toUpperCase();
-        return na.localeCompare(nb);
-      });
+    // Sort by NAMA
+    withVisa = withVisa.sort((a,b)=>{
+      const na=getJemaahName(a.fields).toUpperCase();
+      const nb=getJemaahName(b.fields).toUpperCase();
+      return na.localeCompare(nb);
     });
 
+    // Create progress modal
     window._visaDownloadCancelled=false;
     window._visaAbortController=new AbortController();
     let modal=document.getElementById('visaDownloadModal');
@@ -3176,7 +3153,7 @@ async function _downloadAllDocs(fieldName, label){
       modal.innerHTML=`
         <div class="bg-white rounded-2xl p-5 max-w-md w-full shadow-2xl">
           <div class="flex justify-between items-center mb-3">
-            <h3 class="font-bold text-[13px]" id="visaModalTitle">Downloading ${label} per Hotel...</h3>
+            <h3 class="font-bold text-[13px]" id="visaModalTitle">Downloading ${label}...</h3>
             <button id="visaCancelBtn" onclick="cancelVisaDownload()" class="px-3 py-1 bg-red-50 border border-red-200 text-red-600 rounded-full text-[10px] font-bold hover:bg-red-100">✕ Cancel</button>
           </div>
           <div class="w-full bg-slate-100 rounded-full h-3 mb-3 overflow-hidden"><div id="visaProgressBar" class="h-3 bg-emerald-600 rounded-full transition-all" style="width:0%"></div></div>
@@ -3200,41 +3177,156 @@ async function _downloadAllDocs(fieldName, label){
       if(cancelBtn) cancelBtn.classList.remove('hidden');
       if(cancelBtn2) cancelBtn2.classList.remove('hidden');
       if(closeBtn) closeBtn.classList.add('hidden');
-      const logEl2=document.getElementById('visaProgressLog');
-      if(logEl2) logEl2.innerHTML='';
-      const bar=document.getElementById('visaProgressBar');
-      if(bar) bar.style.width='0%';
-      const titleEl=document.getElementById('visaModalTitle');
-      if(titleEl) titleEl.textContent=`Downloading ${label} per Hotel...`;
+      document.getElementById('visaProgressLog').innerHTML='';
+      document.getElementById('visaProgressBar').style.width='0%';
+      const titleEl=document.getElementById('visaModalTitle'); if(titleEl) titleEl.textContent=`Downloading ${label}...`;
     }
 
     const updateProgress=(curr,total,name,log)=>{
       const pct=Math.round(curr/total*100);
-      const bar=document.getElementById('visaProgressBar');
-      if(bar) bar.style.width=pct+'%';
-      const txt=document.getElementById('visaProgressText');
-      if(txt) txt.textContent=curr+' / '+total+' ('+pct+'%)';
-      const nameEl=document.getElementById('visaProgressName');
-      if(nameEl) nameEl.textContent=name||'-';
+      document.getElementById('visaProgressBar').style.width=pct+'%';
+      document.getElementById('visaProgressText').textContent=curr+' / '+total+' ('+pct+'%)';
+      document.getElementById('visaProgressName').textContent=name||'-';
       if(log){
         const logEl=document.getElementById('visaProgressLog');
-        if(logEl){
-          const div=document.createElement('div');
-          div.textContent=log;
-          logEl.appendChild(div);
-          logEl.scrollTop=logEl.scrollHeight;
-        }
+        const div=document.createElement('div');
+        div.textContent=log;
+        logEl.appendChild(div);
+        logEl.scrollTop=logEl.scrollHeight;
       }
     };
 
+    if(btn){ btn.setAttribute('data-original', btn.innerHTML); btn.disabled=true; btn.innerHTML='⏳ Loading pdf-lib...'; }
+
     const pdfLib=await loadPdfLib();
     const {PDFDocument}=pdfLib;
+    const mergedPdf=await PDFDocument.create();
 
-    let totalGroups = Object.keys(grouped).length;
-    let groupIdx=0;
-    let allFailList=[];
-    let allSuccessCount=0;
+    let successCount=0;
+    let failList=[];
 
+    for(let i=0;i<withVisa.length;i++){
+      if(window._visaDownloadCancelled){ throw new Error('Cancelled by user'); }
+      const jRec=withVisa[i];
+      const nama=getJemaahName(jRec.fields);
+      const mId=jRec.fields['M_ID']||jRec.fields['NO KP']||'';
+      updateProgress(i, withVisa.length, nama, `Fetching: ${nama}`);
+
+      const attachments=jRec.fields[fieldName]||[];
+      // Take all attachments for this jemaah (could be 1-3 files)
+      for(let attIdx=0; attIdx<attachments.length; attIdx++){
+        const att=attachments[attIdx];
+        if(!att||!att.url) continue;
+        const url=att.url;
+        const filename=att.filename||'';
+        const isPdf = filename.toLowerCase().endsWith('.pdf') || (att.type && att.type.includes('pdf'));
+
+        try{
+          if(btn) btn.innerHTML=`⏳ ${i+1}/${withVisa.length} ${nama.substring(0,12)}...`;
+          const buffer=await fetchWithRetry(url);
+          
+          if(isPdf){
+            try{
+              const srcPdf=await PDFDocument.load(buffer, {ignoreEncryption:true});
+              const srcPages = srcPdf.getPages();
+              // Standard size - A4 (595.28 x 841.89) or Letter (612 x 792) - using A4 as requested
+              const A4_WIDTH = 595.28;
+              const A4_HEIGHT = 841.89;
+              // If user wants Letter: const LETTER_WIDTH=612, LETTER_HEIGHT=792
+              
+              for(let pIdx=0; pIdx<srcPdf.getPageCount(); pIdx++){
+                const srcPage = srcPages[pIdx];
+                const {width: origW, height: origH} = srcPage.getSize();
+                
+                // Copy page
+                const [copiedPage] = await mergedPdf.copyPages(srcPdf, [pIdx]);
+                
+                // Standardize: if original not A4, create new A4 page and scale embed
+                const needsResize = Math.abs(origW - A4_WIDTH) > 5 || Math.abs(origH - A4_HEIGHT) > 5;
+                
+                if(needsResize){
+                  // Create new A4 page and embed copied page scaled to fit
+                  const newPage = mergedPdf.addPage([A4_WIDTH, A4_HEIGHT]);
+                  // Calculate scale to fit with margin
+                  const margin = 20;
+                  const availW = A4_WIDTH - margin*2;
+                  const availH = A4_HEIGHT - 40; // leave footer space
+                  const scale = Math.min(availW/origW, availH/origH);
+                  const drawW = origW * scale;
+                  const drawH = origH * scale;
+                  const x = (A4_WIDTH - drawW)/2;
+                  const y = (A4_HEIGHT - drawH)/2 + 10;
+                  
+                  // Embed the copied page as XObject
+                  const embeddedPage = await mergedPdf.embedPage(copiedPage);
+                  newPage.drawPage(embeddedPage, {x, y, width: drawW, height: drawH});
+                  // Footer
+                  newPage.drawText(`${i+1}. ${nama} ${mId? '('+mId+')':''} - ${filename} p${pIdx+1}`, {x:30, y:15, size:7, color: pdfLib.rgb(0.3,0.3,0.3)});
+                } else {
+                  // Already A4-ish, just add with footer
+                  const newPage = mergedPdf.addPage(copiedPage);
+                  // Add footer overlay - draw on top
+                  try{
+                    newPage.drawText(`${i+1}. ${nama} ${mId? '('+mId+')':''} - ${filename} p${pIdx+1}`, {x:30, y:15, size:7, color: pdfLib.rgb(0.3,0.3,0.3)});
+                  }catch(e){}
+                }
+              }
+              successCount++;
+              updateProgress(i+1, withVisa.length, nama, `✓ PDF ${filename} - ${srcPdf.getPageCount()} pages → A4 standardized`);
+            }catch(pdfErr){
+              console.error('PDF load failed', filename, pdfErr);
+              failList.push(`${nama} - ${filename}: PDF corrupt`);
+              updateProgress(i+1, withVisa.length, nama, `✗ PDF failed ${filename}`);
+            }
+          } else {
+            // Image - JPG/PNG
+            try{
+              let img;
+              const lower=filename.toLowerCase();
+              if(lower.endsWith('.png')){
+                img=await mergedPdf.embedPng(buffer);
+              } else {
+                img=await mergedPdf.embedJpg(buffer);
+              }
+              // Standardize to A4 (or Letter) - user requested A4/Letter fit
+              const A4_WIDTH = 595.28;
+              const A4_HEIGHT = 841.89;
+              const page=mergedPdf.addPage([A4_WIDTH, A4_HEIGHT]); // A4 standardized
+              const {width, height}=page.getSize();
+              // Scale image to fit A4 with margins - maintain aspect ratio
+              const margin = 30;
+              const footerSpace = 30;
+              const availW = width - margin*2;
+              const availH = height - margin*2 - footerSpace;
+              const imgDims=img.scaleToFit(availW, availH);
+              page.drawImage(img, {x: (width-imgDims.width)/2, y: (height-imgDims.height)/2 + footerSpace/2 + 5, width: imgDims.width, height: imgDims.height});
+              // Footer with name + border
+              page.drawText(`${i+1}. ${nama} ${mId? '('+mId+')':''} - ${filename}`, {x:30, y:15, size:7, color: pdfLib.rgb(0.3,0.3,0.3)});
+              // Optional thin border for neat look
+              try{
+                page.drawRectangle({x: margin-5, y: footerSpace, width: availW+10, height: availH+10, borderColor: pdfLib.rgb(0.9,0.9,0.9), borderWidth: 0.5});
+              }catch(e){}
+              successCount++;
+              updateProgress(i+1, withVisa.length, nama, `✓ Image ${filename}`);
+            }catch(imgErr){
+              console.error('Image embed failed', filename, imgErr);
+              failList.push(`${nama} - ${filename}: Image failed`);
+              updateProgress(i+1, withVisa.length, nama, `✗ Image failed ${filename}`);
+            }
+          }
+        }catch(fetchErr){
+          console.error('Fetch failed', url, fetchErr);
+          failList.push(`${nama} - ${filename}: Fetch failed ${fetchErr.message}`);
+          updateProgress(i+1, withVisa.length, nama, `✗ Fetch failed ${filename}`);
+        }
+      }
+    }
+
+    updateProgress(withVisa.length, withVisa.length, 'Merging PDF...', 'Compiling final PDF...');
+    if(btn) btn.innerHTML='⏳ Compiling PDF...';
+
+    const pdfBytes=await mergedPdf.save();
+    const blob=new Blob([pdfBytes], {type:'application/pdf'});
     let rawTripName = window.selectedTripRecord?.fields?.['TRIP NAME'] || window.selectedTripRecord?.fields?.['NAMA TRIP'] || window.selectedTripRecord?.fields?.['Name'] || '';
     if(!rawTripName || rawTripName.startsWith('rec')){
       const sel = document.getElementById('roomingTripSelect');
@@ -3252,164 +3344,47 @@ async function _downloadAllDocs(fieldName, label){
     const mm = String(now.getMonth()+1).padStart(2,'0');
     const yy = String(now.getFullYear()).slice(-2);
     const dateStr = `${dd}-${mm}-${yy}`;
+    const fileName=`${label.toUpperCase()}_${tripName}_${dateStr}.pdf`;
+    
+    // Download
+    const link=document.createElement('a');
+    link.href=URL.createObjectURL(blob);
+    link.download=fileName;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(()=>URL.revokeObjectURL(link.href), 10000);
 
-    for(let groupKey of Object.keys(grouped)){
-      if(window._visaDownloadCancelled) throw new Error('Cancelled by user');
-      groupIdx++;
-      const group = grouped[groupKey];
-      const hotelClean = group.hotel.replace(/[^a-zA-Z0-9 \-_]/g,'').replace(/\s+/g,'_').substring(0,30) || 'NO_HOTEL';
-      const lokasiClean = group.lokasi.replace(/[^a-zA-Z0-9 \-_]/g,'').replace(/\s+/g,'_').substring(0,15) || 'MEKAH';
-      
-      updateProgress(groupIdx-1, totalGroups, `${group.lokasi} - ${group.hotel} (${group.jemaah.length} pax)`, `Starting ${group.lokasi} - ${group.hotel}: ${group.jemaah.length} pax`);
-      
-      const mergedPdf=await PDFDocument.create();
-      let successCount=0;
-      let failList=[];
-      const A4_WIDTH = 595.28;
-      const A4_HEIGHT = 841.89;
-
-      for(let i=0;i<group.jemaah.length;i++){
-        if(window._visaDownloadCancelled) throw new Error('Cancelled by user');
-        const jRec=group.jemaah[i];
-        const nama=getJemaahName(jRec.fields);
-        const mId=jRec.fields['M_ID']||jRec.fields['NO KP']||'';
-        updateProgress(groupIdx-1 + (i/group.jemaah.length)*(1/totalGroups), totalGroups, `${group.hotel} - ${nama}`, `Fetching: ${nama} (${i+1}/${group.jemaah.length})`);
-
-        const attachments=jRec.fields[fieldName]||[];
-        for(let attIdx=0; attIdx<attachments.length; attIdx++){
-          const att=attachments[attIdx];
-          if(!att||!att.url) continue;
-          const url=att.url;
-          const filename=att.filename||'';
-          const isPdf = filename.toLowerCase().endsWith('.pdf') || (att.type && att.type.includes('pdf'));
-
-          try{
-            const buffer=await fetchWithRetry(url);
-            
-            if(isPdf){
-              try{
-                const srcPdf=await PDFDocument.load(buffer, {ignoreEncryption:true});
-                for(let pIdx=0; pIdx<srcPdf.getPageCount(); pIdx++){
-                  if(window._visaDownloadCancelled) throw new Error('Cancelled by user');
-                  const srcPage = srcPdf.getPages()[pIdx];
-                  const {width: origW, height: origH} = srcPage.getSize();
-                  const [copiedPage] = await mergedPdf.copyPages(srcPdf, [pIdx]);
-                  const needsResize = Math.abs(origW - A4_WIDTH) > 5 || Math.abs(origH - A4_HEIGHT) > 5;
-                  if(needsResize){
-                    const newPage = mergedPdf.addPage([A4_WIDTH, A4_HEIGHT]);
-                    const margin = 20;
-                    const availW = A4_WIDTH - margin*2;
-                    const availH = A4_HEIGHT - 40;
-                    const scale = Math.min(availW/origW, availH/origH);
-                    const drawW = origW * scale;
-                    const drawH = origH * scale;
-                    const x = (A4_WIDTH - drawW)/2;
-                    const y = (A4_HEIGHT - drawH)/2 + 10;
-                    const embeddedPage = await mergedPdf.embedPage(copiedPage);
-                    newPage.drawPage(embeddedPage, {x, y, width: drawW, height: drawH});
-                    newPage.drawText(`${i+1}. ${nama} ${mId? '('+mId+')':''} - ${filename} p${pIdx+1} - ${group.hotel}`, {x:30, y:15, size:7, color: pdfLib.rgb(0.3,0.3,0.3)});
-                  } else {
-                    const newPage = mergedPdf.addPage(copiedPage);
-                    try{ newPage.drawText(`${i+1}. ${nama} ${mId? '('+mId+')':''} - ${filename} p${pIdx+1} - ${group.hotel}`, {x:30, y:15, size:7, color: pdfLib.rgb(0.3,0.3,0.3)}); }catch(e){}
-                  }
-                }
-                successCount++;
-              }catch(pdfErr){
-                failList.push(`${nama} - ${filename}: PDF corrupt`);
-              }
-            } else {
-              try{
-                let img;
-                const lower=filename.toLowerCase();
-                if(lower.endsWith('.png')){ img=await mergedPdf.embedPng(buffer); } else { img=await mergedPdf.embedJpg(buffer); }
-                const page=mergedPdf.addPage([A4_WIDTH, A4_HEIGHT]);
-                const margin = 30;
-                const footerSpace = 30;
-                const availW = A4_WIDTH - margin*2;
-                const availH = A4_HEIGHT - margin*2 - footerSpace;
-                const imgDims=img.scaleToFit(availW, availH);
-                page.drawImage(img, {x: (A4_WIDTH-imgDims.width)/2, y: (A4_HEIGHT-imgDims.height)/2 + footerSpace/2 + 5, width: imgDims.width, height: imgDims.height});
-                page.drawText(`${i+1}. ${nama} ${mId? '('+mId+')':''} - ${filename} - ${group.hotel}`, {x:30, y:15, size:7, color: pdfLib.rgb(0.3,0.3,0.3)});
-                try{ page.drawRectangle({x: margin-5, y: footerSpace, width: availW+10, height: availH+10, borderColor: pdfLib.rgb(0.9,0.9,0.9), borderWidth: 0.5}); }catch(e){}
-                successCount++;
-              }catch(imgErr){
-                failList.push(`${nama} - ${filename}: Image failed`);
-              }
-            }
-          }catch(fetchErr){
-            if(fetchErr.message==='Cancelled by user') throw fetchErr;
-            failList.push(`${nama} - ${filename}: Fetch failed`);
-          }
-        }
-      }
-
-      const pdfBytes=await mergedPdf.save();
-      const blob=new Blob([pdfBytes], {type:'application/pdf'});
-      const fileName=`${label.toUpperCase()}_${tripName}_${lokasiClean}_${hotelClean}_${dateStr}.pdf`;
-      
-      const link=document.createElement('a');
-      link.href=URL.createObjectURL(blob);
-      link.download=fileName;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      setTimeout(()=>URL.revokeObjectURL(link.href), 10000);
-
-      allSuccessCount+=successCount;
-      allFailList=allFailList.concat(failList.map(f=>`[${group.hotel}] ${f}`));
-      
-      updateProgress(groupIdx, totalGroups, `Saved: ${fileName}`, `✓ ${group.hotel}: ${successCount} files - ${(blob.size/1024/1024).toFixed(2)} MB`);
-      
-      await new Promise(r=>setTimeout(r, 800));
+    document.getElementById('visaProgressLog').innerHTML+=`<div class="text-emerald-600 font-bold mt-2">✓ Done! ${successCount} files merged, ${failList.length} failed</div>`;
+    if(failList.length>0){
+      document.getElementById('visaProgressLog').innerHTML+=`<div class="text-red-500">${failList.join('<br>')}</div>`;
     }
+    updateProgress(withVisa.length, withVisa.length, `Saved: ${fileName}`, `Total size: ${(blob.size/1024/1024).toFixed(2)} MB`);
 
-    const logEl=document.getElementById('visaProgressLog');
-    if(logEl){
-      logEl.innerHTML+=`<div class="text-emerald-600 font-bold mt-2">✓ All Done! ${totalGroups} hotels, ${allSuccessCount} files</div>`;
-      if(allFailList.length>0){ logEl.innerHTML+=`<div class="text-red-500">${allFailList.join('<br>')}</div>`; }
+    setTimeout(()=>{
+      const m=document.getElementById('visaDownloadModal');
+      if(m) m.classList.add('hidden');
+    }, 4000);
+
+    if(btn){ btn.disabled=false; btn.innerHTML=originalText; }
+
+    if(failList.length>0){
+      console.warn('Failed visas', failList);
+      alert(`Selesai! ${successCount} visa berjaya, ${failList.length} gagal.\n\nGagal:\n${failList.slice(0,10).join('\n')}${failList.length>10?'\n...and '+(failList.length-10)+' more':''}`);
+    } else {
+      console.log(`Download All ${label} OK: ${fileName} ${(blob.size/1024/1024).toFixed(2)}MB`);
     }
-    updateProgress(totalGroups, totalGroups, `Done: ${totalGroups} files`, `Total: ${allSuccessCount} files`);
-
-    const cancelBtn=document.getElementById('visaCancelBtn');
-    const cancelBtn2=document.getElementById('visaCancelBtn2');
-    const closeBtn=document.getElementById('visaCloseBtn');
-    if(cancelBtn) cancelBtn.classList.add('hidden');
-    if(cancelBtn2) cancelBtn2.classList.add('hidden');
-    if(closeBtn) closeBtn.classList.remove('hidden');
 
   }catch(e){
-    if(e.message==='Cancelled by user'){ console.log('Download cancelled'); return; }
-    console.error('downloadAllDocs error', e);
+    console.error('downloadAllVisas error', e);
     alert(`Gagal download ${label}: `+e.message);
     const m=document.getElementById('visaDownloadModal');
     if(m) m.classList.add('hidden');
+    if(btn){ btn.disabled=false; btn.innerHTML=originalText; }
   }
 }
 
 
-
-
-function updateVisaCountBadge(){
-  try{
-    const visaCount=allRoomingJemaah.filter(j=> j.fields && j.fields['VISA COPY'] && j.fields['VISA COPY'].length>0).length;
-    const passCount=allRoomingJemaah.filter(j=> j.fields && j.fields['PASSPORT COPY'] && j.fields['PASSPORT COPY'].length>0).length;
-    const vBadge=document.getElementById('visaCountBadge');
-    const pBadge=document.getElementById('passportCountBadge');
-    if(vBadge) vBadge.textContent=visaCount;
-    if(pBadge) pBadge.textContent=passCount;
-  }catch(e){}
-}
-
-// Update badge after fetchRoomingData
-const origFetchRoomingData=window.fetchRoomingData;
-if(typeof fetchRoomingData==='function'){
-  const original=fetchRoomingData;
-  window.fetchRoomingData=async function(...args){
-    const res=await original.apply(this, args);
-    setTimeout(updateVisaCountBadge, 1000);
-    return res;
-  };
-}
 
 async function downloadHotelDocs(lokasi, hotelName, fieldName, label){
   try{
