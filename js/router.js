@@ -1,4 +1,3 @@
-
 const STORAGE_TAB_KEY='effah_active_tab';
 const STORAGE_TIME_KEY='effah_last_active_time';
 const IDLE_LIMIT_MS=15*60*1000;
@@ -10,6 +9,7 @@ document.addEventListener('DOMContentLoaded',()=>{
   if(typeof fetchTripUmrahData==='function') fetchTripUmrahData();
   if(typeof fetchJemaahUmrahData==='function') fetchJemaahUmrahData();
   if(typeof fetchRoomingData==='function') setTimeout(fetchRoomingData, 800);
+  if(typeof fetchEjenData==='function') setTimeout(fetchEjenData, 1000);
   const last=localStorage.getItem(STORAGE_TIME_KEY);
   const saved=localStorage.getItem(STORAGE_TAB_KEY);
   let target='home';
@@ -28,6 +28,16 @@ function switchTab(tabName,saveState=true){
   if(tabName==='rooming'){
     if(typeof renderRoomingHTML==='function') renderRoomingHTML();
     if(typeof fetchRoomingData==='function') fetchRoomingData();
+  }
+  if(tabName==='ejen'){
+    if(typeof renderEjenHTML==='function') renderEjenHTML();
+    if(typeof fetchEjenData==='function') fetchEjenData();
+    if(typeof fetchTripForEjenDropdown==='function') fetchTripForEjenDropdown();
+    // if last active tracker trip, auto load
+    const lastTrip = localStorage.getItem('effah_ejen_active_trip');
+    if(lastTrip && typeof fetchJemaahForEjenTracker==='function'){
+      setTimeout(()=>fetchJemaahForEjenTracker(lastTrip), 500);
+    }
   }
   if(window.innerWidth<768){ const sb=document.getElementById('sidebar'); if(sb) sb.classList.add('-translate-x-full'); }
   if(saveState) try{localStorage.setItem(STORAGE_TAB_KEY,tabName);}catch(e){}
