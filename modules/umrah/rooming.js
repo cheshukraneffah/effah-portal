@@ -627,7 +627,7 @@ function renderRoomingHTML(){
           <div class="px-2.5 pb-2.5 flex gap-1.5">
             <input id="newStaffInput" placeholder="Taip nama staff" class="flex-1 text-[11px] px-2.5 py-2 border border-slate-200 rounded-xl bg-white focus:outline-none" onkeydown="if(event.key==='Enter'){ addNewStaff(); }">
             <button onclick="addNewStaff()" class="px-3 py-2 bg-slate-900 text-white border border-slate-900 rounded-xl text-[11px] font-bold hover:bg-black">+ Add</button>
-            <button onclick="openDeleteStaffModal()" class="px-3 py-2 bg-red-50 border border-red-200 text-red-700 rounded-xl text-[11px] font-bold hover:bg-red-600 hover:text-white hover:border-red-600 flex items-center gap-1" title="Padam staff dari senarai Extra List"><i class="fa-solid fa-trash"></i> Padam</button>
+            <button onclick="openDeleteStaffModal()" class="px-3 py-2 bg-red-50 border border-red-200 text-red-700 rounded-xl text-[11px] font-bold hover:bg-red-600 hover:text-white hover:border-red-600 flex items-center gap-1" title="Padam staff dari senarai Extra List"><i class="fa-solid fa-trash"></i> Delete</button>
           </div>
           <div id="staffListContainer" class="px-2 pb-2.5 max-h-[34vh] overflow-y-auto space-y-1 bg-white min-h-[70px] relative"></div>
         </div>
