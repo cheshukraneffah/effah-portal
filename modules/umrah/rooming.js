@@ -212,15 +212,183 @@ function removeStaff(roomId,staffName, evt){ if(evt){ evt.stopPropagation(); evt
 }
 
 async function deleteStaff(staffId){
+  if(!confirm('Padam staff ini dari Extra List?\n\nStaff akan dibuang dari semua bilik juga jika ada assigned.')) return;
   const s=staffList.find(x=>x.id===staffId||x.airtableId===staffId);
   const base=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base')||localStorage.getItem('effah_base_id');
   const pat=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
+  const staffName = s?.name || 'Staff';
+  // Remove from all rooms first
+  try{
+    for(let rec of (allRoomingRecords||[])){
+      if(rec.fields && rec.fields['STAFF LIST (ROOMING)']){
+        let arr = rec.fields['STAFF LIST (ROOMING)'] || [];
+        if(Array.isArray(arr) && arr.includes(s?.airtableId || staffId)){
+          arr = arr.filter(id=> id!==s?.airtableId && id!==staffId && id!==s?.id);
+          rec.fields['STAFF LIST (ROOMING)'] = arr;
+        }
+      }
+      if(rec.fields && rec.fields['ROOMING LIST']){
+        // also check ROOMING LIST if staff stored there
+      }
+    }
+  }catch(e){ console.warn('cleanup rooms', e); }
+  
   if(base&&pat&&s?.airtableId){
-    try{ await fetch(`https://api.airtable.com/v0/${base}/STAFF%20LIST%20%28ROOMING%29/${s.airtableId}`,{method:'DELETE', headers:{'Authorization':`Bearer ${pat}`}}); }catch(e){ console.error(e); }
+    try{ 
+      const res = await fetch(`https://api.airtable.com/v0/${base}/STAFF%20LIST%20%28ROOMING%29/${s.airtableId}`,{method:'DELETE', headers:{'Authorization':`Bearer ${pat}`}}); 
+      if(!res.ok){
+        const err = await res.json().catch(()=>({}));
+        console.error('Airtable delete failed', err);
+        // still continue to remove locally
+      }
+    }catch(e){ console.error('Delete Airtable failed', e); }
   }
   staffList=staffList.filter(x=>x.id!==staffId&&x.airtableId!==staffId);
-  saveStaffList(); renderStaffList();
+  saveStaffList(); 
+  try{ renderStaffList(); }catch(e){}
+  try{ renderRoomingGrid(); }catch(e){}
+  try{ renderLocationTabs(); }catch(e){}
+  console.log('Staff deleted', staffName);
 }
+
+function openDeleteStaffModal(){
+  const existing = document.getElementById('deleteStaffModal');
+  if(existing) existing.remove();
+  if(staffList.length===0){ alert('Tiada staff dalam Extra List.'); return; }
+  let rows = staffList.map((s,i)=>{
+    const assignedRooms = (s.roomIds||[]).length;
+    const assignedLabel = assignedRooms>0 ? `<span class="ml-2 px-1.5 py-0.5 bg-amber-100 border border-amber-200 text-amber-800 rounded-full text-[9px] font-bold">${assignedRooms} bilik</span>` : `<span class="ml-2 px-1.5 py-0.5 bg-slate-100 border rounded-full text-[9px]">Tidak assigned</span>`;
+    const staffId = s.id||s.airtableId;
+    return `<label class="flex items-center gap-3 p-2.5 rounded-xl border border-slate-200 hover:bg-red-50 cursor-pointer group">
+      <input type="checkbox" value="${staffId}" class="deleteStaffCheck w-4 h-4 accent-red-600 rounded">
+      <div class="flex-1">
+        <div class="font-bold text-[11px] text-slate-900 group-hover:text-red-700">${String(i+1).padStart(2,'0')}. ${s.name}</div>
+        <div class="text-[10px] text-slate-500 flex items-center">${assignedLabel}</div>
+      </div>
+      <button onclick="event.preventDefault(); deleteSingleStaffFromModal('${staffId}')" class="px-2.5 py-1 bg-white border border-red-200 text-red-600 rounded-full text-[10px] font-bold hover:bg-red-600 hover:text-white">Padam</button>
+    </label>`;
+  }).join('');
+  
+  let html = `<div id="deleteStaffModal" class="fixed inset-0 bg-black/60 z-[100] flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+      <div class="p-4 border-b flex items-center justify-between bg-red-50">
+        <div>
+          <h3 class="font-extrabold text-[12px] text-red-900"><i class="fa-solid fa-trash mr-2"></i>PENGESAHAN PEMADAMAN STAFF</h3>
+          <p class="text-[10px] text-red-700 mt-0.5">Sila pilih staff yang ingin dipadam. Staff yang dipadam akan dikeluarkan secara automatik dari semua bilik yang telah ditetapkan.</p>
+        </div>
+        <button onclick="closeDeleteStaffModal()" class="w-7 h-7 rounded-full bg-white border flex items-center justify-center hover:bg-slate-100"><i class="fa-solid fa-xmark text-[11px]"></i></button>
+      </div>
+      <div class="p-3 max-h-[60vh] overflow-y-auto space-y-2">${rows}</div>
+      <div class="p-3 bg-slate-50 border-t flex items-center justify-between gap-2">
+        <label class="flex items-center gap-2 text-[11px] font-bold cursor-pointer"><input type="checkbox" id="selectAllDeleteStaff" onchange="toggleAllDeleteStaff(this.checked)" class="w-4 h-4 accent-red-600"> Pilih Semua</label>
+        <div class="flex gap-2">
+          <button onclick="closeDeleteStaffModal()" class="px-4 py-2 bg-white border border-slate-300 rounded-xl text-[11px] font-bold hover:bg-slate-50">Batal</button>
+          <button onclick="confirmBulkDeleteStaff()" class="px-4 py-2 bg-red-600 text-white rounded-xl text-[11px] font-bold hover:bg-red-700"><i class="fa-solid fa-trash mr-1"></i> Padam Terpilih</button>
+        </div>
+      </div>
+    </div>
+  </div>`;
+  document.body.insertAdjacentHTML('beforeend', html);
+}
+
+function closeDeleteStaffModal(){
+  const m=document.getElementById('deleteStaffModal');
+  if(m) m.remove();
+}
+
+function toggleAllDeleteStaff(checked){
+  document.querySelectorAll('.deleteStaffCheck').forEach(cb=>cb.checked=checked);
+}
+
+async function deleteSingleStaffFromModal(staffId){
+  const s=staffList.find(x=>x.id===staffId||x.airtableId===staffId);
+  const name = s?.name||'Staff ini';
+  if(!confirm(`Adakah anda pasti untuk memadam ${name} dari senarai Extra List?\n\nTindakan ini akan mengeluarkan staff tersebut dari semua bilik yang telah ditetapkan dan rekod akan dipadam dari sistem.`)) return;
+  await performDeleteStaff(staffId);
+  closeDeleteStaffModal();
+  // Reopen if still have staff
+  if(staffList.length>0) setTimeout(openDeleteStaffModal, 300);
+}
+
+async function confirmBulkDeleteStaff(){
+  const checks = Array.from(document.querySelectorAll('.deleteStaffCheck:checked'));
+  if(checks.length===0){ alert('Sila pilih sekurang-kurangnya satu staff untuk dipadam.'); return; }
+  const ids = checks.map(c=>c.value);
+  const names = ids.map(id=> staffList.find(x=>x.id===id||x.airtableId===id)?.name||id).join(', ');
+  if(!confirm(`Adakah anda pasti untuk memadam ${checks.length} staff berikut dari senarai Extra List?\n\n${names}\n\nTindakan ini akan mengeluarkan kesemua staff tersebut dari semua bilik yang telah ditetapkan.`)) return;
+  
+  // Delete one by one
+  for(let id of ids){
+    await performDeleteStaff(id);
+  }
+  closeDeleteStaffModal();
+  alert(`${ids.length} staff telah dipadam.`);
+}
+
+async function performDeleteStaff(staffId){
+  const s=staffList.find(x=>x.id===staffId||x.airtableId===staffId);
+  const base=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base')||localStorage.getItem('effah_base_id');
+  const pat=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
+  const airtableId = s?.airtableId || staffId;
+  
+  // Remove from all rooms
+  try{
+    for(let rec of (allRoomingRecords||[])){
+      let changed=false;
+      if(rec.fields){
+        // Check STAFF LIST (ROOMING) linked field
+        if(Array.isArray(rec.fields['STAFF LIST (ROOMING)'])){
+          const before = rec.fields['STAFF LIST (ROOMING)'].length;
+          rec.fields['STAFF LIST (ROOMING)'] = rec.fields['STAFF LIST (ROOMING)'].filter(id=> id!==airtableId && id!==staffId && id!==s?.id);
+          if(rec.fields['STAFF LIST (ROOMING)'].length!==before) changed=true;
+        }
+        // Check legacy STAFF / EXTRA text field
+        if(typeof rec.fields['STAFF / EXTRA']==='string' && rec.fields['STAFF / EXTRA'].includes(s?.name)){
+          // will be handled by updateRoomField later
+        }
+      }
+      if(changed && base && pat){
+        try{
+          await fetch(`https://api.airtable.com/v0/${base}/ROOMING%20LIST/${rec.id}`,{
+            method:'PATCH',
+            headers:{'Authorization':`Bearer ${pat}`,'Content-Type':'application/json'},
+            body: JSON.stringify({fields:{'STAFF LIST (ROOMING)': rec.fields['STAFF LIST (ROOMING)']}})
+          });
+        }catch(e){ console.warn('Failed to update room', rec.id, e); }
+      }
+    }
+  }catch(e){ console.warn('cleanup rooms failed', e); }
+  
+  // Delete from Airtable STAFF LIST
+  if(base&&pat&&s?.airtableId){
+    try{
+      const res = await fetch(`https://api.airtable.com/v0/${base}/STAFF%20LIST%20%28ROOMING%29/${s.airtableId}`,{method:'DELETE', headers:{'Authorization':`Bearer ${pat}`}});
+      if(!res.ok){
+        const err=await res.json().catch(()=>({}));
+        console.error('Airtable delete failed', err);
+      }
+    }catch(e){ console.error('Delete Airtable error', e); }
+  }
+  
+  // Remove from local list
+  staffList = staffList.filter(x=>x.id!==staffId && x.airtableId!==staffId);
+  try{ localStorage.setItem(getStaffStorageKey(), JSON.stringify(staffList)); }catch(e){}
+  try{ saveStaffList(); }catch(e){}
+  try{ renderStaffList(); }catch(e){}
+  try{ renderRoomingGrid(); }catch(e){}
+  try{ renderLocationTabs(); }catch(e){}
+  try{ renderRoomingOverview(allRoomingRecords.filter(r=>(r.fields['LOKASI / CITY']||'MEKAH').toUpperCase()===activeLocation.toUpperCase())); }catch(e){}
+}
+
+// Override old deleteStaff to use new perform
+async function deleteStaff(staffId){
+  const s=staffList.find(x=>x.id===staffId||x.airtableId===staffId);
+  const name = s?.name||'Staff ini';
+  if(!confirm(`Adakah anda pasti untuk memadam ${name} dari senarai Extra List?\n\nStaff tersebut akan dikeluarkan dari semua bilik yang telah ditetapkan.`)) return;
+  await performDeleteStaff(staffId);
+}
+
+
 
 
 
@@ -458,7 +626,8 @@ function renderRoomingHTML(){
           </div>
           <div class="px-2.5 pb-2.5 flex gap-1.5">
             <input id="newStaffInput" placeholder="Taip nama staff" class="flex-1 text-[11px] px-2.5 py-2 border border-slate-200 rounded-xl bg-white focus:outline-none" onkeydown="if(event.key==='Enter'){ addNewStaff(); }">
-            <button onclick="addNewStaff()" class="px-3 py-2 bg-slate-100 border border-slate-200 text-slate-700 rounded-xl text-[11px] font-bold hover:bg-slate-200">+ Add</button>
+            <button onclick="addNewStaff()" class="px-3 py-2 bg-slate-900 text-white border border-slate-900 rounded-xl text-[11px] font-bold hover:bg-black">+ Add</button>
+            <button onclick="openDeleteStaffModal()" class="px-3 py-2 bg-red-50 border border-red-200 text-red-700 rounded-xl text-[11px] font-bold hover:bg-red-600 hover:text-white hover:border-red-600 flex items-center gap-1" title="Padam staff dari senarai Extra List"><i class="fa-solid fa-trash"></i> Padam</button>
           </div>
           <div id="staffListContainer" class="px-2 pb-2.5 max-h-[34vh] overflow-y-auto space-y-1 bg-white min-h-[70px] relative"></div>
         </div>
@@ -1230,10 +1399,11 @@ function renderStaffList(){
     const staffId = s.id||s.airtableId;
     const boardOptions = ['FULLBOARD','FULLBOARD (MEKAH)','FULLBOARD (MADINAH)','BB (MEKAH)','BB (MADINAH)'];
     const boardDropHtml = boardOptions.map(opt=>`<label class="flex items-center gap-2 px-2.5 py-1.5 hover:bg-slate-50 cursor-pointer text-[11px]"><input type="checkbox" ${boardArr.includes(opt)?'checked':''} onchange="toggleStaffBoardMulti('${staffId}','${opt}')" class="w-3.5 h-3.5 accent-[#7A0C2E]"> ${opt}</label>`).join('');
+    const deleteBtnClass = "w-6 h-6 rounded-full border border-red-300 bg-red-100 text-red-700 hover:bg-red-600 hover:text-white hover:border-red-600 text-[11px] flex items-center justify-center shadow-sm cursor-pointer !opacity-100 !pointer-events-auto";
     return `<div ${drag} class="flex flex-col gap-1.5 px-2.5 py-2 rounded-xl border text-[11px] ${cls} relative">
       <div class="flex items-center justify-between">
-        <div class="flex gap-2 items-center"><span class="text-slate-400 text-[10px]">${String(idx+1).padStart(2,'0')}</span><span class="font-medium truncate max-w-[120px]">${s.name}</span>${assignedInLoc?'<span class="ml-1 px-1 py-0.5 bg-slate-200 rounded text-[8px]">ASSIGNED di '+activeLocation+'</span>':''}</div>
-        <div class="flex gap-1"><button onclick="quickAssignStaff('${staffId}')" class="w-5 h-5 rounded-full border ${assignedInLoc?'opacity-30 pointer-events-none':'hover:bg-[#7A0C2E] hover:text-white'} text-[10px]">+</button><button onclick="deleteStaff('${staffId}')" class="w-5 h-5 rounded-full border hover:bg-red-50 text-[10px]"><i class="fa-solid fa-trash text-[9px]"></i></button></div>
+        <div class="flex gap-2 items-center"><span class="text-slate-400 text-[10px]">${String(idx+1).padStart(2,'0')}</span><span class="font-medium truncate max-w-[120px]">${s.name}</span>${assignedInLoc?'<span class="ml-1 px-1 py-0.5 bg-amber-100 text-amber-800 border border-amber-200 rounded text-[8px] font-bold">ASSIGNED di '+activeLocation+'</span>':''}</div>
+        <div class="flex gap-1.5 items-center"><button onclick="quickAssignStaff('${staffId}')" class="w-6 h-6 rounded-full border ${assignedInLoc?'opacity-30 pointer-events-none':'hover:bg-[#7A0C2E] hover:text-white bg-white'} text-[10px] flex items-center justify-center" title="Assign ke bilik">+</button><button onclick="deleteStaff('${staffId}')" title="Pengesahan pemadaman staff" class="${deleteBtnClass}"><i class="fa-solid fa-trash text-[10px]"></i></button></div>
       </div>
       <div class="flex items-center gap-2">
         <div class="relative flex-1">
@@ -3667,3 +3837,5 @@ window.downloadAllPassports=downloadAllPassports;
 window.downloadAllDocs=downloadAllDocs;
 window.updateVisaCountBadge=updateVisaCountBadge;
 setTimeout(updateVisaCountBadge, 2000);
+
+window.openDeleteStaffModal=openDeleteStaffModal; window.closeDeleteStaffModal=closeDeleteStaffModal; window.deleteSingleStaffFromModal=deleteSingleStaffFromModal; window.confirmBulkDeleteStaff=confirmBulkDeleteStaff; window.performDeleteStaff=performDeleteStaff; window.toggleAllDeleteStaff=toggleAllDeleteStaff; window.deleteStaff=deleteStaff;
