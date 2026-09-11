@@ -265,7 +265,7 @@ function openDeleteStaffModal(){
         <div class="font-bold text-[11px] text-slate-900 group-hover:text-red-700">${String(i+1).padStart(2,'0')}. ${s.name}</div>
         <div class="text-[10px] text-slate-500 flex items-center">${assignedLabel}</div>
       </div>
-      <button onclick="event.preventDefault(); deleteSingleStaffFromModal('${staffId}')" class="px-2.5 py-1 bg-white border border-red-200 text-red-600 rounded-full text-[10px] font-bold hover:bg-red-600 hover:text-white">Padam</button>
+      <button onclick="event.preventDefault(); deleteSingleStaffFromModal('${staffId}')" class="px-2.5 py-1 bg-white border border-red-200 text-red-600 rounded-full text-[10px] font-bold hover:bg-red-600 hover:text-white">Delete</button>
     </label>`;
   }).join('');
   
