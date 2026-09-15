@@ -3,6 +3,12 @@ let allJemaahUmrahRecords = [];
 let rawTripRecordsList = []; 
 let tripMap = {}; 
 let selectedTripFilter = null;
+let selectedHijriFilter = null;
+let isJemaahLoading = false;
+let jemaahFieldOptions = {};
+let ejenListCache = [];
+let jemaahMetaTableId = null;
+let jemaahMetaFieldsByName = {};
 
  // AUTO-FILL GLOBAL PAT - FINAL
 try{
@@ -20,7 +26,7 @@ try{
 let selectedJemaahIds = new Set();
 
 // Hidden Fields Tracking
-let hiddenColumns = {};
+let hiddenColumns = JSON.parse(localStorage.getItem('jemaahHiddenColumns')) || {};
 
 // Sort State Tracking
 let currentSortField = 'NAME';
@@ -31,7 +37,8 @@ let columnOrder = [
     'col-idx', 'col-name', 'col-picture', 'col-ic', 'col-passport', 
     'col-gender', 'col-age', 'col-dob', 'col-dobf', 'col-nat', 
     'col-visa', 'col-passcopy', 'col-visacopy', 'col-mofabio', 
-    'col-fit', 'col-trip', 'col-issue', 'col-expire', 'col-notes'
+    'col-fit', 'col-trip', 'col-issue', 'col-expire', 'col-notes',
+    'col-board', 'col-train', 'col-insuran', 'col-pakej', 'col-ejen'
 ];
 
 // Default Column Widths
@@ -54,7 +61,12 @@ const defaultColumnWidths = {
     'col-trip': 200,
     'col-issue': 110,
     'col-expire': 110,
-    'col-notes': 180
+    'col-notes': 180,
+    'col-board': 180,
+    'col-train': 90,
+    'col-insuran': 180,
+    'col-pakej': 160,
+    'col-ejen': 200
 };
 
 let columnWidths = JSON.parse(localStorage.getItem('jemaahColWidths')) || { ...defaultColumnWidths };
@@ -100,7 +112,7 @@ function renderJemaahUmrahHTML() {
             <div id="jemaahTripSidebar" class="w-full lg:w-72 bg-white rounded-2xl border border-slate-300 shadow-xs p-3.5 flex flex-col flex-shrink-0 transition-all duration-300 ease-in-out">
                 
                 <div class="flex items-center justify-between px-2 pb-3 mb-2 border-b border-slate-200">
-                    <span class="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Views / Filter Trip</span>
+                    <span id="viewsFilterLabel" class="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Senarai Trip</span>
                     <div class="flex items-center space-x-1">
                         <button onclick="openAddTripModal()" class="bg-brand-maroon hover:bg-rose-900 text-white font-bold px-2.5 py-1 rounded-lg text-[10px] transition flex items-center shadow-2xs" title="Tambah Trip Baharu">
                             <i class="fa-solid fa-plus mr-1"></i> Trip
@@ -114,13 +126,18 @@ function renderJemaahUmrahHTML() {
                     </div>
                 </div>
 
+                <!-- V46 Option B: Hijri Season tabs above searchbar - like Trip Umrah image_7d9ee0.png - fetch dari data, jangan hardcoded -->
+                <div id="jemaahHijriFilterTabs" class="flex flex-wrap gap-1.5 mb-3 px-1">
+                    <div class="text-[10px] text-slate-400 animate-pulse">Memuat hijri...</div>
+                </div>
+
                 <div class="relative mb-3">
                     <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-slate-400 text-xs"></i>
-                    <input type="text" id="searchTripViewInput" onkeyup="filterTripViewSidebar()" placeholder="Find a view..." 
+                    <input type="text" id="searchTripViewInput" onkeyup="filterTripViewSidebar()" placeholder="Find a trip..." 
                         class="w-full text-xs pl-8 pr-3 py-1.5 border border-slate-300 rounded-xl bg-slate-50 focus:bg-white focus:outline-none focus:ring-1 focus:ring-slate-400">
                 </div>
 
-                <div id="jemaahViewsSidebar" class="space-y-1 overflow-y-auto flex-1 max-h-[72vh] pr-1">
+                <div id="jemaahViewsSidebar" class="space-y-1 overflow-y-auto flex-1 max-h-[60vh] pr-1">
                     <div class="text-center py-8 text-slate-400 text-xs"><i class="fa-solid fa-spinner fa-spin mr-1"></i> Memuat views...</div>
                 </div>
             </div>
@@ -179,12 +196,21 @@ function renderJemaahUmrahHTML() {
 
                         <div class="relative">
                             <button onclick="toggleHideFieldsDropdown()" class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold px-3 py-1.5 rounded-xl transition text-xs flex items-center border border-slate-300">
-                                <i class="fa-solid fa-eye-slash mr-1.5 text-slate-500"></i> Hide fields
+                                <i class="fa-solid fa-table-columns mr-1.5 text-slate-500"></i> Edit/Arrange Fields
                             </button>
 
-                            <div id="hideFieldsDropdown" class="hidden absolute right-0 mt-2 w-56 bg-white rounded-2xl shadow-xl border border-slate-300 z-50 p-3 text-xs space-y-2 max-h-80 overflow-y-auto">
-                                <div class="font-bold text-slate-400 text-[10px] uppercase border-b border-slate-200 pb-1">Tunjukkan / Sorok Column</div>
-                                <div id="fieldsToggleList" class="space-y-1.5"></div>
+                            <div id="hideFieldsDropdown" class="hidden absolute right-0 mt-2 w-80 bg-white rounded-2xl shadow-xl border border-slate-200 z-50 text-xs max-h-[420px] flex flex-col overflow-hidden">
+                                <div class="p-2.5 border-b border-slate-200">
+                                    <div class="relative">
+                                        <i class="fa-solid fa-magnifying-glass absolute left-2.5 top-2.5 text-slate-400 text-[10px]"></i>
+                                        <input type="text" id="fieldSearchInput" onkeyup="filterFieldsList()" placeholder="Find a field" class="w-full text-xs pl-7 pr-3 py-1.5 border border-slate-300 rounded-lg bg-slate-50 focus:bg-white focus:outline-none focus:ring-1 focus:ring-slate-400">
+                                    </div>
+                                </div>
+                                <div id="fieldsToggleList" class="overflow-y-auto flex-1 p-1.5 space-y-0.5"></div>
+                                <div class="p-2 border-t border-slate-200 bg-slate-50/50 flex justify-between text-[10px] text-slate-500">
+                                    <span id="visibleFieldsCount">0 fields</span>
+                                    <button onclick="resetFieldsToDefault()" class="font-bold text-slate-600 hover:text-brand-maroon">Reset</button>
+                                </div>
                             </div>
                         </div>
 
@@ -356,6 +382,10 @@ function injectResizerStyles() {
     document.head.appendChild(style);
 }
 
+function getJemaahHijriSeasonFromField(val){
+  if(!val) return '';
+  return val.toString().trim().toUpperCase(); // V50: full 26/27 • 1448H, jangan extract 1448H je
+}
 function cleanTripName(tripName) {
     if (!tripName) return 'TBC';
     return tripName.replace(/^[\d\/]+\s*\|\s*/i, '').trim();
@@ -377,15 +407,188 @@ async function fetchTripMapping() {
         tripMap = {};
         rawTripRecordsList.forEach(r => {
             const rawName = r.fields['Trip'] || r.fields['NAME'] || 'TBC';
+            const rawHijri = r.fields['Hijri Season'] || '';
+            const hijri = getJemaahHijriSeasonFromField(rawHijri);
             tripMap[r.id] = {
                 title: cleanTripName(rawName),
                 mula: r.fields['Mula Pakej'] || '',
-                tamat: r.fields['Tamat Pakej'] || ''
+                tamat: r.fields['Tamat Pakej'] || '',
+                hijri: hijri
             };
+            const cleanTitle = cleanTripName(rawName);
+            if(cleanTitle && cleanTitle !== 'TBC'){
+              tripMap[cleanTitle] = tripMap[r.id];
+            }
         });
     } catch (e) {
         console.error("Error fetching trip map:", e);
     }
+}
+
+// V51: Fetch field options dari Airtable meta API - direct fetch, tak hardcoded
+async function fetchJemaahMetaOptions(){
+  try{
+    if(typeof AIRTABLE_PAT === 'undefined' || !AIRTABLE_PAT){
+      AIRTABLE_PAT = window.AIRTABLE_PAT || localStorage.getItem('effah_api_pat') || '';
+      AIRTABLE_BASE_ID = window.AIRTABLE_BASE_ID || localStorage.getItem('effah_base_id') || '';
+    }
+    if(!AIRTABLE_PAT || !AIRTABLE_BASE_ID) return;
+    const url = `https://api.airtable.com/v0/meta/bases/${AIRTABLE_BASE_ID}/tables`;
+    const res = await fetch(url, { headers: { Authorization: `Bearer ${AIRTABLE_PAT}` } });
+    if(!res.ok){ buildFallbackFieldOptions(); return; }
+    const data = await res.json();
+    const tables = data.tables || [];
+    const jemaahTable = tables.find(t=> t.name.trim() === 'DATA JEMAAH UMRAH');
+    if(!jemaahTable){ buildFallbackFieldOptions(); return; }
+    jemaahMetaTableId = jemaahTable.id;
+    jemaahMetaFieldsByName = {};
+    (jemaahTable.fields||[]).forEach(f=>{
+      jemaahMetaFieldsByName[f.name] = f;
+      if(f.options && f.options.choices){
+        jemaahFieldOptions[f.name] = f.options.choices.map(c=>({ id: c.id, name: c.name, color: c.color }));
+      }
+    });
+    if(allJemaahUmrahRecords && allJemaahUmrahRecords.length>0){ filterAndRenderJemaahGrid(); }
+  }catch(e){ console.error(e); buildFallbackFieldOptions(); }
+}
+function buildFallbackFieldOptions(){
+  const fieldsToBuild = ['NATIONALITY','STATUS VISA','BOARD BASIS','INSURAN','PAKEJ'];
+  fieldsToBuild.forEach(fieldName=>{
+    const values = new Set();
+    (allJemaahUmrahRecords||[]).forEach(r=>{
+      const v = r.fields[fieldName];
+      if(!v) return;
+      if(Array.isArray(v)){ v.forEach(x=> values.add(x)); } else { values.add(v); }
+    });
+    if(values.size>0){ jemaahFieldOptions[fieldName] = Array.from(values).map(name=>({ name, id: name })); }
+  });
+}
+async function fetchEjenList(){
+  try{
+    if(typeof AIRTABLE_PAT === 'undefined' || !AIRTABLE_PAT){
+      AIRTABLE_PAT = window.AIRTABLE_PAT || localStorage.getItem('effah_api_pat') || '';
+      AIRTABLE_BASE_ID = window.AIRTABLE_BASE_ID || localStorage.getItem('effah_base_id') || '';
+    }
+    if(!AIRTABLE_PAT || !AIRTABLE_BASE_ID) return;
+    let records = []; let offset = '';
+    do{
+      let url = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/EJEN%20LIST?pageSize=100`;
+      if(offset) url+=`&offset=${offset}`;
+      const res = await fetch(url, { headers: { Authorization: `Bearer ${AIRTABLE_PAT}` } });
+      const data = await res.json();
+      if(data.records) records = records.concat(data.records);
+      offset = data.offset || '';
+    }while(offset);
+    ejenListCache = records.map(r=>({ id: r.id, name: r.fields['NAMA EJEN'] || r.fields['NAMA'] || r.fields['NAME'] || 'Unknown', status: r.fields['STATUS']||'', noTelefon: r.fields['NO TELEFON']||'', raw: r }));
+  }catch(e){ console.error(e); }
+}
+async function addNewOptionToField(fieldName, newOptionName){
+  try{
+    if(!jemaahMetaTableId){ alert('Meta table ID belum load'); return false; }
+    const fieldMeta = jemaahMetaFieldsByName[fieldName];
+    if(!fieldMeta){ alert('Field '+fieldName+' tak jumpa'); return false; }
+    const existingChoices = (fieldMeta.options && fieldMeta.options.choices) ? fieldMeta.options.choices : [];
+    if(existingChoices.some(c=> c.name.toUpperCase() === newOptionName.toUpperCase())){ alert('Option sudah wujud'); return false; }
+    const updatedChoices = [...existingChoices, { name: newOptionName }];
+    const url = `https://api.airtable.com/v0/meta/bases/${AIRTABLE_BASE_ID}/tables/${jemaahMetaTableId}/fields/${fieldMeta.id}`;
+    const res = await fetch(url, { method: 'PATCH', headers: { Authorization: `Bearer ${AIRTABLE_PAT}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ options: { ...fieldMeta.options, choices: updatedChoices } }) });
+    if(!res.ok){ const txt = await res.text(); alert('Gagal: '+txt); return false; }
+    const updatedField = await res.json();
+    jemaahMetaFieldsByName[fieldName] = updatedField;
+    jemaahFieldOptions[fieldName] = updatedField.options.choices.map(c=>({ id: c.id, name: c.name, color: c.color }));
+    alert(`Option '${newOptionName}' ditambah ke ${fieldName}`); filterAndRenderJemaahGrid(); return true;
+  }catch(e){ alert('Error: '+e.message); return false; }
+}
+function handleAddNewOption(fieldName, selectEl){
+  const newVal = prompt(`Tambah option baru untuk ${fieldName}:`);
+  if(!newVal){ if(selectEl) selectEl.value = selectEl.getAttribute('data-prev')||''; return; }
+  const trimmed = newVal.trim().toUpperCase();
+  if(!trimmed) return;
+  addNewOptionToField(fieldName, trimmed).then(ok=>{ if(ok && selectEl){ setTimeout(()=>{ selectEl.value = trimmed; selectEl.dispatchEvent(new Event('change')); }, 500); } });
+}
+function renderSingleSelectCell(recId, fieldName, currentValue){
+  const options = jemaahFieldOptions[fieldName] || [];
+  const safeCurrent = currentValue || '';
+  let optsHtml = `<option value="">-- Pilih --</option>`;
+  if(options.length>0){
+    options.forEach(opt=>{ const selected = (opt.name === safeCurrent) ? 'selected' : ''; optsHtml += `<option value="${opt.name}" ${selected}>${opt.name}</option>`; });
+  } else {
+    if(safeCurrent){ optsHtml += `<option value="${safeCurrent}" selected>${safeCurrent}</option>`; }
+  }
+  optsHtml += `<option value="__ADD_NEW__" style="font-weight:bold; color:#800020;">+ Add new option</option>`;
+  return `<select data-prev="${safeCurrent}" onchange="if(this.value==='__ADD_NEW__'){ handleAddNewOption('${fieldName}', this); } else { updateJemaahField('${recId}', '${fieldName}', this.value); }" class="w-full text-xs p-1.5 font-bold rounded-lg border border-transparent hover:border-slate-300 focus:bg-white bg-transparent">${optsHtml}</select>`;
+}
+function renderMultiSelectCell(recId, fieldName, currentValues){
+  const options = jemaahFieldOptions[fieldName] || [];
+  const currentArr = Array.isArray(currentValues) ? currentValues : (currentValues ? [currentValues] : []);
+  let pillsHtml = '';
+  if(currentArr.length>0){
+    currentArr.forEach(val=>{ pillsHtml += `<span class="inline-flex items-center gap-1 bg-sky-100 text-sky-800 border border-sky-200 text-[10px] font-bold px-2 py-0.5 rounded-full mr-1 mb-1">${val} <button onclick="event.stopPropagation(); removeMultiSelectValue('${recId}', '${fieldName}', '${val.replace(/'/g, "\'")}') " class="ml-1 text-sky-600 hover:text-rose-600">x</button></span>`; });
+  } else { pillsHtml = `<span class="text-slate-300 text-[10px]">-</span>`; }
+  let optsHtml = '';
+  if(options.length>0){
+    options.forEach(opt=>{ const isSelected = currentArr.includes(opt.name); optsHtml += `<label class="flex items-center gap-2 px-2 py-1.5 hover:bg-slate-50 cursor-pointer text-xs"><input type="checkbox" ${isSelected?'checked':''} onchange="toggleMultiSelectValue('${recId}', '${fieldName}', '${opt.name.replace(/'/g, "\'")}', this.checked)" class="w-3.5 h-3.5 rounded border-slate-300 text-brand-maroon"> <span>${opt.name}</span></label>`; });
+  }
+  optsHtml += `<div class="border-t border-slate-200 mt-1 pt-1"><button onclick="handleAddNewMultiOption('${fieldName}')" class="w-full text-left px-2 py-1 text-[11px] font-bold text-brand-maroon hover:bg-rose-50 rounded">+ Add option</button></div>`;
+  const dropdownId = `ms-dropdown-${recId}-${fieldName.replace(/\s/g,'')}`;
+  return `<div class="relative cell-dropdown-wrapper"><div class="flex flex-wrap items-center gap-1 p-1 min-h-[28px] border border-transparent hover:border-slate-300 rounded-lg cursor-pointer" onclick="event.stopPropagation(); toggleCellDropdown('${dropdownId}')">${pillsHtml}<i class="fa-solid fa-chevron-down text-[10px] text-slate-400 ml-auto"></i></div><div id="${dropdownId}" data-cell-dropdown class="hidden absolute left-0 top-full mt-1 w-56 bg-white rounded-xl shadow-xl border border-slate-200 z-50 max-h-64 overflow-y-auto p-1">${optsHtml}</div></div>`;
+}
+
+function toggleMultiSelectValue(recId, fieldName, value, isChecked){
+  const rec = allJemaahUmrahRecords.find(r=> r.id===recId); if(!rec) return;
+  let current = rec.fields[fieldName]; let arr = Array.isArray(current) ? [...current] : (current ? [current] : []);
+  if(isChecked){ if(!arr.includes(value)) arr.push(value); } else { arr = arr.filter(v=> v!==value); }
+  updateJemaahField(recId, fieldName, arr); rec.fields[fieldName] = arr; filterAndRenderJemaahGrid();
+}
+function removeMultiSelectValue(recId, fieldName, value){ toggleMultiSelectValue(recId, fieldName, value, false); }
+function handleAddNewMultiOption(fieldName){ const newVal = prompt(`Tambah option baru untuk ${fieldName}:`); if(!newVal) return; const trimmed = newVal.trim().toUpperCase(); if(!trimmed) return; addNewOptionToField(fieldName, trimmed); }
+function renderEjenCell(recId, currentEjenIds){
+  const ids = Array.isArray(currentEjenIds) ? currentEjenIds : (currentEjenIds ? [currentEjenIds] : []);
+  let pillsHtml = '';
+  if(ids.length>0){
+    ids.forEach(eId=>{
+      const e = ejenListCache.find(x=> x.id===eId);
+      const name = e ? e.name : eId;
+      pillsHtml += `<span class="inline-flex items-center gap-1 bg-emerald-100 text-emerald-800 border border-emerald-200 text-[10px] font-bold px-2 py-0.5 rounded-full mr-1 mb-1">${name} <button onclick="event.stopPropagation(); removeEjenLink('${recId}', '${eId}')" class="ml-1 text-emerald-600 hover:text-rose-600">x</button></span>`;
+    });
+  } else { pillsHtml = `<span class="text-slate-300 text-[10px]">-</span>`; }
+  const dropdownId = `ejen-dropdown-${recId}`;
+  let optsHtml = '';
+  if(ejenListCache.length>0){
+    ejenListCache.forEach(e=>{ const isSelected = ids.includes(e.id); optsHtml += `<label class="flex items-center gap-2 px-2 py-1.5 hover:bg-slate-50 cursor-pointer text-xs ejen-option"><input type="checkbox" ${isSelected?'checked':''} onchange="toggleEjenLink('${recId}', '${e.id}', this.checked)" class="w-3.5 h-3.5 rounded border-slate-300 text-brand-maroon"> <div class="flex flex-col"><span class="font-bold">${e.name}</span><span class="text-[10px] text-slate-500">${e.status||''} ${e.noTelefon?'• '+e.noTelefon:''}</span></div></label>`; });
+  } else { optsHtml = `<div class="text-[11px] text-slate-400 p-2">Memuat ejen... <i class="fa-solid fa-spinner fa-spin"></i></div>`; }
+  return `<div class="relative cell-dropdown-wrapper"><div class="flex flex-wrap items-center gap-1 p-1 min-h-[28px] border border-transparent hover:border-slate-300 rounded-lg cursor-pointer" onclick="event.stopPropagation(); toggleCellDropdown('${dropdownId}')">${pillsHtml}<i class="fa-solid fa-chevron-down text-[10px] text-slate-400 ml-auto"></i></div><div id="${dropdownId}" data-cell-dropdown class="hidden absolute left-0 top-full mt-1 w-72 bg-white rounded-xl shadow-xl border border-slate-200 z-[60] max-h-80 overflow-y-auto p-1"><div class="p-2"><input type="text" placeholder="Search ejen..." class="w-full text-xs p-1.5 border border-slate-200 rounded-lg" onkeyup="filterEjenDropdown('${recId}', this.value)" onclick="event.stopPropagation()"></div><div id="${dropdownId}-list">${optsHtml}</div></div></div>`;
+}
+
+function toggleCellDropdown(id){
+  // Close Sort and Edit/Arrange dropdowns - fix double overlap image_e56e93.png
+  const sortDrop = document.getElementById('sortDropdownMenu');
+  const hideDrop = document.getElementById('hideFieldsDropdown');
+  if(sortDrop) sortDrop.classList.add('hidden');
+  if(hideDrop) hideDrop.classList.add('hidden');
+  const all = document.querySelectorAll('[data-cell-dropdown]');
+  all.forEach(d=>{ if(d.id!==id) d.classList.add('hidden'); });
+  const target = document.getElementById(id);
+  if(target) target.classList.toggle('hidden');
+}
+
+function closeAllCellDropdowns(){
+  document.querySelectorAll('[data-cell-dropdown]').forEach(d=> d.classList.add('hidden'));
+}
+
+function toggleEjenLink(recId, ejenId, isChecked){
+  const rec = allJemaahUmrahRecords.find(r=> r.id===recId); if(!rec) return;
+  let current = rec.fields['EJEN']; let arr = Array.isArray(current) ? [...current] : (current ? [current] : []);
+  if(isChecked){ if(!arr.includes(ejenId)) arr.push(ejenId); } else { arr = arr.filter(v=> v!==ejenId); }
+  updateJemaahField(recId, 'EJEN', arr); rec.fields['EJEN'] = arr; filterAndRenderJemaahGrid();
+}
+function removeEjenLink(recId, ejenId){ toggleEjenLink(recId, ejenId, false); }
+function filterEjenDropdown(recId, query){
+  const dropdownId = `ejen-dropdown-${recId}`;
+  const list = document.getElementById(dropdownId+'-list'); if(!list) return;
+  const q = query.toLowerCase();
+  const labels = list.querySelectorAll('label');
+  labels.forEach(l=>{ const txt = l.textContent.toLowerCase(); if(txt.includes(q)) l.classList.remove('hidden'); else l.classList.add('hidden'); });
 }
 
 async function fetchJemaahUmrahData(isManualClick = false) {
@@ -412,6 +615,9 @@ async function fetchJemaahUmrahData(isManualClick = false) {
     }
 
     await fetchTripMapping();
+    try{ renderJemaahHijriTabs(); renderViewsSidebar(); }catch(e){}
+    fetchJemaahMetaOptions();
+    fetchEjenList();
 
     let newFetchedRecords = [];
     let offset = '';
@@ -445,6 +651,28 @@ async function fetchJemaahUmrahData(isManualClick = false) {
     }
 }
 
+function getJemaahHijriForRecord(jemaahRec){
+  // V46 Option B: fetch dari tripMap, jangan hardcoded
+  const tripField = jemaahRec.fields['TRIP'];
+  if(!tripField) return '';
+  const rawId = Array.isArray(tripField) ? tripField[0] : tripField;
+  if(!rawId) return '';
+  // If tripField is recId
+  if(rawId.startsWith && rawId.startsWith('rec') && tripMap[rawId]){
+    return tripMap[rawId].hijri || '';
+  }
+  // If tripField is trip name
+  const title = cleanTripName(rawId);
+  if(tripMap[title]){
+    return tripMap[title].hijri || '';
+  }
+  // Try lookup via title from tripMap values
+  for(let k in tripMap){
+    if(tripMap[k].title === title) return tripMap[k].hijri || '';
+  }
+  return '';
+}
+
 function getResolvedTripName(tripField) {
     if (!tripField) return 'TBC';
     let rawVal = Array.isArray(tripField) ? tripField[0] : tripField;
@@ -456,14 +684,16 @@ function getResolvedTripName(tripField) {
     return cleanTripName(rawVal);
 }
 
+
 function renderViewsSidebar() {
     const container = document.getElementById('jemaahViewsSidebar');
     if (!container) return;
     container.innerHTML = '';
 
+    renderJemaahHijriTabs();
+
     const baseViews = [
-        { id: 'ALL', name: 'ALL JEMAAH', icon: 'fa-table' },
-        { id: 'TBC', name: 'TBC / TANPA TRIP', icon: 'fa-folder-open' }
+        { id: 'ALL', name: 'ALL', icon: 'fa-table' }
     ];
 
     baseViews.forEach(v => {
@@ -479,19 +709,177 @@ function renderViewsSidebar() {
     hr.className = "my-2 border-t border-slate-200";
     container.appendChild(hr);
 
-    rawTripRecordsList.forEach(rec => {
+    let tripsToShow = rawTripRecordsList;
+    if(selectedHijriFilter && selectedHijriFilter !== 'TBC'){
+      tripsToShow = rawTripRecordsList.filter(rec=>{
+        const hij = tripMap[rec.id]?.hijri || '';
+        return hij === selectedHijriFilter;
+      });
+    } else if(selectedHijriFilter === 'TBC'){
+      tripsToShow = [];
+    }
+
+    // V52: Grouped by bulan macam trip-umrah image_d21506.png - tapi nama trip sahaja
+    function getMonthKeyLongJemaah(dateStr){
+      if(!dateStr) return 'TBC';
+      const d = new Date(dateStr);
+      if(isNaN(d)) return 'TBC';
+      const months = ['JANUARI','FEBRUARI','MAC','APRIL','MEI','JUN','JULAI','OGOS','SEPTEMBER','OKTOBER','NOVEMBER','DISEMBER'];
+      return months[d.getMonth()] + ' ' + d.getFullYear();
+    }
+    const monthOrder = {'JANUARI':1,'FEBRUARI':2,'MAC':3,'APRIL':4,'MEI':5,'JUN':6,'JULAI':7,'OGOS':8,'SEPTEMBER':9,'OKTOBER':10,'NOVEMBER':11,'DISEMBER':12};
+    function parseMonthKeyForSortJemaah(key){
+      const parts = key.trim().split(' ');
+      const monthName = parts[0];
+      const year = parseInt(parts[1])||0;
+      const mNum = monthOrder[monthName]||99;
+      return year*100 + mNum;
+    }
+
+    const safeTrips = (tripsToShow||[]).filter(rec=> rec && rec.fields && typeof rec.fields === 'object');
+    const groups = {};
+    safeTrips.forEach(rec=>{
+      const key = getMonthKeyLongJemaah(rec.fields['Mula Pakej']||'');
+      if(!key || key==='TBC') return;
+      if(!groups[key]) groups[key]=[];
+      groups[key].push(rec);
+    });
+
+    const sortedGroupKeys = Object.keys(groups).sort((a,b)=> parseMonthKeyForSortJemaah(a)-parseMonthKeyForSortJemaah(b));
+
+    if(sortedGroupKeys.length===0){
+      safeTrips.forEach(rec => {
         const title = tripMap[rec.id] ? tripMap[rec.id].title : cleanTripName(rec.fields['Trip']);
         if (!title || title === 'TBC') return;
-
         const isActive = selectedTripFilter === title;
-
         const btn = document.createElement('button');
         btn.onclick = () => selectTripFilter(title, title);
         btn.className = `w-full text-left p-2 px-3 rounded-xl text-xs font-semibold transition flex items-center space-x-2.5 ${isActive ? 'bg-slate-100 text-slate-900 border border-slate-300/80 shadow-2xs' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'}`;
         btn.innerHTML = `<i class="fa-solid fa-list-check text-brand-maroon text-xs w-4"></i><span class="truncate">${title}</span>`;
         container.appendChild(btn);
-    });
+      });
+    } else {
+      sortedGroupKeys.forEach(groupKey=>{
+        const groupRecs = groups[groupKey];
+        groupRecs.sort((a,b)=>{
+          const da = new Date(a.fields['Mula Pakej']||0);
+          const db = new Date(b.fields['Mula Pakej']||0);
+          return da - db;
+        });
+
+        const header = document.createElement('div');
+        header.className = 'flex items-center justify-between mt-4 mb-2 px-1 first:mt-0';
+        header.innerHTML = `
+          <div class="flex items-center gap-1.5">
+            <span class="text-[11px]">📅</span>
+            <span class="text-[11px] font-extrabold text-[#8B1E3F] tracking-wide uppercase">${groupKey}</span>
+          </div>
+          <span class="text-[10px] font-bold bg-[#FDF0F3] text-[#8B1E3F] border border-[#F5D0D9] px-2 py-0.5 rounded-full">${groupRecs.length} Trip</span>
+        `;
+        container.appendChild(header);
+
+        groupRecs.forEach(rec=>{
+          const title = tripMap[rec.id] ? tripMap[rec.id].title : cleanTripName(rec.fields['Trip']);
+          if (!title || title === 'TBC') return;
+          const isActive = selectedTripFilter === title;
+          const btn = document.createElement('button');
+          btn.onclick = () => selectTripFilter(title, title);
+          btn.className = `w-full text-left p-2 px-3 rounded-xl text-xs font-semibold transition flex items-center space-x-2.5 mb-1 ${isActive ? 'bg-slate-100 text-slate-900 border border-slate-300/80 shadow-2xs' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'}`;
+          btn.innerHTML = `<i class="fa-solid fa-list-check text-brand-maroon text-xs w-4"></i><span class="truncate">${title}</span>`;
+          container.appendChild(btn);
+        });
+      });
+    }
+
+    if(tripsToShow.length===0 && selectedHijriFilter && selectedHijriFilter!=='TBC'){
+      const empty = document.createElement('div');
+      empty.className = "text-[11px] text-slate-400 text-center py-4";
+      empty.textContent = `Tiada trip untuk ${selectedHijriFilter}`;
+      container.appendChild(empty);
+    }
+    const filterLabel = document.getElementById('viewsFilterLabel');
+    if(filterLabel && selectedHijriFilter){
+      filterLabel.textContent = `Senarai Trip ${selectedHijriFilter}`;
+    }
 }
+
+function renderJemaahHijriTabs(){
+  const container = document.getElementById('jemaahHijriFilterTabs');
+  if(!container) return;
+  const jemaahCounts = {};
+  const tripCounts = {};
+  let tbcJemaah = 0;
+  rawTripRecordsList.forEach(r=>{
+    const hij = tripMap[r.id]?.hijri || '';
+    if(!hij) return;
+    tripCounts[hij] = (tripCounts[hij]||0)+1;
+  });
+  (allJemaahUmrahRecords||[]).forEach(j=>{
+    const hij = getJemaahHijriForRecord(j);
+    if(!hij){ tbcJemaah++; return; }
+    jemaahCounts[hij] = (jemaahCounts[hij]||0)+1;
+  });
+  let existingHijri = Object.keys(tripCounts).filter(h=>tripCounts[h]>0);
+  Object.keys(jemaahCounts).forEach(h=>{ if(!existingHijri.includes(h)) existingHijri.push(h); });
+  const extractYear = (s)=>{ const m=s.match(/(\d{4})H/); return m?parseInt(m[1]):9999; };
+  existingHijri.sort((a,b)=> extractYear(a)-extractYear(b));
+  if(!selectedHijriFilter && existingHijri.length>0){
+    selectedHijriFilter = existingHijri[0];
+  }
+  if(!selectedHijriFilter && tbcJemaah>0) selectedHijriFilter='TBC';
+  let html = ``;
+  existingHijri.forEach(h=>{
+    const jc = jemaahCounts[h]||0;
+    const tc = tripCounts[h]||0;
+    const active = selectedHijriFilter===h;
+    const isLoadingThis = isJemaahLoading && active;
+    html += `<button onclick="setJemaahHijriFilter('${h.replace(/'/g, "\'")}')" class="px-3.5 py-2 rounded-2xl text-[11px] font-bold border transition flex flex-col items-start leading-none gap-0.5 ${active ? 'bg-slate-900 text-white border-slate-900 shadow-sm' : 'bg-white text-slate-700 border-slate-200 hover:border-slate-300'} ${isLoadingThis?'opacity-70':''}"><span class="flex items-center gap-1.5">${isLoadingThis?'<i class="fa-solid fa-spinner fa-spin text-[10px]"></i>':''}${h}</span><span class="text-[9px] font-semibold opacity-70 tracking-wide">${tc} TRIP${jc>0?` (${jc})`:''}</span></button>`;
+  });
+  if(tbcJemaah>0 || selectedHijriFilter==='TBC'){
+    const active = selectedHijriFilter==='TBC';
+    const isLoadingThis = isJemaahLoading && active;
+    if(tbcJemaah>0 || active){
+      html += `<button onclick="setJemaahHijriFilter('TBC')" class="px-3.5 py-2 rounded-2xl text-[11px] font-bold border transition flex flex-col items-start leading-none gap-0.5 ${active ? 'bg-slate-900 text-white border-slate-900 shadow-sm' : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'} ${isLoadingThis?'opacity-70':''}"><span class="flex items-center gap-1.5">${isLoadingThis?'<i class="fa-solid fa-spinner fa-spin text-[10px]"></i>':''}TBC</span><span class="text-[9px] font-semibold opacity-70 tracking-wide">${tbcJemaah>0?tbcJemaah+' jemaah':'TBC'}</span></button>`;
+    }
+  }
+  container.innerHTML = html || `<div class="text-[10px] text-slate-400">Tiada musim</div>`;
+}
+
+function setJemaahHijriFilter(hijri){
+  if(isJemaahLoading) return;
+  if(selectedHijriFilter===hijri) return;
+  selectedHijriFilter = hijri;
+  isJemaahLoading = true;
+  renderJemaahHijriTabs();
+  const tbody = document.getElementById('jemaahTableBody');
+  if(tbody){
+    tbody.innerHTML = `<tr><td colspan="24" class="text-center py-16"><div class="inline-flex flex-col items-center gap-2 text-slate-500"><i class="fa-solid fa-spinner fa-spin text-xl text-slate-900"></i><span class="text-xs font-bold">Memuat ${hijri}...</span></div></td></tr>`;
+  }
+  const titleEl = document.getElementById('currentViewTitle');
+  if(titleEl){
+    if(hijri==='TBC') titleEl.textContent = 'TBC / TANPA TRIP';
+    else titleEl.textContent = `JEMAAH MUSIM ${hijri}`;
+  }
+  const filterLabel = document.getElementById('viewsFilterLabel');
+  if(filterLabel){
+    filterLabel.textContent = `Senarai Trip ${hijri}`;
+  }
+  setTimeout(()=>{
+    if(hijri==='TBC'){
+      selectedTripFilter='TBC';
+    } else {
+      if(selectedTripFilter && selectedTripFilter!=='ALL' && selectedTripFilter!=='TBC'){
+        const hijForTrip = tripMap[selectedTripFilter]?.hijri || '';
+        if(hijForTrip!==hijri) selectedTripFilter=null;
+      }
+    }
+    renderViewsSidebar();
+    filterAndRenderJemaahGrid();
+    isJemaahLoading=false;
+    renderJemaahHijriTabs();
+  }, 50);
+}
+
 
 function selectTripFilter(tripId, displayTitle) {
     selectedTripFilter = tripId;
@@ -526,7 +914,12 @@ function renderTableHeader() {
         'col-trip': `<th draggable="true" data-col="col-trip" class="p-3 border-r border-slate-300 col-trip draggable-header relative select-none overflow-hidden text-ellipsis">TRIP<div class="col-resizer"></div></th>`,
         'col-issue': `<th draggable="true" data-col="col-issue" class="p-3 border-r border-slate-300 col-issue draggable-header relative select-none overflow-hidden text-ellipsis">DATE OF ISSUE<div class="col-resizer"></div></th>`,
         'col-expire': `<th draggable="true" data-col="col-expire" class="p-3 border-r border-slate-300 col-expire draggable-header relative select-none overflow-hidden text-ellipsis">DATE OF EXPIRE<div class="col-resizer"></div></th>`,
-        'col-notes': `<th draggable="true" data-col="col-notes" class="p-3 col-notes draggable-header relative select-none overflow-hidden text-ellipsis">NOTES<div class="col-resizer"></div></th>`
+        'col-notes': `<th draggable="true" data-col="col-notes" class="p-3 border-r border-slate-300 col-notes draggable-header relative select-none overflow-hidden text-ellipsis">NOTES<div class="col-resizer"></div></th>`,
+        'col-board': `<th draggable="true" data-col="col-board" class="p-3 border-r border-slate-300 col-board draggable-header relative select-none overflow-hidden text-ellipsis">BOARD BASIS<div class="col-resizer"></div></th>`,
+        'col-train': `<th draggable="true" data-col="col-train" class="p-3 border-r border-slate-300 col-train draggable-header relative select-none overflow-hidden text-ellipsis">TRAIN<div class="col-resizer"></div></th>`,
+        'col-insuran': `<th draggable="true" data-col="col-insuran" class="p-3 border-r border-slate-300 col-insuran draggable-header relative select-none overflow-hidden text-ellipsis">INSURAN<div class="col-resizer"></div></th>`,
+        'col-pakej': `<th draggable="true" data-col="col-pakej" class="p-3 border-r border-slate-300 col-pakej draggable-header relative select-none overflow-hidden text-ellipsis">PAKEJ<div class="col-resizer"></div></th>`,
+        'col-ejen': `<th draggable="true" data-col="col-ejen" class="p-3 col-ejen draggable-header relative select-none overflow-hidden text-ellipsis">EJEN<div class="col-resizer"></div></th>`
     };
 
     columnOrder.forEach(colKey => {
@@ -540,7 +933,7 @@ function filterAndRenderJemaahGrid() {
     const tbody = document.getElementById('jemaahTableBody');
     const countBadge = document.getElementById('jemaahCountBadge');
 
-    if (!selectedTripFilter) {
+    if (!selectedTripFilter && !selectedHijriFilter) {
         if (tbody) {
             tbody.innerHTML = `
                 <tr>
@@ -556,6 +949,14 @@ function filterAndRenderJemaahGrid() {
     }
 
     let filtered = [...allJemaahUmrahRecords];
+
+    if(selectedHijriFilter){
+      if(selectedHijriFilter === 'TBC'){
+        filtered = filtered.filter(r=> !getJemaahHijriForRecord(r));
+      } else {
+        filtered = filtered.filter(r=> getJemaahHijriForRecord(r) === selectedHijriFilter);
+      }
+    }
 
     if (selectedTripFilter === 'TBC') {
         filtered = filtered.filter(j => {
@@ -632,8 +1033,8 @@ function renderJemaahRows(records) {
             'col-age': `<td class="p-2.5 border-r border-slate-300 bg-slate-50/50 font-semibold text-slate-600 col-age" id="age-cell-${id}">${f['AGE'] || '-'}</td>`,
             'col-dob': `<td class="p-2.5 border-r border-slate-300 bg-slate-50/50 font-semibold text-slate-600 col-dob" id="dob-cell-${id}">${f['DOB'] || '-'}</td>`,
             'col-dobf': `<td class="p-1 border-r border-slate-300 col-dobf"><input type="date" value="${f['DOB (FOREIGNER)'] || ''}" onchange="updateJemaahField('${id}', 'DOB (FOREIGNER)', this.value)" class="w-full text-xs p-1.5 rounded-lg border border-transparent hover:border-slate-300 focus:bg-white bg-transparent"></td>`,
-            'col-nat': `<td class="p-1 border-r border-slate-300 col-nat"><select onchange="updateJemaahField('${id}', 'NATIONALITY', this.value)" class="w-full text-xs p-1.5 font-bold rounded-lg border border-transparent hover:border-slate-300 focus:bg-white bg-transparent"><option value="MALAYSIA" ${(!f['NATIONALITY'] || f['NATIONALITY'] === 'MALAYSIA') ? 'selected' : ''}>MALAYSIA</option><option value="INDONESIA" ${f['NATIONALITY'] === 'INDONESIA' ? 'selected' : ''}>INDONESIA</option><option value="THAILAND" ${f['NATIONALITY'] === 'THAILAND' ? 'selected' : ''}>THAILAND</option><option value="INDIA" ${f['NATIONALITY'] === 'INDIA' ? 'selected' : ''}>INDIA</option><option value="BANGLADESH" ${f['NATIONALITY'] === 'BANGLADESH' ? 'selected' : ''}>BANGLADESH</option></select></td>`,
-            'col-visa': `<td class="p-1 border-r border-slate-300 col-visa"><select onchange="updateJemaahField('${id}', 'STATUS VISA', this.value)" class="w-full text-xs p-1.5 font-bold rounded-lg border border-transparent hover:border-slate-300 focus:bg-white bg-transparent"><option value="">-- Pilih --</option><option value="TOURIST" ${f['STATUS VISA'] === 'TOURIST' ? 'selected' : ''}>TOURIST</option><option value="TOURIST (VALID)" ${f['STATUS VISA'] === 'TOURIST (VALID)' ? 'selected' : ''}>TOURIST (VALID)</option><option value="UMRAH" ${f['STATUS VISA'] === 'UMRAH' ? 'selected' : ''}>UMRAH</option><option value="UMRAH (VALID)" ${f['STATUS VISA'] === 'UMRAH (VALID)' ? 'selected' : ''}>UMRAH (VALID)</option><option value="IQAMA (VALID)" ${f['STATUS VISA'] === 'IQAMA (VALID)' ? 'selected' : ''}>IQAMA (VALID)</option></select></td>`,
+            'col-nat': `<td class="p-1 border-r border-slate-300 col-nat">${renderSingleSelectCell(id, 'NATIONALITY', f['NATIONALITY'])}</td>`,
+            'col-visa': `<td class="p-1 border-r border-slate-300 col-visa">${renderSingleSelectCell(id, 'STATUS VISA', f['STATUS VISA'])}</td>`,
             'col-passcopy': `<td class="p-2 border-r border-slate-300 text-center col-passcopy">${renderInlineUploadCell(id, 'PASSPORT COPY', passCopyFiles, 'Passport')}</td>`,
             'col-visacopy': `<td class="p-2 border-r border-slate-300 text-center col-visacopy">${renderInlineUploadCell(id, 'VISA COPY', visaCopyFiles, 'Visa')}</td>`,
             'col-mofabio': `<td class="p-2 border-r border-slate-300 text-center col-mofabio">${renderInlineUploadCell(id, 'MOFABIO', mofabioFiles, 'Mofabio')}</td>`,
@@ -641,7 +1042,12 @@ function renderJemaahRows(records) {
             'col-trip': `<td class="p-2.5 border-r border-slate-300 font-bold text-brand-maroon col-trip">${actualTripName}</td>`,
             'col-issue': `<td class="p-1 border-r border-slate-300 col-issue"><input type="date" value="${f['DATE OF ISSUE'] || ''}" onchange="updateJemaahField('${id}', 'DATE OF ISSUE', this.value)" class="w-full text-xs p-1.5 rounded-lg border border-transparent hover:border-slate-300 focus:bg-white bg-transparent"></td>`,
             'col-expire': `<td class="p-1 border-r border-slate-300 col-expire"><input type="date" value="${f['DATE OF EXPIRE'] || ''}" onchange="updateJemaahField('${id}', 'DATE OF EXPIRE', this.value)" class="w-full text-xs p-1.5 rounded-lg border border-transparent hover:border-slate-300 focus:bg-white bg-transparent"></td>`,
-            'col-notes': `<td class="p-1 col-notes"><input type="text" value="${f['Notes'] || ''}" onchange="updateJemaahField('${id}', 'Notes', this.value)" class="w-full text-xs p-1.5 rounded-lg border border-transparent hover:border-slate-300 focus:bg-white bg-transparent"></td>`
+            'col-notes': `<td class="p-1 border-r border-slate-300 col-notes"><input type="text" value="${f['Notes'] || ''}" onchange="updateJemaahField('${id}', 'Notes', this.value)" class="w-full text-xs p-1.5 rounded-lg border border-transparent hover:border-slate-300 focus:bg-white bg-transparent"></td>`,
+            'col-board': `<td class="p-1 border-r border-slate-300 col-board">${renderMultiSelectCell(id, 'BOARD BASIS', f['BOARD BASIS'])}</td>`,
+            'col-train': `<td class="p-2 border-r border-slate-300 text-center col-train"><input type="checkbox" ${f['TRAIN'] ? 'checked' : ''} onchange="updateJemaahField('${id}', 'TRAIN', this.checked)" class="w-4 h-4 rounded text-brand-maroon focus:ring-brand-maroon"></td>`,
+            'col-insuran': `<td class="p-1 border-r border-slate-300 col-insuran">${renderMultiSelectCell(id, 'INSURAN', f['INSURAN'])}</td>`,
+            'col-pakej': `<td class="p-1 border-r border-slate-300 col-pakej">${renderSingleSelectCell(id, 'PAKEJ', f['PAKEJ'])}</td>`,
+            'col-ejen': `<td class="p-1 col-ejen">${renderEjenCell(id, f['EJEN'])}</td>`
         };
 
         columnOrder.forEach(colKey => {
@@ -1734,51 +2140,177 @@ function updateStickyNameLeftOffset(idxWidth) {
 }
 
 const columnDefinitions = [
-    { key: 'col-name', label: 'NAME' },
-    { key: 'col-picture', label: 'PICTURE' },
-    { key: 'col-ic', label: 'IC NO.' },
-    { key: 'col-passport', label: 'PASSPORT NO.' },
-    { key: 'col-gender', label: 'GENDER' },
-    { key: 'col-age', label: 'AGE' },
-    { key: 'col-dob', label: 'DOB' },
-    { key: 'col-dobf', label: 'DOB (FOREIGNER)' },
-    { key: 'col-nat', label: 'NATIONALITY' },
-    { key: 'col-visa', label: 'STATUS VISA' },
-    { key: 'col-passcopy', label: 'PASSPORT COPY' },
-    { key: 'col-visacopy', label: 'VISA COPY' },
-    { key: 'col-mofabio', label: 'MOFABIO' },
-    { key: 'col-fit', label: 'FIT TICKET' },
-    { key: 'col-trip', label: 'TRIP' },
-    { key: 'col-issue', label: 'DATE OF ISSUE' },
-    { key: 'col-expire', label: 'DATE OF EXPIRE' },
-    { key: 'col-notes', label: 'NOTES' }
+    { key: 'col-name', label: 'NAME', icon: 'fa-font', type: 'A' },
+    { key: 'col-picture', label: 'PICTURE', icon: 'fa-image', type: '🖼️' },
+    { key: 'col-ic', label: 'IC NO.', icon: 'fa-id-card', type: 'A' },
+    { key: 'col-passport', label: 'PASSPORT NO.', icon: 'fa-passport', type: 'A' },
+    { key: 'col-gender', label: 'GENDER', icon: 'fa-venus-mars', type: 'singleSelect' },
+    { key: 'col-age', label: 'AGE', icon: 'fa-calculator', type: 'formula' },
+    { key: 'col-dob', label: 'DOB', icon: 'fa-calculator', type: 'formula' },
+    { key: 'col-dobf', label: 'DOB (FOREIGNER)', icon: 'fa-calendar', type: 'date' },
+    { key: 'col-nat', label: 'NATIONALITY', icon: 'fa-flag', type: 'singleSelect' },
+    { key: 'col-visa', label: 'STATUS VISA', icon: 'fa-file-lines', type: 'singleSelect' },
+    { key: 'col-passcopy', label: 'PASSPORT COPY', icon: 'fa-file-image', type: 'attachment' },
+    { key: 'col-visacopy', label: 'VISA COPY', icon: 'fa-file-image', type: 'attachment' },
+    { key: 'col-mofabio', label: 'MOFABIO', icon: 'fa-file-image', type: 'attachment' },
+    { key: 'col-fit', label: 'FIT TICKET', icon: 'fa-square-check', type: 'checkbox' },
+    { key: 'col-trip', label: 'TRIP', icon: 'fa-link', type: 'link' },
+    { key: 'col-issue', label: 'DATE OF ISSUE', icon: 'fa-calendar', type: 'date' },
+    { key: 'col-expire', label: 'DATE OF EXPIRE', icon: 'fa-calendar', type: 'date' },
+    { key: 'col-notes', label: 'NOTES', icon: 'fa-align-left', type: 'text' },
+    { key: 'col-board', label: 'BOARD BASIS', icon: 'fa-utensils', type: 'multiSelect' },
+    { key: 'col-train', label: 'TRAIN', icon: 'fa-train', type: 'checkbox' },
+    { key: 'col-insuran', label: 'INSURAN', icon: 'fa-shield-halved', type: 'multiSelect' },
+    { key: 'col-pakej', label: 'PAKEJ', icon: 'fa-box', type: 'singleSelect' },
+    { key: 'col-ejen', label: 'EJEN', icon: 'fa-user-tie', type: 'link' }
 ];
+
+function getFieldTypeIcon(type){
+  const map = {
+    'singleSelect': '<i class="fa-solid fa-circle-dot text-emerald-500 text-[11px]"></i>',
+    'multiSelect': '<i class="fa-solid fa-list text-sky-500 text-[11px]"></i>',
+    'attachment': '<i class="fa-solid fa-paperclip text-slate-400 text-[11px]"></i>',
+    'date': '<i class="fa-regular fa-calendar text-slate-400 text-[11px]"></i>',
+    'checkbox': '<i class="fa-regular fa-square-check text-slate-400 text-[11px]"></i>',
+    'formula': '<i class="fa-solid fa-calculator text-purple-400 text-[11px]"></i>',
+    'link': '<i class="fa-solid fa-link text-amber-500 text-[11px]"></i>',
+    'text': '<i class="fa-solid fa-align-left text-slate-400 text-[11px]"></i>',
+    'A': '<span class="text-[11px] font-bold text-slate-500">A</span>'
+  };
+  return map[type] || '<span class="text-[10px] text-slate-400">T</span>';
+}
+
+let draggedFieldKey = null;
 
 function buildHideFieldsList() {
     const listContainer = document.getElementById('fieldsToggleList');
     if (!listContainer) return;
     listContainer.innerHTML = '';
 
-    columnDefinitions.forEach(col => {
+    const orderedDefs = [];
+    columnOrder.forEach(k=>{
+      const def = columnDefinitions.find(c=> c.key===k);
+      if(def) orderedDefs.push(def);
+    });
+    columnDefinitions.forEach(def=>{
+      if(!orderedDefs.find(d=> d.key===def.key)){
+        if(def.key==='col-idx') return;
+        orderedDefs.push(def);
+      }
+    });
+
+    orderedDefs.forEach((col, idx) => {
         const isHidden = hiddenColumns[col.key] || false;
-        const item = document.createElement('label');
-        item.className = "flex items-center space-x-2 p-1 hover:bg-slate-50 rounded cursor-pointer select-none";
+        const isVisible = !isHidden;
+        const item = document.createElement('div');
+        item.draggable = true;
+        item.dataset.key = col.key;
+        item.dataset.index = idx;
+        item.className = `group flex items-center justify-between gap-2 px-2 py-1.5 rounded-lg hover:bg-slate-50 transition cursor-grab active:cursor-grabbing select-none border border-transparent hover:border-slate-200 ${isHidden?'opacity-60':''}`;
         item.innerHTML = `
-            <input type="checkbox" ${!isHidden ? 'checked' : ''} onchange="toggleColumnVisibility('${col.key}', this.checked)" class="rounded text-brand-maroon focus:ring-brand-maroon w-3.5 h-3.5">
-            <span class="text-slate-700 font-medium">${col.label}</span>
+            <div class="flex items-center gap-2 flex-1 min-w-0">
+                <label class="relative inline-flex items-center cursor-pointer">
+                    <input type="checkbox" ${isVisible ? 'checked' : ''} onchange="toggleColumnVisibility('${col.key}', this.checked)" class="sr-only peer">
+                    <div class="w-7 h-4 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-sky-500"></div>
+                </label>
+                <span class="w-4 h-4 flex items-center justify-center flex-shrink-0">${getFieldTypeIcon(col.type)}</span>
+                <span class="text-slate-700 font-medium truncate text-[11px]">${col.label}</span>
+            </div>
+            <div class="flex items-center gap-1 opacity-60 group-hover:opacity-100">
+                <span class="text-[10px] text-slate-400 font-mono">${col.type==='A'?'A':''}</span>
+                <i class="fa-solid fa-grip text-[10px] text-slate-300 cursor-grab"></i>
+            </div>
         `;
+        item.addEventListener('dragstart', (e)=>{
+          draggedFieldKey = col.key;
+          e.dataTransfer.effectAllowed = 'move';
+          item.classList.add('opacity-50');
+        });
+        item.addEventListener('dragend', ()=>{
+          item.classList.remove('opacity-50');
+          draggedFieldKey = null;
+        });
+        item.addEventListener('dragover', (e)=>{
+          e.preventDefault();
+          item.classList.add('bg-sky-50','border-sky-200');
+        });
+        item.addEventListener('dragleave', ()=>{
+          item.classList.remove('bg-sky-50','border-sky-200');
+        });
+        item.addEventListener('drop', (e)=>{
+          e.preventDefault();
+          item.classList.remove('bg-sky-50','border-sky-200');
+          const targetKey = col.key;
+          if(draggedFieldKey && draggedFieldKey!==targetKey){
+            rearrangeColumns(draggedFieldKey, targetKey);
+          }
+        });
         listContainer.appendChild(item);
     });
+
+    const visibleCount = orderedDefs.filter(c=> !hiddenColumns[c.key]).length;
+    const countEl = document.getElementById('visibleFieldsCount');
+    if(countEl) countEl.textContent = `${visibleCount} fields visible`;
+}
+
+function rearrangeColumns(draggedKey, targetKey){
+  const fromIdx = columnOrder.indexOf(draggedKey);
+  const toIdx = columnOrder.indexOf(targetKey);
+  if(fromIdx===-1 || toIdx===-1) return;
+  const [removed] = columnOrder.splice(fromIdx,1);
+  const newToIdx = columnOrder.indexOf(targetKey);
+  columnOrder.splice(newToIdx, 0, removed);
+  localStorage.setItem('jemaahColOrder', JSON.stringify(columnOrder));
+  renderTableHeader();
+  filterAndRenderJemaahGrid();
+  buildHideFieldsList();
+}
+
+function filterFieldsList(){
+  const q = (document.getElementById('fieldSearchInput')?.value || '').toLowerCase();
+  const list = document.getElementById('fieldsToggleList');
+  if(!list) return;
+  Array.from(list.children).forEach(child=>{
+    const label = child.textContent.toLowerCase();
+    if(label.includes(q)) child.classList.remove('hidden');
+    else child.classList.add('hidden');
+  });
+}
+
+function resetFieldsToDefault(){
+  hiddenColumns = {};
+  columnOrder = [
+    'col-idx', 'col-name', 'col-picture', 'col-ic', 'col-passport', 
+    'col-gender', 'col-age', 'col-dob', 'col-dobf', 'col-nat', 
+    'col-visa', 'col-passcopy', 'col-visacopy', 'col-mofabio', 
+    'col-fit', 'col-trip', 'col-issue', 'col-expire', 'col-notes',
+    'col-board', 'col-train', 'col-insuran', 'col-pakej', 'col-ejen'
+  ];
+  localStorage.removeItem('jemaahColOrder');
+  localStorage.removeItem('jemaahHiddenColumns');
+  renderTableHeader();
+  filterAndRenderJemaahGrid();
+  buildHideFieldsList();
+  applyHiddenColumns();
 }
 
 function toggleHideFieldsDropdown() {
     const drop = document.getElementById('hideFieldsDropdown');
-    if (drop) drop.classList.toggle('hidden');
+    if (!drop) return;
+    const isHidden = drop.classList.contains('hidden');
+    if (isHidden) {
+      buildHideFieldsList();
+      drop.classList.remove('hidden');
+    } else {
+      drop.classList.add('hidden');
+    }
 }
 
 function toggleColumnVisibility(colClass, isVisible) {
     hiddenColumns[colClass] = !isVisible;
+    localStorage.setItem('jemaahHiddenColumns', JSON.stringify(hiddenColumns));
     applyHiddenColumns();
+    buildHideFieldsList();
 }
 
 function applyHiddenColumns() {
@@ -2036,4 +2568,110 @@ function filterJemaahTable() {
     modal.classList.remove('hidden');
     modal.style.display='flex';
   };
+
+// V54: Auto-close dropdowns when clicking outside - fix image_c96f0e.png double dropdown overlap
+document.addEventListener('click', function(e){
+  const sortDrop = document.getElementById('sortDropdownMenu');
+  const hideDrop = document.getElementById('hideFieldsDropdown');
+  const sortBtn = e.target.closest('[onclick*="toggleSortDropdown"]') || e.target.closest('button')?.parentElement?.querySelector('#sortDropdownMenu') ? null : null;
+  // Check if click is inside dropdown or its button
+  const isSortButton = e.target.closest('button[onclick="toggleSortDropdown()"]') || e.target.closest('button')?.innerHTML?.includes('Sort:');
+  const isHideButton = e.target.closest('button[onclick="toggleHideFieldsDropdown()"]') || e.target.closest('button')?.innerHTML?.includes('Edit/Arrange Fields');
+  const isInsideSort = sortDrop && sortDrop.contains(e.target);
+  const isInsideHide = hideDrop && hideDrop.contains(e.target);
+  
+  // More robust: check button ancestors
+  const sortButton = document.querySelector('button[onclick="toggleSortDropdown()"]');
+  const hideButton = document.querySelector('button[onclick="toggleHideFieldsDropdown()"]');
+  
+  const clickedSortButton = sortButton && (sortButton.contains(e.target) || e.target === sortButton || e.target.closest('button') === sortButton);
+  const clickedHideButton = hideButton && (hideButton.contains(e.target) || e.target === hideButton || e.target.closest('button') === hideButton);
+  
+  if(sortDrop && !sortDrop.classList.contains('hidden')){
+    if(!isInsideSort && !clickedSortButton && !e.target.closest('#sortDropdownMenu')){
+      // Only close if not clicking inside sort dropdown or its button
+      const isButton = e.target.closest('button') && e.target.closest('button').getAttribute('onclick')?.includes('toggleSortDropdown');
+      if(!isButton && !sortDrop.contains(e.target) && !(sortButton && sortButton.contains(e.target))){
+        sortDrop.classList.add('hidden');
+      }
+    }
+  }
+  if(hideDrop && !hideDrop.classList.contains('hidden')){
+    if(!isInsideHide && !clickedHideButton && !e.target.closest('#hideFieldsDropdown')){
+      const isButton = e.target.closest('button') && e.target.closest('button').getAttribute('onclick')?.includes('toggleHideFieldsDropdown');
+      if(!isButton && !hideDrop.contains(e.target) && !(hideButton && hideButton.contains(e.target))){
+        hideDrop.classList.add('hidden');
+      }
+    }
+  }
+});
+
+// Improved version: single handler for all dropdowns
+(function(){
+  const originalToggleSort = window.toggleSortDropdown;
+  const originalToggleHide = window.toggleHideFieldsDropdown;
+  
+  window.toggleSortDropdown = function(){
+    const drop = document.getElementById('sortDropdownMenu');
+    const hideDrop = document.getElementById('hideFieldsDropdown');
+    if(hideDrop) hideDrop.classList.add('hidden'); // Close other dropdown - fix image_c96f0e.png double
+    if(drop){
+      drop.classList.toggle('hidden');
+    } else if(originalToggleSort){
+      originalToggleSort();
+    }
+  };
+  
+  window.toggleHideFieldsDropdown = function(){
+    const drop = document.getElementById('hideFieldsDropdown');
+    const sortDrop = document.getElementById('sortDropdownMenu');
+    if(sortDrop) sortDrop.classList.add('hidden'); // Close other dropdown - fix image_c96f0e.png double
+    if(drop){
+      const isHidden = drop.classList.contains('hidden');
+      if(isHidden){
+        if(typeof buildHideFieldsList === 'function') buildHideFieldsList();
+        drop.classList.remove('hidden');
+      } else {
+        drop.classList.add('hidden');
+      }
+    } else if(originalToggleHide){
+      originalToggleHide();
+    }
+  };
+  
+  // Global click outside to close all dropdowns
+  document.addEventListener('click', function(event){
+    const sortDrop = document.getElementById('sortDropdownMenu');
+    const hideDrop = document.getElementById('hideFieldsDropdown');
+    const sortBtn = document.querySelector('button[onclick="toggleSortDropdown()"]');
+    const hideBtn = document.querySelector('button[onclick="toggleHideFieldsDropdown()"]');
+    
+    // If clicking outside both dropdowns and their buttons, close them
+    const clickedInsideSort = sortDrop && (sortDrop.contains(event.target) || (sortBtn && sortBtn.contains(event.target)));
+    const clickedInsideHide = hideDrop && (hideDrop.contains(event.target) || (hideBtn && hideBtn.contains(event.target)));
+    
+    if(!clickedInsideSort && sortDrop && !sortDrop.classList.contains('hidden')){
+      sortDrop.classList.add('hidden');
+    }
+    if(!clickedInsideHide && hideDrop && !hideDrop.classList.contains('hidden')){
+      // Don't close if clicking inside search input filtering
+      if(!event.target.closest('#fieldSearchInput') && !event.target.closest('#fieldsToggleList')){
+        // Check if it's not the toggle itself (already handled by contains)
+        if(!(hideBtn && hideBtn.contains(event.target))){
+          hideDrop.classList.add('hidden');
+        }
+      }
+    }
+  });
+})();
+
+
+
+document.addEventListener('click', function(e){
+  if(!e.target.closest('[data-cell-dropdown]') && !e.target.closest('.cell-dropdown-wrapper')){
+    if(typeof closeAllCellDropdowns === 'function') closeAllCellDropdowns();
+  }
+});
+
+
 })();

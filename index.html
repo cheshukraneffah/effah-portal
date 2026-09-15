@@ -173,21 +173,72 @@
                         </div>
                     </div>
                     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-                        <div class="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm flex items-center justify-between">
-                            <div><p class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Total Trip Umrah</p><h3 class="text-3xl font-black text-slate-900 mt-2" id="statUmrahCount">0</h3><p class="text-[11px] text-emerald-600 font-semibold mt-1"><i class="fa-solid fa-circle-check text-[9px] mr-1"></i> Rekod Terdaftar</p></div>
+                        <div class="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm flex items-center justify-between hover:shadow-md transition">
+                            <div>
+                                <p class="text-[11px] font-bold text-slate-400 uppercase tracking-wider" id="statUmrahLabel">Trip Umrah Musim 1448H</p>
+                                <h3 class="text-3xl font-black text-slate-900 mt-2" id="statUmrahCount">0</h3>
+                                <p class="text-[11px] text-emerald-600 font-semibold mt-1"><i class="fa-solid fa-calendar-check text-[9px] mr-1"></i> <span id="statUmrahSub">Musim Aktif</span></p>
+                            </div>
                             <div class="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center text-xl"><i class="fa-solid fa-kaaba"></i></div>
                         </div>
-                        <div class="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm flex items-center justify-between">
+                        <div class="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm flex items-center justify-between hover:shadow-md transition">
                             <div><p class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Total Trip Luar</p><h3 class="text-3xl font-black text-slate-900 mt-2" id="statLuarCount">0</h3><p class="text-[11px] text-blue-600 font-semibold mt-1"><i class="fa-solid fa-plane text-[9px] mr-1"></i> Pakej Pelancongan</p></div>
                             <div class="w-12 h-12 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center text-xl"><i class="fa-solid fa-earth-americas"></i></div>
                         </div>
-                        <div class="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm flex items-center justify-between">
-                            <div><p class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Jemaah Umrah</p><h3 class="text-3xl font-black text-slate-900 mt-2" id="statJemaahUmrahCount">0</h3><p class="text-[11px] text-brand-maroon font-semibold mt-1"><i class="fa-solid fa-users text-[9px] mr-1"></i> Total Peserta</p></div>
+                        <div class="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm flex items-center justify-between hover:shadow-md transition">
+                            <div>
+                                <p class="text-[11px] font-bold text-slate-400 uppercase tracking-wider" id="statJemaahLabel">Jemaah Musim 1448H</p>
+                                <h3 class="text-3xl font-black text-slate-900 mt-2" id="statJemaahUmrahCount">0</h3>
+                                <p class="text-[11px] text-brand-maroon font-semibold mt-1"><i class="fa-solid fa-users text-[9px] mr-1"></i> <span id="statJemaahSub">Musim Aktif</span></p>
+                            </div>
                             <div class="w-12 h-12 bg-rose-50 text-brand-maroon rounded-2xl flex items-center justify-center text-xl"><i class="fa-solid fa-user-group"></i></div>
                         </div>
-                        <div class="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm flex items-center justify-between">
+                        <div class="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm flex items-center justify-between hover:shadow-md transition">
                             <div><p class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Peserta Trip Luar</p><h3 class="text-3xl font-black text-slate-900 mt-2" id="statPesertaLuarCount">0</h3><p class="text-[11px] text-amber-600 font-semibold mt-1"><i class="fa-solid fa-passport text-[9px] mr-1"></i> Total Peserta</p></div>
                             <div class="w-12 h-12 bg-amber-50 text-amber-600 rounded-2xl flex items-center justify-center text-xl"><i class="fa-solid fa-suitcase-rolling"></i></div>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-5 mt-6">
+                        <div class="lg:col-span-2 bg-white rounded-2xl border border-slate-200/80 shadow-sm p-6">
+                            <div class="flex items-center justify-between mb-5">
+                                <div>
+                                    <h3 class="text-sm font-extrabold text-slate-900 tracking-tight">Kalendar Trip Umrah</h3>
+                                    <p class="text-[11px] text-slate-500 mt-1">Musim <span id="calendarActiveSeason" class="font-bold text-slate-800">1448H</span> </p>
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <button onclick="changeCalendarMonth(-1)" class="w-8 h-8 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-center hover:bg-slate-100 transition"><i class="fa-solid fa-chevron-left text-[11px]"></i></button>
+                                    <span id="calendarMonthLabel" class="text-xs font-bold text-slate-800 px-2 min-w-[110px] text-center">September 2026</span>
+                                    <button onclick="changeCalendarMonth(1)" class="w-8 h-8 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-center hover:bg-slate-100 transition"><i class="fa-solid fa-chevron-right text-[11px]"></i></button>
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-7 gap-1 text-center mb-2">
+                                <div class="text-[10px] font-bold text-slate-400 py-1">AHAD</div>
+                                <div class="text-[10px] font-bold text-slate-400 py-1">ISNIN</div>
+                                <div class="text-[10px] font-bold text-slate-400 py-1">SELASA</div>
+                                <div class="text-[10px] font-bold text-slate-400 py-1">RABU</div>
+                                <div class="text-[10px] font-bold text-slate-400 py-1">KHAMIS</div>
+                                <div class="text-[10px] font-bold text-slate-400 py-1">JUMAAT</div>
+                                <div class="text-[10px] font-bold text-slate-400 py-1">SABTU</div>
+                            </div>
+                            <div id="calendarGrid" class="grid grid-cols-7 gap-1">
+                                <div class="text-center py-8 col-span-7 text-slate-400 text-xs"><i class="fa-solid fa-spinner fa-spin mr-1"></i> Memuat kalendar...</div>
+                            </div>
+                            <div class="flex items-center gap-3 mt-4 pt-4 border-t border-slate-100 text-[10px]">
+                                <div class="flex items-center gap-1.5"><span class="w-2 h-2 bg-emerald-500 rounded-full"></span> Ada Trip</div>
+                                <div class="flex items-center gap-1.5"><span class="w-2 h-2 bg-slate-900 rounded-full"></span> Hari Ini</div>
+                                <div class="flex items-center gap-1.5"><span class="w-2 h-2 bg-amber-400 rounded-full"></span> Dalam 30 Hari</div>
+                            </div>
+                        </div>
+                        <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-6 flex flex-col">
+                            <div class="flex items-center justify-between mb-4">
+                                <h3 class="text-sm font-extrabold text-slate-900 tracking-tight">Dalam 30 Hari</h3>
+                                <span class="text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200 px-2 py-1 rounded-full" id="upcomingCount">0 Trip</span>
+                            </div>
+                            <div id="upcomingTripsList" class="space-y-2.5 flex-1 overflow-y-auto max-h-[340px] pr-1">
+                                <div class="text-center py-10 text-slate-400 text-xs">Memuat trip akan datang...</div>
+                            </div>
+                            <button onclick="switchTab('pakej-umrah')" class="mt-4 w-full bg-slate-900 text-white text-xs font-bold py-2.5 rounded-xl hover:bg-black transition">Lihat Semua Trip <i class="fa-solid fa-arrow-right ml-1"></i></button>
                         </div>
                     </div>
                 </section>
@@ -219,7 +270,328 @@
 </div>
 
     <!-- SCRIPT MODULES - CLEAN ORDER - NO FALLBACK DUPLICATE -->
+    
+    <script>
+    // V39 FINAL FIX for image_b58a64.png - tak keluar trip
+    let calendarCurrentDate = new Date();
+    let activeHijriSeason = '1448H';
+    let allTripDataForCalendar = [];
+    let cachedTrips = [];
+    let cachedJemaah = [];
+
+    function cleanTripNameForDisplay(raw){
+      if(!raw) return 'TBC';
+      let name = raw.toString().trim();
+      name = name.replace(/^\d{1,2}\/\d{1,2}\s*\|\s*/i, '');
+      name = name.replace(/^\d{1,2}\/\d{1,2}\s*\(\d+\s*D?\s*\)\s*\|?\s*/i, '');
+      if(name.includes('|')){
+        const parts = name.split('|');
+        name = parts[parts.length-1].trim();
+      }
+      name = name.replace(/\s+/g, ' ').trim();
+      return name || 'TBC';
+    }
+    function getHijriSeasonFromField(val){
+      if(!val) return '';
+      const m = val.toString().toUpperCase().match(/(\d{4})H/);
+      return m ? m[0] : val.toString().trim().toUpperCase();
+    }
+    function determineActiveHijriSeason(trips){
+      if(!trips || trips.length===0) return {active:'1448H', nextSeason:'1449H', seasonMap:{}};
+      const seasonMap = {};
+      trips.forEach(rec=>{
+        const f = rec.fields || {};
+        let hijri = getHijriSeasonFromField(f['Hijri Season'] || '');
+        if(!hijri) return;
+        const mula = f['Mula Pakej'] ? new Date(f['Mula Pakej']) : null;
+        if(!mula || isNaN(mula)) return;
+        if(!seasonMap[hijri]) seasonMap[hijri] = { trips: [], maxDate: mula, minDate: mula };
+        seasonMap[hijri].trips.push(rec);
+        if(mula > seasonMap[hijri].maxDate) seasonMap[hijri].maxDate = mula;
+        if(mula < seasonMap[hijri].minDate) seasonMap[hijri].minDate = mula;
+      });
+      const today = new Date(); today.setHours(0,0,0,0);
+      const seasons = Object.keys(seasonMap).sort();
+      let active = null; let nextSeason = null;
+      for(let season of seasons){
+        const hasUpcoming = seasonMap[season].trips.some(r=>{
+          const d = new Date(r.fields['Mula Pakej']); return d >= today;
+        });
+        if(hasUpcoming && !active){
+          active = season;
+          const idx = seasons.indexOf(season);
+          nextSeason = seasons[idx+1] || null;
+          break;
+        }
+      }
+      if(!active){
+        let latest = null; let latestDate = new Date(0);
+        seasons.forEach(s=>{
+          if(seasonMap[s].maxDate > latestDate){
+            latestDate = seasonMap[s].maxDate; latest = s;
+          }
+        });
+        active = latest || seasons[seasons.length-1] || '1448H';
+        const idx = seasons.indexOf(active);
+        nextSeason = seasons[idx+1] || (parseInt(active)+1 + 'H');
+      }
+      return { active, nextSeason, seasonMap };
+    }
+    function getTripData(){
+      if(window.allTripUmrahRecords && window.allTripUmrahRecords.length>0) return window.allTripUmrahRecords;
+      if(window.allTripRecords && window.allTripRecords.length>0) return window.allTripRecords;
+      try{ if(typeof allTripUmrahRecords !== 'undefined' && allTripUmrahRecords.length>0) return allTripUmrahRecords; }catch(e){}
+      return [];
+    }
+    function getJemaahData(){
+      if(window.allJemaahUmrahRecords && window.allJemaahUmrahRecords.length>0) return window.allJemaahUmrahRecords;
+      try{ if(typeof allJemaahUmrahRecords !== 'undefined' && allJemaahUmrahRecords.length>0) return allJemaahUmrahRecords; }catch(e){}
+      return [];
+    }
+    async function autoFetchIfNeeded(){
+      let existing = getTripData();
+      if(existing.length>0) return existing;
+      console.log('V39 auto-fetch for calendar');
+      if(typeof window.fetchTripUmrahData === 'function'){
+        try{ await window.fetchTripUmrahData(); existing = getTripData(); if(existing.length>0) return existing; }catch(e){}
+      }
+      try{
+        const pat = window.AIRTABLE_PAT || localStorage.getItem('effah_api_pat');
+        const base = window.AIRTABLE_BASE_ID || localStorage.getItem('effah_base_id');
+        if(!pat || !base) return [];
+        const url = 'https://api.airtable.com/v0/'+base+'/PAKEJ%20UMRAH?sort[0][field]=Mula%20Pakej&sort[0][direction]=asc&pageSize=100';
+        const res = await fetch(url, {headers:{Authorization:'Bearer '+pat}});
+        const data = await res.json();
+        const records = (data.records||[]).filter(r=>r && r.id && r.fields);
+        window.allTripUmrahRecords = records; window.allTripRecords = records;
+        return records;
+      }catch(e){ return []; }
+    }
+    function updateStatsForActiveSeason(trips, jemaah){
+      let result = determineActiveHijriSeason(trips);
+      if(typeof result === 'string') result = {active: result, nextSeason: (parseInt(result)+1)+'H', seasonMap:{}};
+      activeHijriSeason = result.active;
+      const umrahLabel = document.getElementById('statUmrahLabel');
+      const jemaahLabel = document.getElementById('statJemaahLabel');
+      const calendarSeason = document.getElementById('calendarActiveSeason');
+      if(umrahLabel) umrahLabel.textContent = 'Trip Umrah Musim '+activeHijriSeason;
+      if(jemaahLabel) jemaahLabel.textContent = 'Jemaah Musim '+activeHijriSeason;
+      if(calendarSeason) calendarSeason.textContent = activeHijriSeason;
+      // V44 FIX: jangan hardcoded fallback blank jadi 1448H - fetch dari data je, blank hanya di SEMUA (31), bukan 1448H (29)
+      // Home sepatutnya 29 sama dengan tab 1448H (29), bukan 30
+      let filteredTrips = trips.filter(r=>{
+        const raw = r.fields['Hijri Season']||'';
+        const hijri = getHijriSeasonFromField(raw);
+        if(!hijri) return false; // blank jangan kira sebagai 1448H
+        return hijri === activeHijriSeason;
+      });
+      // Jangan fallback ke semua trips - kalau 0, tunjuk 0
+      const statUmrah = document.getElementById('statUmrahCount');
+      const statUmrahSub = document.getElementById('statUmrahSub');
+      if(statUmrah) statUmrah.textContent = filteredTrips.length;
+      if(statUmrahSub) statUmrahSub.textContent = filteredTrips.length+' Rekod Musim Ini';
+      let jemaahCount = 0;
+      if(jemaah && jemaah.length>0){
+        const map = {};
+        trips.forEach(t=>{
+          const h = getHijriSeasonFromField(t.fields['Hijri Season']||'') || ''; // jangan hardcoded fallback, biar blank stay blank
+          map[t.id] = h;
+          const tn = (t.fields['Trip']||'').toString(); if(tn) map[tn]=h;
+        });
+        jemaahCount = jemaah.filter(j=>{
+          const tl = j.fields['TRIP']; const tid = Array.isArray(tl)?tl[0]:tl;
+          const tn = (j.fields['Trip Name']||'').toString();
+          const hij = map[tid] || map[tn] || '';
+          return hij === activeHijriSeason;
+        }).length;
+      }
+      const statJemaah = document.getElementById('statJemaahUmrahCount');
+      const statJemaahSub = document.getElementById('statJemaahSub');
+      if(statJemaah) statJemaah.textContent = jemaahCount || filteredTrips.reduce((s,t)=> s + (parseInt(t.fields['Total Jemaah']||0)),0) || 0;
+      if(statJemaahSub) statJemaahSub.textContent = 'Jemaah Didaftarkan';
+      allTripDataForCalendar = filteredTrips.length>0 ? filteredTrips : trips;
+      renderCalendar();
+      renderUpcoming30Days();
+    }
+    // V42: 15-color palette consistent per trip ID, like image_11a9de but without date alt text (image_9f1123) - only name
+    const TRIP_COLORS = [
+      { bg: 'bg-emerald-100', text: 'text-emerald-800', border: 'border-emerald-200', dot: 'bg-emerald-500' },
+      { bg: 'bg-blue-100', text: 'text-blue-800', border: 'border-blue-200', dot: 'bg-blue-500' },
+      { bg: 'bg-amber-100', text: 'text-amber-800', border: 'border-amber-200', dot: 'bg-amber-500' },
+      { bg: 'bg-rose-100', text: 'text-rose-800', border: 'border-rose-200', dot: 'bg-rose-500' },
+      { bg: 'bg-violet-100', text: 'text-violet-800', border: 'border-violet-200', dot: 'bg-violet-500' },
+      { bg: 'bg-cyan-100', text: 'text-cyan-800', border: 'border-cyan-200', dot: 'bg-cyan-500' },
+      { bg: 'bg-orange-100', text: 'text-orange-800', border: 'border-orange-200', dot: 'bg-orange-500' },
+      { bg: 'bg-teal-100', text: 'text-teal-800', border: 'border-teal-200', dot: 'bg-teal-500' },
+      { bg: 'bg-pink-100', text: 'text-pink-800', border: 'border-pink-200', dot: 'bg-pink-500' },
+      { bg: 'bg-indigo-100', text: 'text-indigo-800', border: 'border-indigo-200', dot: 'bg-indigo-500' },
+      { bg: 'bg-lime-100', text: 'text-lime-800', border: 'border-lime-200', dot: 'bg-lime-500' },
+      { bg: 'bg-sky-100', text: 'text-sky-800', border: 'border-sky-200', dot: 'bg-sky-500' },
+      { bg: 'bg-fuchsia-100', text: 'text-fuchsia-800', border: 'border-fuchsia-200', dot: 'bg-fuchsia-500' },
+      { bg: 'bg-yellow-100', text: 'text-yellow-800', border: 'border-yellow-200', dot: 'bg-yellow-500' },
+      { bg: 'bg-slate-100', text: 'text-slate-800', border: 'border-slate-200', dot: 'bg-slate-500' }
+    ];
+    function getTripColor(rec){
+      const id = rec.id || rec.fields['Trip'] || '0';
+      let hash = 0;
+      for(let i=0;i<id.length;i++){ hash = (hash*31 + id.charCodeAt(i)) % 100000; }
+      return TRIP_COLORS[hash % TRIP_COLORS.length];
+    }
+
+        function renderCalendar(){
+      const grid = document.getElementById('calendarGrid');
+      const label = document.getElementById('calendarMonthLabel');
+      if(!grid) return;
+      const year = calendarCurrentDate.getFullYear();
+      const month = calendarCurrentDate.getMonth();
+      if(label) label.textContent = calendarCurrentDate.toLocaleDateString('ms-MY', {month:'long', year:'numeric'});
+      const firstDay = new Date(year, month, 1).getDay();
+      const daysInMonth = new Date(year, month+1, 0).getDate();
+      const today = new Date(); today.setHours(0,0,0,0);
+      
+      // V42: Like image_11a9de - highlight full range 10-20 Dis, show bar on every day in range, not just start
+      // But without alt text date below (image_9f1123), only name - fixes image_0bd6fe vs image_11a9de
+      const activeByDate = {};
+      const sourceTrips = (cachedTrips.length>0) ? cachedTrips : (allTripDataForCalendar||[]);
+      sourceTrips.forEach(rec=>{
+        const f = rec.fields || {};
+        const mulaStr = f['Mula Pakej'];
+        const tamatStr = f['Tamat Pakej'];
+        if(!mulaStr) return;
+        const mula = new Date(mulaStr);
+        const tamat = tamatStr ? new Date(tamatStr) : mula;
+        if(isNaN(mula)) return;
+        const cur = new Date(mula); cur.setHours(0,0,0,0);
+        const end = new Date(tamat); end.setHours(0,0,0,0);
+        while(cur <= end){
+          if(cur.getMonth()===month && cur.getFullYear()===year){
+            const day = cur.getDate();
+            if(!activeByDate[day]) activeByDate[day] = [];
+            activeByDate[day].push(rec);
+          }
+          cur.setDate(cur.getDate()+1);
+          if(cur > new Date(year, month+1, 10)) break;
+        }
+      });
+
+      let html = '';
+      for(let i=0;i<firstDay;i++){ html += '<div class="h-[88px]"></div>'; }
+      for(let day=1; day<=daysInMonth; day++){
+        const date = new Date(year, month, day);
+        const isToday = date.getTime() === today.getTime();
+        const activeTrips = activeByDate[day] || [];
+        const hasActive = activeTrips.length > 0;
+        
+        let classes = 'h-[88px] p-2 rounded-xl border text-left relative transition cursor-pointer hover:shadow-sm flex flex-col ';
+        if(isToday) classes += 'bg-white border-slate-900 border-2 shadow-sm ring-2 ring-slate-900/10 ';
+        else if(hasActive) classes += 'bg-white border-slate-200 hover:border-slate-300 ';
+        else classes += 'bg-white border-slate-100 hover:bg-slate-50 ';
+        
+        let content = '';
+        if(hasActive){
+          // V42: Show up to 3 trips as colored bars, consistent color per trip ID (repeat 15 colors), only name, no date text - fixes image_9f1123
+          content = activeTrips.slice(0,3).map(rec=>{
+            const clean = cleanTripNameForDisplay(rec.fields['Trip']||'Trip');
+            const color = getTripColor(rec);
+            // Only name, no date alt text below - per user request image_9f1123.png tu tak perlu
+            return `<div class="mt-1 px-2 py-1 rounded-md border text-[8px] font-bold leading-tight flex items-center gap-1.5 ${color.bg} ${color.text} ${color.border} truncate" title="${clean}"><span class="w-1.5 h-1.5 rounded-full ${color.dot} shrink-0"></span><span class="truncate">${clean.substring(0,24)}</span></div>`;
+          }).join('');
+          if(activeTrips.length>3){
+            content += `<div class="mt-1 text-[7px] font-bold text-slate-400 px-1">+${activeTrips.length-3} lagi</div>`;
+          }
+        }
+        
+        html += '<div class="'+classes+'" onclick="showTripsForDate('+year+','+month+','+day+')" title="'+(hasActive ? activeTrips.map(t=>cleanTripNameForDisplay(t.fields['Trip'])).join(', ') : '')+'"><div class="flex items-center justify-between"><span class="text-[11px] '+(isToday?'font-black text-slate-900':'font-bold text-slate-700')+'">'+day+'</span>'+(isToday?'<span class="text-[8px] font-black bg-slate-900 text-white px-1.5 py-0.5 rounded-full">HARI INI</span>':'')+'</div>'+content+'</div>';
+      }
+      grid.innerHTML = html;
+    }
+    function changeCalendarMonth(dir){
+      calendarCurrentDate.setMonth(calendarCurrentDate.getMonth()+dir);
+      renderCalendar();
+    }
+    function showTripsForDate(year,month,day){
+      const sourceTrips = (cachedTrips.length>0) ? cachedTrips : (allTripDataForCalendar||[]);
+      const trips = sourceTrips.filter(rec=>{
+        const mula = new Date(rec.fields['Mula Pakej']);
+        const tamat = rec.fields['Tamat Pakej'] ? new Date(rec.fields['Tamat Pakej']) : mula;
+        if(isNaN(mula)) return false;
+        const target = new Date(year, month, day); target.setHours(0,0,0,0);
+        mula.setHours(0,0,0,0); tamat.setHours(0,0,0,0);
+        return target >= mula && target <= tamat;
+      });
+      if(trips.length===0) return;
+      const list = trips.map(t=>{
+        const clean = cleanTripNameForDisplay(t.fields['Trip']||'TBC');
+        const mula = new Date(t.fields['Mula Pakej']).toLocaleDateString('ms-MY');
+        const tamat = t.fields['Tamat Pakej'] ? new Date(t.fields['Tamat Pakej']).toLocaleDateString('ms-MY') : '';
+        return '- '+clean+' ('+mula+' - '+tamat+') ['+(t.fields['Penerbangan']||'')+']';
+      }).join('\n');
+      alert('Trip pada '+day+'/'+(month+1)+'/'+year+':\n\n'+list);
+    }
+    function renderUpcoming30Days(){
+      const list = document.getElementById('upcomingTripsList');
+      const countEl = document.getElementById('upcomingCount');
+      if(!list) return;
+      const today = new Date(); today.setHours(0,0,0,0);
+      const in30 = new Date(); in30.setDate(today.getDate()+30);
+      const sourceTrips = (cachedTrips.length>0) ? cachedTrips : (allTripDataForCalendar||[]);
+      const upcoming = sourceTrips.filter(rec=>{
+        const mula = rec.fields['Mula Pakej'] ? new Date(rec.fields['Mula Pakej']) : null;
+        if(!mula) return false; 
+        const mulaMid = new Date(mula); mulaMid.setHours(0,0,0,0);
+        return mulaMid >= today && mulaMid <= in30;
+      }).sort((a,b)=> new Date(a.fields['Mula Pakej']) - new Date(b.fields['Mula Pakej']));
+      if(countEl) countEl.textContent = upcoming.length+' Trip';
+      if(upcoming.length===0){
+        list.innerHTML = '<div class="text-center py-8 text-slate-400 text-xs"><i class="fa-solid fa-calendar-check text-2xl mb-2 text-slate-200"></i><p>Tiada trip dalam 30 hari akan datang</p><p class="text-[10px] mt-1">Musim '+activeHijriSeason+' - semua trip telah berlepas atau belum dijadualkan</p></div>';
+        return;
+      }
+      list.innerHTML = upcoming.map(rec=>{
+        const f = rec.fields;
+        const mula = new Date(f['Mula Pakej']);
+        const mulaMid = new Date(mula); mulaMid.setHours(0,0,0,0);
+        const diff = Math.round((mulaMid - today)/(1000*60*60*24));
+        const diffText = diff===0 ? 'Hari ini' : diff===1 ? 'Esok • dalam 1 hari' : 'dalam '+diff+' hari';
+        const diffSub = diff===0 ? 'Berlepas hari ini' : diff===1 ? 'Berlepas esok' : 'Berlepas dalam '+diff+' hari lagi';
+        const baki = f['Available Seat']||0;
+        const bakiColor = baki>5 ? 'text-emerald-600' : baki>0 ? 'text-amber-600' : 'text-slate-400';
+        const cleanName = cleanTripNameForDisplay(f['Trip']||'TBC');
+        return '<div class="p-3 rounded-xl border border-slate-200/80 hover:border-slate-300 hover:bg-slate-50/50 transition cursor-pointer" onclick="switchTab(\'pakej-umrah\')" title="'+diffSub+'"><div class="flex items-start justify-between gap-2"><div class="flex-1"><p class="text-xs font-bold text-slate-900 leading-snug">'+cleanName.substring(0,32)+'</p><p class="text-[10px] text-slate-500 mt-0.5"><i class="fa-solid fa-plane text-[8px] mr-1"></i>'+(f['Penerbangan']||'N/A')+' • '+(f['Sektor']||'')+'</p></div><span class="text-[10px] font-bold px-2 py-1 rounded-full '+(diff<=3?'bg-amber-100 text-amber-800 border border-amber-200':'bg-slate-100 text-slate-700 border border-slate-200')+'">'+diffText+'</span></div><div class="flex items-center justify-between mt-2"><span class="text-[10px] text-slate-500"><i class="fa-solid fa-calendar text-[9px] mr-1"></i>'+mula.toLocaleDateString('ms-MY', {day:'numeric', month:'short'})+'</span><span class="text-[10px] font-bold '+bakiColor+'">Baki: '+baki+' Seat</span></div></div>';
+      }).join('');
+    }
+    let pollCount = 0;
+    setInterval(async function(){
+      pollCount++;
+      let trips = getTripData();
+      let jemaah = getJemaahData();
+      if(trips.length===0 && pollCount===3){
+        trips = await autoFetchIfNeeded();
+        jemaah = getJemaahData();
+      }
+      if(trips.length>0 && trips !== cachedTrips){
+        cachedTrips = trips; cachedJemaah = jemaah;
+        console.log('V39 found trips:', trips.length);
+        updateStatsForActiveSeason(cachedTrips, cachedJemaah);
+      }
+      if(jemaah.length>0 && jemaah !== cachedJemaah){
+        cachedJemaah = jemaah;
+        if(cachedTrips.length>0) updateStatsForActiveSeason(cachedTrips, cachedJemaah);
+      }
+      if(pollCount===10 && trips.length===0){
+        const grid = document.getElementById('calendarGrid');
+        if(grid) grid.innerHTML = '<div class="text-center py-8 col-span-7 text-slate-400 text-xs">Tiada data trip. Sila klik Refresh di Trip Umrah atau semak API Key.</div>';
+      }
+    }, 1000);
+    document.addEventListener('DOMContentLoaded', function(){
+      setTimeout(async ()=>{
+        const trips = await autoFetchIfNeeded();
+        if(trips.length>0) updateStatsForActiveSeason(trips, getJemaahData());
+      }, 1500);
+    });
+    console.log('✅ V39 FINAL Calendar 30 Hari + Range Highlight + Clean Name + Auto-Fetch loaded - fixes image_b58a64.png');
+    </script>
     <script src="js/config.js"></script>
+
     <script src="js/auth.js"></script>
     <script src="js/router.js"></script>
     <script src="modules/settings/settings.js"></script>
