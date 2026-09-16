@@ -1295,6 +1295,7 @@ async function bulkDeleteJemaah() {
     }
 }
 
+
 function openAddTripModal() {
     const modal = document.getElementById('expandRecordModal');
     const container = document.getElementById('expandModalFormContainer');
@@ -1309,23 +1310,112 @@ function openAddTripModal() {
         saveBtn.onclick = createNewTripFromModal;
     }
 
+    // Ensure selectOptions are loaded, if not, try fetch
+    if(typeof selectOptions === 'undefined' || !selectOptions){
+        window.selectOptions = {hijri:[], group:[], sektor:[], penerbangan:[], musim:[], tempoh:[]};
+    }
+
+    const buildOptions = (arr, placeholder) => {
+        const opts = (arr||[]).filter(Boolean).sort();
+        let html = `<option value="">${placeholder}</option>`;
+        opts.forEach(o=>{
+            const safe = (o||'').toString().replace(/"/g,'&quot;');
+            html += `<option value="${safe}">${safe}</option>`;
+        });
+        return html;
+    };
+
     container.innerHTML = `
-        <form id="addTripModalForm" class="space-y-4">
+        <form id="addTripModalForm" class="space-y-4 max-h-[70vh] overflow-y-auto pr-1">
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                    <label class="block font-extrabold text-slate-700 mb-1">MULA PAKEJ *</label>
-                    <input type="date" name="Mula Pakej" required class="w-full p-3 font-semibold border border-slate-300 rounded-xl focus:ring-2 focus:ring-brand-maroon focus:outline-none bg-slate-50">
+                    <label class="block text-[11px] font-extrabold text-slate-700 mb-1 tracking-wider">Group (If relevant)</label>
+                    <select name="Group (if relevant)" class="w-full p-3 font-semibold border border-slate-300 rounded-xl focus:ring-2 focus:ring-brand-maroon focus:outline-none bg-slate-50 text-[13px]">
+                        ${buildOptions(selectOptions.group, '-- Pilih Group --')}
+                    </select>
                 </div>
                 <div>
-                    <label class="block font-extrabold text-slate-700 mb-1">TAMAT PAKEJ *</label>
-                    <input type="date" name="Tamat Pakej" required class="w-full p-3 font-semibold border border-slate-300 rounded-xl focus:ring-2 focus:ring-brand-maroon focus:outline-none bg-slate-50">
+                    <label class="block text-[11px] font-extrabold text-slate-700 mb-1 tracking-wider">Sektor</label>
+                    <select name="Sektor" class="w-full p-3 font-semibold border border-slate-300 rounded-xl focus:ring-2 focus:ring-brand-maroon focus:outline-none bg-slate-50 text-[13px]">
+                        ${buildOptions(selectOptions.sektor, '-- Pilih Sektor --')}
+                    </select>
                 </div>
             </div>
-            <p class="text-[11px] text-slate-400 italic mt-1">* Nota: Nama trip akan dijana secara automatik oleh Airtable berdasarkan tarikh di atas.</p>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-[11px] font-extrabold text-slate-700 mb-1 tracking-wider">MULA PAKEJ *</label>
+                    <input type="date" id="addMulaPakej" name="Mula Pakej" required class="w-full p-3 font-semibold border border-slate-300 rounded-xl focus:ring-2 focus:ring-brand-maroon focus:outline-none bg-slate-50 text-[13px]">
+                </div>
+                <div>
+                    <label class="block text-[11px] font-extrabold text-slate-700 mb-1 tracking-wider">TAMAT PAKEJ *</label>
+                    <input type="date" id="addTamatPakej" name="Tamat Pakej" required class="w-full p-3 font-semibold border border-slate-300 rounded-xl focus:ring-2 focus:ring-brand-maroon focus:outline-none bg-slate-50 text-[13px]">
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-[11px] font-extrabold text-slate-700 mb-1 tracking-wider">Penerbangan</label>
+                    <select name="Penerbangan" class="w-full p-3 font-semibold border border-slate-300 rounded-xl focus:ring-2 focus:ring-brand-maroon focus:outline-none bg-slate-50 text-[13px]">
+                        ${buildOptions(selectOptions.penerbangan, '-- Pilih Penerbangan --')}
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-[11px] font-extrabold text-slate-700 mb-1 tracking-wider">Musim</label>
+                    <select name="Musim" class="w-full p-3 font-semibold border border-slate-300 rounded-xl focus:ring-2 focus:ring-brand-maroon focus:outline-none bg-slate-50 text-[13px]">
+                        ${buildOptions(selectOptions.musim, '-- Pilih Musim --')}
+                    </select>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-[11px] font-extrabold text-slate-700 mb-1 tracking-wider">Hijri Season</label>
+                    <select name="Hijri Season" class="w-full p-3 font-semibold border border-slate-300 rounded-xl focus:ring-2 focus:ring-brand-maroon focus:outline-none bg-slate-50 text-[13px]">
+                        ${buildOptions(selectOptions.hijri, '-- Pilih Hijri Season --')}
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-[11px] font-extrabold text-slate-700 mb-1 tracking-wider">Tempoh Pakej</label>
+                    <select name="Tempoh Pakej" class="w-full p-3 font-semibold border border-slate-300 rounded-xl focus:ring-2 focus:ring-brand-maroon focus:outline-none bg-slate-50 text-[13px]">
+                        ${buildOptions(selectOptions.tempoh, '-- Pilih Tempoh --')}
+                    </select>
+                </div>
+            </div>
+
+            <div>
+                <label class="block text-[11px] font-extrabold text-slate-700 mb-1 tracking-wider">Total Seat</label>
+                <input type="number" name="Total Seat" min="0" placeholder="Contoh: 40" class="w-full p-3 font-semibold border border-slate-300 rounded-xl focus:ring-2 focus:ring-brand-maroon focus:outline-none bg-slate-50 text-[13px]">
+            </div>
+
+            
         </form>
     `;
 
     if (modal) modal.classList.remove('hidden');
+
+    // V118: Date validation - Tamat tidak boleh sebelum Mula
+    setTimeout(()=>{
+        const mulaEl = document.getElementById('addMulaPakej');
+        const tamatEl = document.getElementById('addTamatPakej');
+        if(mulaEl && tamatEl){
+            mulaEl.addEventListener('change', ()=>{
+                if(mulaEl.value){
+                    tamatEl.min = mulaEl.value;
+                    if(tamatEl.value && tamatEl.value < mulaEl.value){
+                        tamatEl.value = '';
+                        alert('Tarikh tamat tidak boleh sebelum tarikh mula.');
+                    }
+                }
+            });
+            tamatEl.addEventListener('change', ()=>{
+                if(mulaEl.value && tamatEl.value && tamatEl.value < mulaEl.value){
+                    alert('Tarikh tamat tidak boleh sebelum tarikh mula. Sila pilih tarikh selepas atau sama dengan tarikh mula.');
+                    tamatEl.value = '';
+                }
+            });
+        }
+    }, 100);
 }
 
 async function createNewTripFromModal() {
@@ -1335,9 +1425,21 @@ async function createNewTripFromModal() {
     const formData = new FormData(form);
     const mulaPakej = formData.get('Mula Pakej');
     const tamatPakej = formData.get('Tamat Pakej');
+    const groupVal = formData.get('Group (if relevant)');
+    const sektorVal = formData.get('Sektor');
+    const penerbanganVal = formData.get('Penerbangan');
+    const musimVal = formData.get('Musim');
+    const hijriVal = formData.get('Hijri Season');
+    const tempohVal = formData.get('Tempoh Pakej');
+    const totalSeatVal = formData.get('Total Seat');
 
     if (!mulaPakej || !tamatPakej) {
         alert("Sila masukkan Tarikh Mula dan Tarikh Tamat Pakej!");
+        return;
+    }
+
+    if (tamatPakej < mulaPakej) {
+        alert("Tarikh tamat tidak boleh sebelum tarikh mula. Sila betulkan tarikh.");
         return;
     }
 
@@ -1345,6 +1447,18 @@ async function createNewTripFromModal() {
         "Mula Pakej": mulaPakej,
         "Tamat Pakej": tamatPakej
     };
+
+    // Only add if has value - exclude formula fields
+    if(groupVal && groupVal.trim()!=='') payloadFields["Group (if relevant)"] = groupVal.trim();
+    if(sektorVal && sektorVal.trim()!=='') payloadFields["Sektor"] = sektorVal.trim();
+    if(penerbanganVal && penerbanganVal.trim()!=='') payloadFields["Penerbangan"] = penerbanganVal.trim();
+    if(musimVal && musimVal.trim()!=='') payloadFields["Musim"] = musimVal.trim();
+    if(hijriVal && hijriVal.trim()!=='') payloadFields["Hijri Season"] = hijriVal.trim();
+    if(tempohVal && tempohVal.trim()!=='') payloadFields["Tempoh Pakej"] = tempohVal.trim();
+    if(totalSeatVal && totalSeatVal.toString().trim()!==''){
+        const num = parseInt(totalSeatVal);
+        if(!isNaN(num) && num>=0) payloadFields["Total Seat"] = num;
+    }
 
     const saveBtn = document.getElementById('modalSaveBtn');
     if (saveBtn) saveBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> Menyimpan...';
@@ -1357,22 +1471,32 @@ async function createNewTripFromModal() {
                 Authorization: `Bearer ${AIRTABLE_PAT}`,
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({ fields: payloadFields })
+            body: JSON.stringify({ fields: payloadFields, typecast: true })
         });
 
         if (response.ok) {
-            await fetchTripMapping();
-            renderViewsSidebar();
+            const data = await response.json();
+            console.log('Trip created', data);
+            // Refresh data
+            if(typeof fetchTripMapping === 'function') await fetchTripMapping();
+            if(typeof fetchTripUmrahData === 'function') await fetchTripUmrahData(true);
+            if(typeof renderViewsSidebar === 'function') renderViewsSidebar();
             closeExpandModal();
+            alert('Pakej / Trip Umrah telah berjaya ditambahkan.');
         } else {
-            alert("Gagal menambah trip baharu.");
+            const errData = await response.json();
+            console.error('Create trip failed', errData);
+            let msg = errData.error?.message || 'Gagal menambah trip baharu.';
+            alert(`Gagal menambah trip baharu: ${msg}`);
         }
     } catch (e) {
         console.error("Error creating trip:", e);
+        alert(`Ralat semasa menambah trip: ${e.message}`);
     } finally {
-        if (saveBtn) saveBtn.innerHTML = 'Simpan Perubahan';
+        if (saveBtn) saveBtn.innerHTML = 'Simpan Trip';
     }
 }
+
 
 function openExpandModal(recId) {
     const rec = allJemaahUmrahRecords.find(r => r.id === recId);
