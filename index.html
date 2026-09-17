@@ -126,11 +126,14 @@
                     </a>
                 </nav>
             </div>
-            <div class="p-4 border-t border-slate-800">
+            <div class="p-4 border-t border-slate-800 space-y-3">
                 <div class="bg-slate-950/60 p-3 rounded-xl flex items-center justify-between text-xs">
                     <span class="text-slate-400 text-[11px]">Status API:</span>
                     <span id="apiStatusBadge" class="bg-rose-500/20 text-rose-400 border border-rose-500/30 px-2.5 py-0.5 rounded-full font-bold text-[10px]">Offline</span>
                 </div>
+                <button onclick="logoutPortal()" class="w-full flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold py-2.5 rounded-xl border border-slate-700 transition">
+                    <i class="fa-solid fa-lock text-[11px]"></i> Kunci Portal
+                </button>
             </div>
         </aside>
 
@@ -146,9 +149,7 @@
                         <span id="breadcrumbCurrent" class="text-slate-800 font-bold">Overview</span>
                     </div>
                 </div>
-                <button onclick="logoutPortal()" class="text-xs bg-slate-100 hover:bg-rose-50 hover:text-rose-600 text-slate-600 px-3 py-1.5 rounded-xl font-bold transition">
-                    <i class="fa-solid fa-lock mr-1"></i> Kunci
-                </button>
+                <div class="text-[11px] text-slate-400 hidden md:block">Portal Operasi Dalaman</div>
             </header>
 
             <div class="p-6 md:p-8 space-y-6 max-w-7xl w-full mx-auto">
@@ -224,18 +225,13 @@
                             <div id="calendarGrid" class="grid grid-cols-7 gap-1">
                                 <div class="text-center py-8 col-span-7 text-slate-400 text-xs"><i class="fa-solid fa-spinner fa-spin mr-1"></i> Memuat kalendar...</div>
                             </div>
-                            <div class="flex items-center gap-3 mt-4 pt-4 border-t border-slate-100 text-[10px]">
-                                <div class="flex items-center gap-1.5"><span class="w-2 h-2 bg-emerald-500 rounded-full"></span> Ada Trip</div>
-                                <div class="flex items-center gap-1.5"><span class="w-2 h-2 bg-slate-900 rounded-full"></span> Hari Ini</div>
-                                <div class="flex items-center gap-1.5"><span class="w-2 h-2 bg-amber-400 rounded-full"></span> Dalam 30 Hari</div>
-                            </div>
+
                         </div>
-                        <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-6 flex flex-col">
+                        <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-6">
                             <div class="flex items-center justify-between mb-4">
-                                <h3 class="text-sm font-extrabold text-slate-900 tracking-tight">Dalam 30 Hari</h3>
-                                <span class="text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200 px-2 py-1 rounded-full" id="upcomingCount">0 Trip</span>
+                                <h3 class="text-sm font-extrabold text-slate-900 tracking-tight">Trip Akan Datang</h3>
                             </div>
-                            <div id="upcomingTripsList" class="space-y-2.5 flex-1 overflow-y-auto max-h-[340px] pr-1">
+                            <div id="upcomingTripsList" class="space-y-2.5">
                                 <div class="text-center py-10 text-slate-400 text-xs">Memuat trip akan datang...</div>
                             </div>
                             <button onclick="switchTab('pakej-umrah')" class="mt-4 w-full bg-slate-900 text-white text-xs font-bold py-2.5 rounded-xl hover:bg-black transition">Lihat Semua Trip <i class="fa-solid fa-arrow-right ml-1"></i></button>
@@ -530,20 +526,18 @@
     }
     function renderUpcoming30Days(){
       const list = document.getElementById('upcomingTripsList');
-      const countEl = document.getElementById('upcomingCount');
       if(!list) return;
       const today = new Date(); today.setHours(0,0,0,0);
-      const in30 = new Date(); in30.setDate(today.getDate()+30);
       const sourceTrips = (cachedTrips.length>0) ? cachedTrips : (allTripDataForCalendar||[]);
+      // PATCH: Tukar jadi 6 trip akan datang, bukan filter 30 hari sahaja
       const upcoming = sourceTrips.filter(rec=>{
         const mula = rec.fields['Mula Pakej'] ? new Date(rec.fields['Mula Pakej']) : null;
-        if(!mula) return false; 
+        if(!mula || isNaN(mula)) return false; 
         const mulaMid = new Date(mula); mulaMid.setHours(0,0,0,0);
-        return mulaMid >= today && mulaMid <= in30;
-      }).sort((a,b)=> new Date(a.fields['Mula Pakej']) - new Date(b.fields['Mula Pakej']));
-      if(countEl) countEl.textContent = upcoming.length+' Trip';
+        return mulaMid >= today;
+      }).sort((a,b)=> new Date(a.fields['Mula Pakej']) - new Date(b.fields['Mula Pakej'])).slice(0,6);
       if(upcoming.length===0){
-        list.innerHTML = '<div class="text-center py-8 text-slate-400 text-xs"><i class="fa-solid fa-calendar-check text-2xl mb-2 text-slate-200"></i><p>Tiada trip dalam 30 hari akan datang</p><p class="text-[10px] mt-1">Musim '+activeHijriSeason+' - semua trip telah berlepas atau belum dijadualkan</p></div>';
+        list.innerHTML = '<div class="text-center py-8 text-slate-400 text-xs"><i class="fa-solid fa-calendar-check text-2xl mb-2 text-slate-200"></i><p>Tiada trip akan datang</p><p class="text-[10px] mt-1">Musim '+activeHijriSeason+' - semua trip telah berlepas atau belum dijadualkan</p></div>';
         return;
       }
       list.innerHTML = upcoming.map(rec=>{
