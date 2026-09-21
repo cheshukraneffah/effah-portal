@@ -32,14 +32,15 @@ let hiddenColumns = JSON.parse(localStorage.getItem('jemaahHiddenColumns')) || {
 let currentSortField = 'NAME';
 let currentSortDir = 'asc';
 
-// Default Column Order
-let columnOrder = [
+// Default Column Order - FIXED v2: susunan logik ikut screenshot + flow dokumen
+const DEFAULT_COLUMN_ORDER = [
     'col-idx', 'col-name', 'col-picture', 'col-ic', 'col-passport', 
     'col-gender', 'col-age', 'col-dob', 'col-dobf', 'col-nat', 
     'col-visa', 'col-passcopy', 'col-visacopy', 'col-mofabio', 
     'col-fit', 'col-trip', 'col-issue', 'col-expire', 'col-notes',
     'col-board', 'col-train', 'col-insuran', 'col-pakej', 'col-ejen'
 ];
+let columnOrder = [...DEFAULT_COLUMN_ORDER];
 
 // Default Column Widths
 const defaultColumnWidths = {
@@ -48,9 +49,9 @@ const defaultColumnWidths = {
     'col-picture': 90,
     'col-ic': 130,
     'col-passport': 120,
-    'col-gender': 100,
+    'col-gender': 90,
     'col-age': 90,
-    'col-dob': 100,
+    'col-dob': 130,
     'col-dobf': 160,
     'col-nat': 110,
     'col-visa': 140,
@@ -71,14 +72,158 @@ const defaultColumnWidths = {
 
 let columnWidths = JSON.parse(localStorage.getItem('jemaahColWidths')) || { ...defaultColumnWidths };
 
+// === FIX V2: File Picker Binding untuk Add Jemaah Modal ===
+let addModalFiles = { 'PICTURE': [], 'PASSPORT_COPY': [], 'VISA_COPY': [], 'MOFABIO': [], 'INSURAN_DOC': [] };
+
+function setupAddModalFilePickers(){
+    const fileFields = ['PICTURE','PASSPORT_COPY','VISA_COPY','MOFABIO'];
+    // alias mapping untuk id yang pakai underscore
+    const idMap = {
+        'PICTURE': 'PICTURE',
+        'PASSPORT_COPY': 'PASSPORT_COPY',
+        'VISA_COPY': 'VISA_COPY',
+        'MOFABIO': 'MOFABIO'
+    };
+    
+    fileFields.forEach(field=>{
+        const dropId = `addModalDropzone-${field}`;
+        const inputId = `addModalFileInput-${field}`;
+        const previewId = `addModalPreview-${field}`;
+        const dropzone = document.getElementById(dropId);
+        const fileInput = document.getElementById(inputId);
+        if(!dropzone || !fileInput) return;
+        
+        // Reset
+        addModalFiles[field] = addModalFiles[field] || [];
+        
+        const openPicker = (e)=>{
+            if(e) e.stopPropagation();
+            fileInput.click();
+        };
+        
+        // Hapus listener lama dengan clone (simple)
+        const newDrop = dropzone.cloneNode(true);
+        dropzone.parentNode.replaceChild(newDrop, dropzone);
+        const dz = document.getElementById(dropId);
+        const fi = document.getElementById(inputId);
+        const previewEl = document.getElementById(previewId);
+        
+        if(!dz || !fi) return;
+        
+        dz.addEventListener('click', (e)=>{
+            // jangan trigger kalau klik pada preview delete button
+            if(e.target.closest('button')) return;
+            fi.click();
+        });
+        
+        dz.addEventListener('dragover', (e)=>{
+            e.preventDefault();
+            dz.classList.add('border-brand-maroon','bg-rose-50','scale-[1.02]');
+            dz.classList.remove('border-slate-300','bg-slate-50');
+        });
+        
+        dz.addEventListener('dragleave', (e)=>{
+            e.preventDefault();
+            dz.classList.remove('border-brand-maroon','bg-rose-50','scale-[1.02]');
+            dz.classList.add('border-slate-300','bg-slate-50');
+        });
+        
+        dz.addEventListener('drop', (e)=>{
+            e.preventDefault();
+            dz.classList.remove('border-brand-maroon','bg-rose-50','scale-[1.02]');
+            dz.classList.add('border-slate-300','bg-slate-50');
+            if(e.dataTransfer.files && e.dataTransfer.files.length){
+                handleAddModalFiles(field, e.dataTransfer.files);
+            }
+        });
+        
+        fi.addEventListener('change', (e)=>{
+            if(e.target.files && e.target.files.length){
+                handleAddModalFiles(field, e.target.files);
+                // reset value supaya boleh pilih file sama lagi
+                e.target.value = '';
+            }
+        });
+    });
+}
+
+function handleAddModalFiles(field, fileList){
+    const files = Array.from(fileList);
+    if(!files.length) return;
+    addModalFiles[field] = addModalFiles[field] || [];
+    
+    // Validate
+    const validFiles = files.filter(f=>{
+        const isValidType = f.type.startsWith('image/') || f.type==='application/pdf' || f.name.toLowerCase().endsWith('.pdf');
+        const isValidSize = f.size <= 10*1024*1024;
+        if(!isValidType) alert(`File ${f.name}: format tak disokong. Guna JPG/PNG/PDF`);
+        if(!isValidSize) alert(`File ${f.name}: lebih 10MB`);
+        return isValidType && isValidSize;
+    });
+    
+    addModalFiles[field].push(...validFiles);
+    
+    // Update preview
+    const previewId = `addModalPreview-${field}`;
+    const previewEl = document.getElementById(previewId);
+    if(previewEl){
+        previewEl.innerHTML = addModalFiles[field].map((f,i)=>`
+            <div class="flex items-center gap-2 bg-white border border-slate-200 rounded-lg px-2 py-1 text-[11px]">
+                <i class="fa-solid ${f.type.includes('pdf')?'fa-file-pdf text-red-500':'fa-file-image text-blue-500'}"></i>
+                <span class="max-w-[120px] truncate font-bold">${f.name}</span>
+                <span class="text-[10px] text-slate-400">${(f.size/1024).toFixed(0)}KB</span>
+                <button type="button" onclick="removeAddModalFile('${field}',${i})" class="w-5 h-5 rounded-full bg-red-100 text-red-600 flex items-center justify-center hover:bg-red-200"><i class="fa-solid fa-xmark text-[10px]"></i></button>
+            </div>
+        `).join('');
+    }
+}
+
+function removeAddModalFile(field, idx){
+    if(addModalFiles[field]) {
+        addModalFiles[field].splice(idx,1);
+        const previewId = `addModalPreview-${field}`;
+        const previewEl = document.getElementById(previewId);
+        if(previewEl){
+            if(addModalFiles[field].length===0){
+                previewEl.innerHTML = '';
+            } else {
+                previewEl.innerHTML = addModalFiles[field].map((f,i)=>`
+                    <div class="flex items-center gap-2 bg-white border border-slate-200 rounded-lg px-2 py-1 text-[11px]">
+                        <i class="fa-solid ${f.type.includes('pdf')?'fa-file-pdf text-red-500':'fa-file-image text-blue-500'}"></i>
+                        <span class="max-w-[120px] truncate font-bold">${f.name}</span>
+                        <span class="text-[10px] text-slate-400">${(f.size/1024).toFixed(0)}KB</span>
+                        <button type="button" onclick="removeAddModalFile('${field}',${i})" class="w-5 h-5 rounded-full bg-red-100 text-red-600 flex items-center justify-center hover:bg-red-200"><i class="fa-solid fa-xmark text-[10px]"></i></button>
+                    </div>
+                `).join('');
+            }
+        }
+    }
+}
+
+window.removeAddModalFile = removeAddModalFile;
+
+
 // CLEANED: override removed - using global var from config.js
 
 function cleanTripName(raw){
   if(!raw) return 'TBC';
-  let s = String(raw);
-  // buang pattern "26/08 |" atau "26/08 | 16 - 25 OGOS 2026"
-  if(s.includes('|')) s = s.split('|').pop();
-  return s.trim();
+  let s = String(raw).trim();
+  // Kalau ada pipe, ambil part terakhir yang ada makna
+  if(s.includes('|')){
+    const parts = s.split('|').map(p=>p.trim()).filter(p=>p.length>0);
+    // ambil part paling panjang / paling akhir yang mengandungi huruf
+    if(parts.length>0){
+      // prefer part yang ada huruf, bukan hanya tarikh 26/08
+      const withAlpha = parts.filter(p=> /[A-Z]/i.test(p));
+      s = (withAlpha.length>0 ? withAlpha[withAlpha.length-1] : parts[parts.length-1]);
+    }
+  }
+  // buang prefix tarikh pendek macam "26/08" atau "07/25" di depan jika masih ada
+  s = s.replace(/^\d{1,2}\/\d{1,2}\s*\|?\s*/,'').trim();
+  // Normalisasi: kalau format "07 - 19 JULAI 2026" kekalkan
+  // Kalau kosong lepas clean, fallback ke raw
+  if(!s) return String(raw).trim() || 'TBC';
+  return s.toUpperCase();
 }
 // CLEANED: override removed - using global var from config.js
 // make brand-maroon class fallback
@@ -86,6 +231,44 @@ function cleanTripName(raw){
   const style=document.createElement('style');
   style.textContent='.bg-brand-maroon{background:#800020}.text-brand-maroon{color:#800020}.hover\\:bg-rose-900:hover{background:#600018}';
   document.head.appendChild(style);
+
+// Hook setup after openAddJemaahModal original
+(function(){
+    const _origOpenAdd = window.openAddJemaahModal;
+    if(_origOpenAdd){
+        const original = _origOpenAdd;
+        window.openAddJemaahModal = function(){
+            original.apply(this, arguments);
+            setTimeout(()=>{
+                const modal = document.getElementById('expandRecordModal');
+                if(modal){
+                    modal.classList.remove('hidden');
+                    modal.style.display='flex';
+                }
+                setupAddModalFilePickers();
+            }, 100);
+        };
+    } else {
+        // if not yet defined, patch via event
+        document.addEventListener('DOMContentLoaded', ()=>{
+            const orig = window.openAddJemaahModal;
+            if(orig){
+                window.openAddJemaahModal = function(){
+                    orig.apply(this, arguments);
+                    setTimeout(()=>{
+                        const modal = document.getElementById('expandRecordModal');
+                        if(modal){
+                            modal.classList.remove('hidden');
+                            modal.style.display='flex';
+                        }
+                        setupAddModalFilePickers();
+                    }, 100);
+                };
+            }
+        });
+    }
+})();
+
 })();
 
 
@@ -95,12 +278,67 @@ document.addEventListener('DOMContentLoaded', () => {
         currentSortField = savedSort.field || 'NAME';
         currentSortDir = savedSort.dir || 'asc';
     }
-    const savedOrder = JSON.parse(localStorage.getItem('jemaahColOrder'));
+    let savedOrder = JSON.parse(localStorage.getItem('jemaahColOrder'));
+    try{ if(savedOrder && (!savedOrder.includes('col-age') || !savedOrder.includes('col-dob'))){ localStorage.removeItem('jemaahColOrder'); savedOrder = null; console.log('Migrating columnOrder to include AGE/DOB'); } }catch(e){}
     if (savedOrder && Array.isArray(savedOrder)) {
-        columnOrder = savedOrder;
+        // FIX: validate, buang legacy col-age/dob, buang duplikat, pastikan semua default ada
+        let cleaned = [...new Set(savedOrder.filter(k=> k!=='col-age' && k!=='col-dob' && DEFAULT_COLUMN_ORDER.includes(k)))];
+        // tambah yang missing dari default supaya tak hilang
+        DEFAULT_COLUMN_ORDER.forEach(k=>{
+            if(!cleaned.includes(k)) cleaned.push(k);
+        });
+        columnOrder = cleaned.length>0 ? cleaned : [...DEFAULT_COLUMN_ORDER];
+        if(columnOrder.length===0){
+            columnOrder = [...DEFAULT_COLUMN_ORDER];
+        }
+        localStorage.setItem('jemaahColOrder', JSON.stringify(columnOrder));
+    } else {
+        columnOrder = [...DEFAULT_COLUMN_ORDER];
     }
+    const savedHidden = JSON.parse(localStorage.getItem('jemaahHiddenColumns')) || {};
+    // FIX v4: jangan hide AGE/DOB, paksa show sebelah GENDER
+    if(savedHidden['col-age']) delete savedHidden['col-age'];
+    if(savedHidden['col-dob']) delete savedHidden['col-dob'];
+    localStorage.setItem('jemaahHiddenColumns', JSON.stringify(savedHidden));
+    hiddenColumns = savedHidden;
     renderJemaahUmrahHTML();
 });
+
+
+function initHeaderDragAndDrop(){
+    try{
+        const headers = document.querySelectorAll('th.draggable-header');
+        headers.forEach(th=>{
+            th.setAttribute('draggable','true');
+            th.addEventListener('dragstart', (e)=>{
+                e.dataTransfer.effectAllowed = 'move';
+                e.dataTransfer.setData('text/plain', th.dataset.col || '');
+                th.classList.add('opacity-50');
+                window._dragCol = th.dataset.col;
+            });
+            th.addEventListener('dragend', ()=>{
+                th.classList.remove('opacity-50');
+                document.querySelectorAll('th.drag-over').forEach(el=>el.classList.remove('drag-over'));
+            });
+            th.addEventListener('dragover', (e)=>{
+                e.preventDefault();
+                th.classList.add('drag-over');
+            });
+            th.addEventListener('dragleave', ()=>{
+                th.classList.remove('drag-over');
+            });
+            th.addEventListener('drop', (e)=>{
+                e.preventDefault();
+                th.classList.remove('drag-over');
+                const fromCol = window._dragCol;
+                const toCol = th.dataset.col;
+                if(fromCol && toCol && fromCol!==toCol && typeof reorderColumns==='function'){
+                    reorderColumns(fromCol, toCol);
+                }
+            });
+        });
+    }catch(err){ console.warn('initHeaderDragAndDrop fail', err); }
+}
 
 function renderJemaahUmrahHTML() {
     const container = document.getElementById('modul-jemaah-umrah');
@@ -387,8 +625,18 @@ function getJemaahHijriSeasonFromField(val){
   return val.toString().trim().toUpperCase(); // V50: full 26/27 • 1448H, jangan extract 1448H je
 }
 function cleanTripName(tripName) {
-    if (!tripName) return 'TBC';
-    return tripName.replace(/^[\d\/]+\s*\|\s*/i, '').trim();
+    if(!tripName) return 'TBC';
+    let s = String(tripName).trim();
+    if(s.includes('|')){
+        const parts = s.split('|').map(p=>p.trim()).filter(p=>p.length>0);
+        if(parts.length>0){
+            const withAlpha = parts.filter(p=> /[A-Z]/i.test(p));
+            s = (withAlpha.length>0 ? withAlpha[withAlpha.length-1] : parts[parts.length-1]);
+        }
+    }
+    s = s.replace(/^\d{1,2}\/\d{1,2}\s*\|?\s*/,'').trim();
+    if(!s) return String(tripName).trim() || 'TBC';
+    return s.toUpperCase();
 }
 
 async function fetchTripMapping() {
@@ -426,31 +674,280 @@ async function fetchTripMapping() {
 }
 
 // V51: Fetch field options dari Airtable meta API - direct fetch, tak hardcoded
-async function fetchJemaahMetaOptions(){
+let _jemaahMetaCache = null;
+let _jemaahMetaFetching = false;
+
+
+
+async function cleanBlankOptions(fieldName, auto=false){
   try{
-    if(typeof AIRTABLE_PAT === 'undefined' || !AIRTABLE_PAT){
-      AIRTABLE_PAT = window.AIRTABLE_PAT || localStorage.getItem('effah_api_pat') || '';
-      AIRTABLE_BASE_ID = window.AIRTABLE_BASE_ID || localStorage.getItem('effah_base_id') || '';
+    const base = window.AIRTABLE_BASE_ID||localStorage.getItem('effah_base_id')||'appSsn4JyQD4DnYu0';
+    const pat = window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
+    if(!base||!pat){ console.warn('No base/pat for clean'); return false; }
+    console.log(`V87 Cleaning blank for ${fieldName}...`);
+    
+    // Force fresh fetch directly from API (not cache)
+    const resTables = await fetch(`https://api.airtable.com/v0/meta/bases/${base}/tables`, {headers:{Authorization:`Bearer ${pat}`}});
+    if(!resTables.ok){
+      console.error('Failed to fetch tables for clean', resTables.status);
+      return false;
     }
-    if(!AIRTABLE_PAT || !AIRTABLE_BASE_ID) return;
-    const url = `https://api.airtable.com/v0/meta/bases/${AIRTABLE_BASE_ID}/tables`;
-    const res = await fetch(url, { headers: { Authorization: `Bearer ${AIRTABLE_PAT}` } });
-    if(!res.ok){ buildFallbackFieldOptions(); return; }
+    const data = await resTables.json();
+    const tables = data.tables||[];
+    const targetTable = tables.find(t=> t.name.trim()==='DATA JEMAAH UMRAH') || tables.find(t=> t.name.toUpperCase().includes('DATA JEMAAH UMRAH')) || tables.find(t=> t.name.toUpperCase().includes('JEMAAH'));
+    if(!targetTable){ console.error('Table not found for clean'); return false; }
+    
+    const targetField = targetTable.fields.find(f=> f.name.toUpperCase()===fieldName.toUpperCase());
+    if(!targetField){ console.error(`Field ${fieldName} not found`); return false; }
+    
+    const choices = targetField.options?.choices||[];
+    const blankChoices = choices.filter(c=> !c.name || c.name.trim()==='');
+    const realChoices = choices.filter(c=> c.name && c.name.trim()!=='');
+    
+    console.log(`V87 ${fieldName}: total ${choices.length}, real ${realChoices.length}, blank ${blankChoices.length}`);
+    console.log(`Real:`, realChoices.map(c=> `${c.name}(${c.id?.length})`));
+    console.log(`Blank:`, blankChoices.map(c=> `${c.id} len ${c.id?.length}`));
+    
+    if(blankChoices.length===0){
+      if(!auto) console.log(`No blank in ${fieldName}`);
+      return true;
+    }
+    
+    // V87: Keep ALL real choices, send id+name if id exists (any length), but ensure name trimmed and not blank
+    // This will remove blank by not including it
+    const dedupedMap = new Map();
+    for(let c of realChoices){
+      const key = c.name.trim().toUpperCase();
+      if(!key) continue;
+      if(!dedupedMap.has(key)){
+        // Keep id if exists, even if 15 chars - Airtable will accept id+name for existing
+        if(c.id){
+          dedupedMap.set(key, {id: c.id, name: c.name.trim()});
+        } else {
+          dedupedMap.set(key, {name: c.name.trim()});
+        }
+      }
+    }
+    const deduped = Array.from(dedupedMap.values());
+    console.log(`V87 Cleaning ${fieldName}: keeping ${deduped.length} real, removing ${blankChoices.length} blank`);
+    console.log('Payload:', JSON.stringify({options:{choices: deduped}}, null, 2).substring(0,1000));
+    
+    if(deduped.length===0){
+      console.error(`V87 Cannot clean ${fieldName} - no real choices`);
+      return false;
+    }
+    
+    const metaUrl = `https://api.airtable.com/v0/meta/bases/${base}/tables/${targetTable.id}/fields/${targetField.id}`;
+    const res = await fetch(metaUrl, {
+      method:'PATCH',
+      headers:{Authorization:`Bearer ${pat}`,'Content-Type':'application/json'},
+      body: JSON.stringify({options:{choices: deduped}})
+    });
+    const text = await res.text();
+    console.log(`V87 Clean ${fieldName} result: ${res.status}`, text.substring(0,800));
+    
+    if(res.ok){
+      console.log(`✅ V87 Cleaned ${blankChoices.length} blank from ${fieldName}`);
+      // Update local caches
+      _jemaahMetaCache = null;
+      await fetchJemaahMetaOptionsFromMeta();
+      if(typeof filterAndRenderJemaahGrid==='function') filterAndRenderJemaahGrid();
+      return true;
+    } else {
+      console.error(`V87 Failed clean ${fieldName}:`, text);
+      if(!auto) alert(`Gagal clean ${fieldName}: ${text.substring(0,300)}`);
+      return false;
+    }
+  }catch(e){ console.error('V87 clean error', e); return false; }
+}
+
+async function cleanAllBlankOptions(){
+  const fields = ['NATIONALITY','BOARD BASIS','INSURAN','PAKEJ','STATUS VISA','GENDER'];
+  for(let f of fields){
+    await cleanBlankOptions(f, true);
+    await new Promise(r=> setTimeout(r, 700));
+  }
+  alert('Selesai clean semua blank. Refresh Airtable.');
+}
+
+// V87 Auto-clean on load - more aggressive
+let _autoCleanDone = false;
+async function autoCleanBlankOnLoad(){
+  if(_autoCleanDone) return;
+  _autoCleanDone = true;
+  try{
+    console.log('V87 Auto-clean start...');
+    const fieldsToCheck = ['NATIONALITY','BOARD BASIS','INSURAN','PAKEJ','STATUS VISA'];
+    for(let fname of fieldsToCheck){
+      await cleanBlankOptions(fname, true);
+      await new Promise(r=> setTimeout(r, 600));
+    }
+    console.log('V87 Auto-clean done');
+  }catch(e){ console.warn('V87 auto-clean error', e); }
+}
+setTimeout(autoCleanBlankOnLoad, 2000);
+setTimeout(autoCleanBlankOnLoad, 6000);
+
+// Manual clean button helper - call from console
+window.cleanNationalityBlank = async ()=>{ return await cleanBlankOptions('NATIONALITY', false); };
+window.cleanAllBlank = cleanAllBlankOptions;
+
+
+async function fetchJemaahMetaOptionsFromMeta(){
+  if(_jemaahMetaFetching) return null;
+  _jemaahMetaFetching = true;
+  try{
+    const FULL_BASE_ID = 'appSsn4JyQD4DnYu0';
+    let base = window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base')||localStorage.getItem('effah_base_id')||FULL_BASE_ID;
+    if(!base || base.length!==17){ base = FULL_BASE_ID; try{ localStorage.setItem('effah_base_id', FULL_BASE_ID); localStorage.setItem('effah_api_base', FULL_BASE_ID); }catch{} }
+    const pat = window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
+    if(!base||!pat){ 
+      console.warn('Jemaah: Base atau PAT tiada'); 
+      _jemaahMetaFetching=false; 
+      return null; 
+    }
+    console.log('Jemaah V78: Fetching fresh schema from GET /meta/bases/'+base+'/tables');
+    const res = await fetch(`https://api.airtable.com/v0/meta/bases/${base}/tables`, {headers:{Authorization:`Bearer ${pat}`}});
+    if(!res.ok){
+      console.warn('Jemaah: Gagal fetch meta', res.status, await res.text().then(t=>t.substring(0,500)));
+      _jemaahMetaFetching=false;
+      return null;
+    }
     const data = await res.json();
-    const tables = data.tables || [];
-    const jemaahTable = tables.find(t=> t.name.trim() === 'DATA JEMAAH UMRAH');
-    if(!jemaahTable){ buildFallbackFieldOptions(); return; }
-    jemaahMetaTableId = jemaahTable.id;
-    jemaahMetaFieldsByName = {};
-    (jemaahTable.fields||[]).forEach(f=>{
-      jemaahMetaFieldsByName[f.name] = f;
-      if(f.options && f.options.choices){
-        jemaahFieldOptions[f.name] = f.options.choices.map(c=>({ id: c.id, name: c.name, color: c.color }));
+    const tables = data.tables||[];
+    let targetTable = tables.find(t=> (t.name||'').trim()==='DATA JEMAAH UMRAH');
+    if(!targetTable) targetTable = tables.find(t=> (t.name||'').toUpperCase().includes('DATA JEMAAH UMRAH'));
+    if(!targetTable) targetTable = tables.find(t=> (t.name||'').toUpperCase().includes('JEMAAH'));
+    if(!targetTable){
+      console.warn('Jemaah: Table DATA JEMAAH UMRAH tidak jumpa');
+      _jemaahMetaFetching=false;
+      return null;
+    }
+    _jemaahMetaCache = targetTable;
+    jemaahMetaTableId = targetTable.id;
+    window._jemaahMetaCache = targetTable;
+    
+    // Validate ID lengths
+    console.log('✅ Jemaah table found:', targetTable.name, 'id:', targetTable.id, 'len', targetTable.id.length, 'fields', targetTable.fields.length);
+    targetTable.fields.forEach(f=>{
+      if(f.id && f.id.length!==17) console.warn(`⚠️ Field ${f.name} ID len ${f.id.length}: ${f.id}`);
+      if(f.options?.choices){
+        f.options.choices.forEach(c=>{
+          if(c.id && c.id.length!==17) console.warn(`⚠️ Choice ${f.name} -> ${c.name} ID len ${c.id.length}: ${c.id}`);
+        });
       }
     });
-    if(allJemaahUmrahRecords && allJemaahUmrahRecords.length>0){ filterAndRenderJemaahGrid(); }
-  }catch(e){ console.error(e); buildFallbackFieldOptions(); }
+    
+    // Build lookup like rooming.js
+    jemaahMetaFieldsByName = {};
+    jemaahFieldOptions = {};
+    targetTable.fields.forEach(field=>{
+      jemaahMetaFieldsByName[field.name] = field;
+      if(field.options?.choices){
+        // V84: Filter out blank options - jangan simpan blank ke portal
+        const filtered = field.options.choices.filter(c=> c.name && c.name.trim()!=='');
+        if(filtered.length !== field.options.choices.length){
+          console.warn(`⚠️ Filtered ${field.options.choices.length - filtered.length} blank options from ${field.name}`);
+        }
+        jemaahFieldOptions[field.name] = filtered.map(c=> ({ id: c.id, name: c.name, color: c.color }));
+      }
+    });
+    console.log('✅ Jemaah V78 loaded', Object.keys(jemaahMetaFieldsByName).length, 'fields');
+    const p = jemaahMetaFieldsByName['PAKEJ'];
+    if(p) console.log('Sample PAKEJ:', { id: p.id, id_len: p.id.length, type: p.type, choices: (p.options?.choices||[]).map(c=> ({id: c.id, len: c.id.length, name: c.name})) });
+    const ins = jemaahMetaFieldsByName['INSURAN'];
+    if(ins) console.log('Sample INSURAN:', { id: ins.id, id_len: ins.id.length, type: ins.type, choices: (ins.options?.choices||[]).map(c=> ({id: c.id, len: c.id.length, name: c.name})) });
+    
+    _jemaahMetaFetching=false;
+    return jemaahFieldOptions;
+  }catch(e){
+    console.warn('fetchJemaahMetaOptionsFromMeta error', e);
+    _jemaahMetaFetching=false;
+    return null;
+  }
 }
+
+// Override old fetchJemaahMetaOptions to call new one
+
+async function cleanBlankOptions(fieldName){
+  try{
+    const base = window.AIRTABLE_BASE_ID||localStorage.getItem('effah_base_id')||'appSsn4JyQD4DnYu0';
+    const pat = window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
+    if(!base||!pat) return;
+    console.log(`V84 Cleaning blank options for ${fieldName}...`);
+    _jemaahMetaCache = null;
+    await fetchJemaahMetaOptionsFromMeta();
+    if(!_jemaahMetaCache) return;
+    const targetField = _jemaahMetaCache.fields.find(f=> f.name.toUpperCase()===fieldName.toUpperCase());
+    if(!targetField) return;
+    const choices = targetField.options?.choices||[];
+    const blankChoices = choices.filter(c=> !c.name || c.name.trim()==='');
+    const realChoices = choices.filter(c=> c.name && c.name.trim()!=='');
+    console.log(`Found ${blankChoices.length} blank choices in ${fieldName}:`, blankChoices.map(c=> c.id));
+    console.log(`Real choices: ${realChoices.length}`, realChoices.map(c=> c.name));
+    if(blankChoices.length===0){
+      console.log(`No blank choices in ${fieldName} - already clean`);
+      return true;
+    }
+    // V84: Keep only real choices with real 17-char IDs, filter out blank completely
+    const realChoicesWithId = realChoices.filter(c=> c.id && c.id.length===17 && c.name && c.name.trim()!=='').map(c=> ({id: c.id, name: c.name}));
+    console.log(`V84 Cleaning: keeping ${realChoicesWithId.length} real (non-blank), removing ${blankChoices.length} blank`);
+    if(realChoicesWithId.length===0){
+      console.error(`Cannot clean ${fieldName} - no real choices left, would delete all options`);
+      return false;
+    }
+    const metaUrl = `https://api.airtable.com/v0/meta/bases/${base}/tables/${_jemaahMetaCache.id}/fields/${targetField.id}`;
+    const res = await fetch(metaUrl, {
+      method:'PATCH',
+      headers:{Authorization:`Bearer ${pat}`,'Content-Type':'application/json'},
+      body: JSON.stringify({options:{choices: realChoicesWithId}})
+    });
+    const text = await res.text();
+    console.log(`V84 Clean ${fieldName} result:`, res.status, text.substring(0,500));
+    if(res.ok){
+      console.log(`✅ V84 Cleaned ${blankChoices.length} blank options from ${fieldName}`);
+      await fetchJemaahMetaOptionsFromMeta();
+      if(typeof filterAndRenderJemaahGrid==='function') filterAndRenderJemaahGrid();
+      return true;
+    } else {
+      console.error(`Failed to clean ${fieldName}:`, text);
+      return false;
+    }
+  }catch(e){ console.error('cleanBlankOptions V84 error', e); return false; }
+}
+
+async function cleanAllBlankOptions(){
+  const fieldsToClean = ['BOARD BASIS','INSURAN','PAKEJ','NATIONALITY','STATUS VISA','GENDER'];
+  for(let f of fieldsToClean){
+    await cleanBlankOptions(f);
+    await new Promise(r=> setTimeout(r, 800));
+  }
+  alert('Selesai clean blank options. Sila refresh.');
+}
+
+// Auto-clean on load if blank detected
+setTimeout(async ()=>{
+  try{
+    // Check if any field has blank in jemaahFieldOptions
+    for(let fieldName in jemaahFieldOptions){
+      const opts = jemaahFieldOptions[fieldName]||[];
+      const hasBlank = opts.some(o=> !o.name || o.name.trim()==='');
+      if(hasBlank){
+        console.warn(`Blank detected in ${fieldName}, auto-cleaning...`);
+        await cleanBlankOptions(fieldName);
+      }
+    }
+  }catch{}
+}, 3000);
+
+
+async function fetchJemaahMetaOptions(){
+  return await fetchJemaahMetaOptionsFromMeta();
+}
+
+
+
+
 function buildFallbackFieldOptions(){
   const fieldsToBuild = ['NATIONALITY','STATUS VISA','BOARD BASIS','INSURAN','PAKEJ'];
   fieldsToBuild.forEach(fieldName=>{
@@ -482,42 +979,437 @@ async function fetchEjenList(){
     ejenListCache = records.map(r=>({ id: r.id, name: r.fields['NAMA EJEN'] || r.fields['NAMA'] || r.fields['NAME'] || 'Unknown', status: r.fields['STATUS']||'', noTelefon: r.fields['NO TELEFON']||'', raw: r }));
   }catch(e){ console.error(e); }
 }
-async function addNewOptionToField(fieldName, newOptionName){
+async function addNewOptionToField(fieldName, newOptionName, triggerElement=null, recordId=null){
+  let loadingBtn = null;
+  let originalBtnHTML = '';
   try{
-    if(!jemaahMetaTableId){ alert('Meta table ID belum load'); return false; }
-    const fieldMeta = jemaahMetaFieldsByName[fieldName];
-    if(!fieldMeta){ alert('Field '+fieldName+' tak jumpa'); return false; }
-    const existingChoices = (fieldMeta.options && fieldMeta.options.choices) ? fieldMeta.options.choices : [];
-    if(existingChoices.some(c=> c.name.toUpperCase() === newOptionName.toUpperCase())){ alert('Option sudah wujud'); return false; }
-    const updatedChoices = [...existingChoices, { name: newOptionName }];
-    const url = `https://api.airtable.com/v0/meta/bases/${AIRTABLE_BASE_ID}/tables/${jemaahMetaTableId}/fields/${fieldMeta.id}`;
-    const res = await fetch(url, { method: 'PATCH', headers: { Authorization: `Bearer ${AIRTABLE_PAT}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ options: { ...fieldMeta.options, choices: updatedChoices } }) });
-    if(!res.ok){ const txt = await res.text(); alert('Gagal: '+txt); return false; }
-    const updatedField = await res.json();
-    jemaahMetaFieldsByName[fieldName] = updatedField;
-    jemaahFieldOptions[fieldName] = updatedField.options.choices.map(c=>({ id: c.id, name: c.name, color: c.color }));
-    alert(`Option '${newOptionName}' ditambah ke ${fieldName}`); filterAndRenderJemaahGrid(); return true;
-  }catch(e){ alert('Error: '+e.message); return false; }
+    const FULL_BASE_ID = 'appSsn4JyQD4DnYu0';
+    let base = window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base')||localStorage.getItem('effah_base_id')||FULL_BASE_ID;
+    if(!base || base.length!==17){ base = FULL_BASE_ID; try{ localStorage.setItem('effah_base_id', FULL_BASE_ID); localStorage.setItem('effah_api_base', FULL_BASE_ID); }catch{} }
+    const pat = window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
+    if(!base||!pat){ alert('Konfigurasi Airtable tidak ditemui'); return false; }
+
+    if(triggerElement){
+      loadingBtn = triggerElement;
+      originalBtnHTML = loadingBtn.innerHTML;
+      loadingBtn.disabled = true;
+      loadingBtn.innerHTML = '<span class="inline-flex items-center gap-1"><svg class="animate-spin h-3 w-3" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Menambah...</span>';
+      loadingBtn.classList.add('opacity-70','cursor-wait');
+    }
+
+    console.log(`\n=== V88 addNewOptionToField ${fieldName} -> ${newOptionName} ===`);
+
+    if(!newOptionName || newOptionName.trim()===''){
+      console.error('Blank name, abort');
+      alert('Nama pilihan tidak boleh kosong.');
+      return false;
+    }
+    newOptionName = newOptionName.trim().toUpperCase();
+
+    _jemaahMetaCache = null;
+    await fetchJemaahMetaOptionsFromMeta();
+    if(!_jemaahMetaCache){
+      if(loadingBtn){ loadingBtn.innerHTML = originalBtnHTML; loadingBtn.disabled = false; loadingBtn.classList.remove('opacity-70','cursor-wait'); }
+      alert('Tidak dapat mencapai metadata Airtable.');
+      return false;
+    }
+    const tableId = _jemaahMetaCache.id;
+    const fields = _jemaahMetaCache.fields||[];
+    const targetField = fields.find(f=> (f.name||'').toUpperCase()===fieldName.toUpperCase());
+    if(!targetField){
+      if(loadingBtn){ loadingBtn.innerHTML = originalBtnHTML; loadingBtn.disabled = false; }
+      alert(`Medan ${fieldName} tidak ditemui.`);
+      return false;
+    }
+
+    if(targetField.type!=='singleSelect' && targetField.type!=='multipleSelects'){
+      if(targetField.type==='multipleRecordLinks' || targetField.type==='singleRecordLink' || fieldName==='EJEN' || fieldName==='TRIP'){
+        const linkedTable = fieldName==='EJEN' ? 'EJEN LIST' : 'PAKEJ UMRAH';
+        const linkedField = fieldName==='EJEN' ? 'NAMA EJEN' : 'NAMA PAKEJ';
+        try{
+          const url = `https://api.airtable.com/v0/${base}/${encodeURIComponent(linkedTable)}`;
+          const res = await fetch(url, { method:'POST', headers:{ Authorization: `Bearer ${pat}`, 'Content-Type':'application/json' }, body: JSON.stringify({ fields: { [linkedField]: newOptionName } }) });
+          if(loadingBtn){ loadingBtn.innerHTML = originalBtnHTML; loadingBtn.disabled = false; loadingBtn.classList.remove('opacity-70','cursor-wait'); }
+          if(!res.ok){ const t=await res.text(); alert('Gagal tambah di '+linkedTable); return false; }
+          await fetchJemaahMetaOptionsFromMeta();
+          if(typeof filterAndRenderJemaahGrid==='function') filterAndRenderJemaahGrid();
+          alert(`'${newOptionName}' berjaya ditambahkan.`);
+          return true;
+        }catch(e){ 
+          if(loadingBtn){ loadingBtn.innerHTML = originalBtnHTML; loadingBtn.disabled = false; }
+          alert('Ralat: '+e.message); return false; 
+        }
+      }
+      if(loadingBtn){ loadingBtn.innerHTML = originalBtnHTML; loadingBtn.disabled = false; }
+      alert(`Medan ${fieldName} bukan jenis pilihan.`);
+      return false;
+    }
+
+    const existingChoices = (targetField.options && targetField.options.choices) ? targetField.options.choices : [];
+    const existingNonBlank = existingChoices.filter(c=> c.name && c.name.trim()!=='');
+    if(existingNonBlank.some(c=> (c.name||'').toUpperCase()===newOptionName.toUpperCase())){
+      if(loadingBtn){ loadingBtn.innerHTML = originalBtnHTML; loadingBtn.disabled = false; loadingBtn.classList.remove('opacity-70','cursor-wait'); }
+      alert(`'${newOptionName}' telah wujud.`);
+      return false;
+    }
+
+    console.log('Trying typecast:true FIRST...');
+    let typecastSuccess = false;
+    let allRecords = [];
+    try{
+      allRecords = (typeof allJemaahRecords!=='undefined' && allJemaahRecords.length>0) ? allJemaahRecords : (window.allJemaahRecords||[]);
+      if(allRecords.length===0 && typeof allJemaahUmrahRecords!=='undefined') allRecords = allJemaahUmrahRecords;
+      if(allRecords.length===0 && window.allJemaahUmrahRecords) allRecords = window.allJemaahUmrahRecords;
+    }catch{}
+    
+    if(allRecords.length>0){
+      const first = allRecords[0];
+      const isMulti = targetField.type==='multipleSelects';
+      const originalVal = first.fields[fieldName];
+      try{
+        const typecastPayload = isMulti ? [newOptionName] : newOptionName;
+        const url = `https://api.airtable.com/v0/${base}/DATA%20JEMAAH%20UMRAH/${first.id}`;
+        const typecastRes = await fetch(url, {
+          method:'PATCH',
+          headers:{Authorization:`Bearer ${pat}`,'Content-Type':'application/json'},
+          body: JSON.stringify({fields:{[fieldName]: typecastPayload}, typecast:true})
+        });
+        const typecastText = await typecastRes.text();
+        console.log('Typecast response:', typecastRes.status, typecastText.substring(0,500));
+        if(typecastRes.ok){
+          typecastSuccess = true;
+          setTimeout(async ()=>{
+            try{
+              const revertValue = isMulti ? (Array.isArray(originalVal) ? originalVal.filter(v=> v && v.trim()!=='') : []) : (originalVal || null);
+              await fetch(url, {
+                method:'PATCH',
+                headers:{Authorization:`Bearer ${pat}`,'Content-Type':'application/json'},
+                body: JSON.stringify({fields:{[fieldName]: revertValue}, typecast:true})
+              });
+            }catch(e){}
+          }, 1000);
+        }
+      }catch(e){ console.warn('Typecast exception', e); }
+    }
+
+    if(typecastSuccess){
+      await new Promise(r=> setTimeout(r, 1200));
+      await fetchJemaahMetaOptionsFromMeta();
+      
+      try{
+        if(recordId){
+          const isMulti = targetField.type==='multipleSelects';
+          const rec = allRecords.find(r=> r.id===recordId);
+          if(rec){
+            if(isMulti){
+              let arr = Array.isArray(rec.fields[fieldName]) ? [...rec.fields[fieldName]] : (rec.fields[fieldName] ? [rec.fields[fieldName]] : []);
+              arr = arr.filter(v=> v && v.trim()!=='');
+              if(!arr.includes(newOptionName)) arr.push(newOptionName);
+              arr = [...new Set(arr)].filter(v=> v && v.trim()!=='');
+              rec.fields[fieldName] = arr;
+            } else {
+              rec.fields[fieldName] = newOptionName;
+            }
+            try{
+              const payload = isMulti ? rec.fields[fieldName] : newOptionName;
+              console.log(`V88 Auto-select PATCH ${recordId} ${fieldName}=`, payload);
+              const res = await fetch(`https://api.airtable.com/v0/${base}/DATA%20JEMAAH%20UMRAH/${recordId}`, {
+                method:'PATCH',
+                headers:{Authorization:`Bearer ${pat}`,'Content-Type':'application/json'},
+                body: JSON.stringify({fields:{[fieldName]: payload}, typecast:true})
+              });
+              const t = await res.text();
+              console.log(`V88 Auto-select result ${res.status}`, t.substring(0,500));
+            }catch(e){ console.warn('V88 auto-select error', e); }
+          }
+        }
+      }catch(e){ console.warn('V88 auto-select outer', e); }
+
+      if(loadingBtn){ loadingBtn.innerHTML = originalBtnHTML; loadingBtn.disabled = false; loadingBtn.classList.remove('opacity-70','cursor-wait'); }
+      alert(`'${newOptionName}' berjaya ditambahkan.`);
+      if(typeof filterAndRenderJemaahGrid==='function') filterAndRenderJemaahGrid();
+      return true;
+    }
+
+    // Fallback meta PATCH - never send blank
+    const realChoices = existingChoices.filter(c=> c.name && c.name.trim()!=='' && c.id);
+    const dedupMap = new Map();
+    for(let c of realChoices){
+      const k = c.name.trim().toUpperCase();
+      if(!k) continue;
+      if(!dedupMap.has(k)) dedupMap.set(k, {id: c.id, name: c.name.trim()});
+    }
+    const choicesWithId = Array.from(dedupMap.values()).map(c=> c.id && c.id.length===17 ? {id: c.id, name: c.name} : {name: c.name});
+    const newChoices = [...choicesWithId, {name: newOptionName}];
+    
+    console.log('Meta PATCH payload (no blank):', newChoices.length);
+    
+    try{
+      const metaUrl = `https://api.airtable.com/v0/meta/bases/${base}/tables/${tableId}/fields/${targetField.id}`;
+      const metaRes = await fetch(metaUrl, {
+        method:'PATCH',
+        headers:{Authorization:`Bearer ${pat}`,'Content-Type':'application/json'},
+        body: JSON.stringify({options:{choices: newChoices}})
+      });
+      const metaText = await metaRes.text();
+      console.log('Meta result:', metaRes.status, metaText.substring(0,500));
+      if(loadingBtn){ loadingBtn.innerHTML = originalBtnHTML; loadingBtn.disabled = false; loadingBtn.classList.remove('opacity-70','cursor-wait'); }
+      if(metaRes.ok){
+        await fetchJemaahMetaOptionsFromMeta();
+        if(recordId){
+          try{
+            const rec = allRecords.find(r=> r.id===recordId);
+            if(rec){
+              if(targetField.type==='multipleSelects'){
+                let arr = Array.isArray(rec.fields[fieldName]) ? [...rec.fields[fieldName]] : [];
+                arr = arr.filter(v=> v && v.trim()!=='');
+                if(!arr.includes(newOptionName)) arr.push(newOptionName);
+                rec.fields[fieldName] = arr;
+              } else {
+                rec.fields[fieldName] = newOptionName;
+              }
+              await fetch(`https://api.airtable.com/v0/${base}/DATA%20JEMAAH%20UMRAH/${recordId}`, {
+                method:'PATCH',
+                headers:{Authorization:`Bearer ${pat}`,'Content-Type':'application/json'},
+                body: JSON.stringify({fields:{[fieldName]: rec.fields[fieldName]}, typecast:true})
+              });
+            }
+          }catch{}
+        }
+        if(typeof filterAndRenderJemaahGrid==='function') filterAndRenderJemaahGrid();
+        alert(`'${newOptionName}' berjaya ditambahkan.`);
+        return true;
+      } else {
+        alert(`Gagal menambah '${newOptionName}'. Sila tambah manual di Airtable.`);
+        return false;
+      }
+    }catch(e){
+      if(loadingBtn){ loadingBtn.innerHTML = originalBtnHTML; loadingBtn.disabled = false; loadingBtn.classList.remove('opacity-70','cursor-wait'); }
+      alert(`Gagal: ${e.message}`);
+      return false;
+    }
+  }catch(e){
+    console.error('V88 error', e);
+    try{ if(loadingBtn){ loadingBtn.innerHTML = originalBtnHTML; loadingBtn.disabled = false; } }catch{}
+    alert(`Gagal menambah "${newOptionName}".`);
+    return false;
+  }
 }
-function handleAddNewOption(fieldName, selectEl){
-  const newVal = prompt(`Tambah option baru untuk ${fieldName}:`);
+
+
+// Helper to handle + Add new option click with loading and auto-select
+function handleAddNewOptionClick(fieldName, recordId=null, btnElement=null){
+  const raw = prompt(`Tambah pilihan baharu untuk ${fieldName}:`);
+  if(!raw) return;
+  const trimmed = raw.trim().toUpperCase();
+  if(!trimmed) return;
+  // Call with button element for loading
+  addNewOptionToField(fieldName, trimmed, btnElement, recordId);
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+function handleAddNewOption(fieldName, selectEl, modalDropdownId){
+  const newVal = prompt(`Sila masukkan pilihan baharu untuk ${fieldName}:`);
   if(!newVal){ if(selectEl) selectEl.value = selectEl.getAttribute('data-prev')||''; return; }
   const trimmed = newVal.trim().toUpperCase();
   if(!trimmed) return;
-  addNewOptionToField(fieldName, trimmed).then(ok=>{ if(ok && selectEl){ setTimeout(()=>{ selectEl.value = trimmed; selectEl.dispatchEvent(new Event('change')); }, 500); } });
+  
+  let originalHTML = '';
+  let originalValue = '';
+  let recId = null;
+  let cellEl = null;
+  let isModal = false;
+  
+  if(selectEl){
+    originalValue = selectEl.value;
+    originalHTML = selectEl.innerHTML;
+    cellEl = selectEl.closest('td') || selectEl.closest('div.sm\\:col-span-2') || selectEl.parentElement;
+    isModal = !!selectEl.closest('#expandRecordModal') || !!selectEl.closest('#addModalForm');
+    recId = selectEl.getAttribute('data-rec-id') || (selectEl.dataset ? selectEl.dataset.recId : null);
+    if(!recId && !isModal){
+      try{
+        const tr = selectEl.closest('tr');
+        if(tr) recId = tr.getAttribute('data-rec-id') || tr.getAttribute('data-id');
+        if(!recId){
+          const oc = selectEl.getAttribute('onchange')||'';
+          const m2 = oc.match(/updateJemaahField\('([^']+)'/);
+          if(m2) recId = m2[1];
+        }
+      }catch{}
+    }
+    console.log(`V89 handleAddNewOption ${fieldName} recId=${recId} isModal=${isModal} trimmed=${trimmed}`);
+    if(recId && !isModal){
+      try{ localStorage.setItem('effah_pending_autoselect', JSON.stringify({recId, fieldName, value: trimmed, ts: Date.now()})); }catch{}
+    }
+    
+    // V89: Loading UI like Group box "Sedang diproses..."
+    if(cellEl && !isModal){
+      cellEl.dataset.originalHTML = cellEl.innerHTML;
+      cellEl.innerHTML = `<div class="w-full text-xs p-2 font-bold rounded-lg border border-slate-300 bg-white flex items-center justify-center gap-2 text-slate-600"><svg class="animate-spin h-4 w-4 text-slate-500" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg><span>Sedang diproses...</span></div>`;
+    } else if(isModal){
+      // For modal, show loading in select itself
+      selectEl.disabled = true;
+      selectEl.innerHTML = `<option selected>⏳ Menambah ${trimmed}...</option>`;
+      selectEl.classList.add('opacity-70');
+    } else {
+      selectEl.disabled = true;
+      selectEl.innerHTML = `<option selected>⏳ Menambah ${trimmed}...</option>`;
+      selectEl.classList.add('opacity-70');
+    }
+  }
+  
+  addNewOptionToField(fieldName, trimmed, selectEl, recId).then(ok=>{ 
+    console.log(`V89 add result ${fieldName} ${trimmed} ok=${ok} recId=${recId} isModal=${isModal}`);
+    const currentCell = cellEl || (selectEl ? selectEl.closest('td') || selectEl.closest('div.sm\\:col-span-2') || selectEl.parentElement : null);
+    
+    if(!ok){
+      if(currentCell && currentCell.dataset.originalHTML) currentCell.innerHTML = currentCell.dataset.originalHTML;
+      else if(selectEl){ selectEl.disabled=false; selectEl.classList.remove('opacity-70'); selectEl.innerHTML=originalHTML; selectEl.value=selectEl.getAttribute('data-prev')||originalValue; }
+      try{ localStorage.removeItem('effah_pending_autoselect'); }catch{}
+      return;
+    }
+    
+    // Success
+    if(isModal){
+      // V89: For modal, rebuild select options with new value selected
+      setTimeout(async ()=>{
+        await fetchJemaahMetaOptionsFromMeta();
+        const opts = (jemaahFieldOptions[fieldName]||[]).filter(o=> o.name && o.name.trim()!=='');
+        if(selectEl){
+          let html = `<option value="">${selectEl.querySelector('option[value=""]') ? selectEl.querySelector('option[value=""]').textContent : '-- Pilih --'}</option>`;
+          opts.forEach(opt=>{
+            const sel = opt.name===trimmed ? 'selected' : '';
+            html += `<option value="${opt.name}" ${sel}>${opt.name}</option>`;
+          });
+          if(fieldName!=='GENDER'){
+            html += `<option value="__ADD_NEW__" style="font-weight:bold;color:#800020;">+ Add new option</option>`;
+          }
+          selectEl.innerHTML = html;
+          selectEl.disabled = false;
+          selectEl.classList.remove('opacity-70');
+          selectEl.value = trimmed;
+          selectEl.setAttribute('data-prev', trimmed);
+          console.log(`V89 Modal ${fieldName} set to ${trimmed}`);
+        }
+        // For BOARD BASIS and INSURAN multi in modal, update checkbox lists
+        if(fieldName==='BOARD BASIS'){
+          const list = document.getElementById('boardBasisList');
+          if(list){
+            const filtered = opts;
+            list.innerHTML = filtered.map(opt=>{
+              const checked = opt.name===trimmed ? 'checked' : '';
+              return `<label class="flex items-center gap-2 px-3 py-2 hover:bg-slate-50 cursor-pointer"><input type="checkbox" value="${opt.name}" ${checked} class="board-checkbox w-4 h-4 rounded border-slate-300 text-brand-maroon"><span class="text-xs font-bold">${opt.name}</span></label>`;
+            }).join('');
+            document.querySelectorAll('.board-checkbox').forEach(cb=>{ cb.addEventListener('change', updateBoardBasisSelected); });
+            if(typeof updateBoardBasisSelected==='function') updateBoardBasisSelected();
+          }
+        }
+        if(fieldName==='INSURAN'){
+          const list = document.getElementById('insuranList');
+          if(list){
+            const filtered = opts;
+            list.innerHTML = filtered.map(opt=>{
+              const checked = opt.name===trimmed ? 'checked' : '';
+              return `<label class="flex items-center gap-2 px-3 py-2 hover:bg-slate-50 cursor-pointer"><input type="checkbox" value="${opt.name}" ${checked} class="insuran-checkbox w-4 h-4 rounded border-slate-300 text-brand-maroon"><span class="text-xs font-bold">${opt.name}</span></label>`;
+            }).join('');
+            document.querySelectorAll('.insuran-checkbox').forEach(cb=>{ cb.addEventListener('change', updateInsuranSelected); });
+            if(typeof updateInsuranSelected==='function') updateInsuranSelected();
+          }
+        }
+      }, 800);
+    } else {
+      // Table case - keep loading until grid refresh
+      if(currentCell){
+        currentCell.innerHTML = `<div class="w-full text-xs p-2 font-bold rounded-lg border border-slate-300 bg-white flex items-center justify-center gap-2 text-emerald-600"><svg class="animate-spin h-4 w-4" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg><span>Menyimpan ${trimmed}...</span></div>`;
+      }
+      setTimeout(()=>{
+        if(typeof filterAndRenderJemaahGrid==='function'){
+          filterAndRenderJemaahGrid();
+          setTimeout(()=>{
+            try{
+              const allRecs = window.allJemaahUmrahRecords||window.allJemaahRecords||[];
+              const rec = allRecs.find(r=> r.id===recId);
+              if(rec && rec.fields[fieldName]!==trimmed){
+                rec.fields[fieldName]=trimmed;
+                filterAndRenderJemaahGrid();
+              }
+            }catch{}
+            setTimeout(()=>{ try{ localStorage.removeItem('effah_pending_autoselect'); }catch{} }, 2500);
+          }, 400);
+        }
+      }, 600);
+    }
+  });
+  
+  if(modalDropdownId){
+    // For modal multi dropdowns called via + Add option button in dropdown
+    const options = jemaahFieldOptions[fieldName] || [];
+    const filtered = options.filter(o=> o.name && o.name.trim()!=='');
+    if(modalDropdownId==='boardBasisDropdown'){
+      const list = document.getElementById('boardBasisList');
+      if(list){
+        // Will be updated after add, but show loading now
+        list.innerHTML = `<div class="p-3 text-xs text-slate-500 flex items-center gap-2"><svg class="animate-spin h-3 w-3" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Menambah ${trimmed}...</div>` + list.innerHTML;
+      }
+    } else if(modalDropdownId==='insuranDropdown'){
+      const list = document.getElementById('insuranList');
+      if(list){
+        list.innerHTML = `<div class="p-3 text-xs text-slate-500 flex items-center gap-2"><svg class="animate-spin h-3 w-3" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Menambah ${trimmed}...</div>` + list.innerHTML;
+      }
+    }
+  }
 }
+
+
 function renderSingleSelectCell(recId, fieldName, currentValue){
   const options = jemaahFieldOptions[fieldName] || [];
-  const safeCurrent = currentValue || '';
+  let safeCurrent = currentValue || '';
+  
+  try{
+    const pendingRaw = localStorage.getItem('effah_pending_autoselect');
+    if(pendingRaw){
+      const pending = JSON.parse(pendingRaw);
+      if(pending.recId===recId && pending.fieldName===fieldName && Date.now() - pending.ts < 10000){
+        safeCurrent = pending.value;
+      }
+    }
+  }catch{}
+  
   let optsHtml = `<option value="">-- Pilih --</option>`;
   if(options.length>0){
-    options.forEach(opt=>{ const selected = (opt.name === safeCurrent) ? 'selected' : ''; optsHtml += `<option value="${opt.name}" ${selected}>${opt.name}</option>`; });
+    const filteredOpts = options.filter(opt=> opt.name && opt.name.trim()!=='');
+    let allOpts = [...filteredOpts];
+    if(safeCurrent && safeCurrent.trim()!=='' && !allOpts.some(o=> o.name===safeCurrent)){
+      allOpts.push({name: safeCurrent});
+    }
+    allOpts.forEach(opt=>{ const selected = (opt.name === safeCurrent) ? 'selected' : ''; optsHtml += `<option value="${opt.name}" ${selected}>${opt.name}</option>`; });
   } else {
-    if(safeCurrent){ optsHtml += `<option value="${safeCurrent}" selected>${safeCurrent}</option>`; }
+    if(safeCurrent && safeCurrent.trim()!==''){ optsHtml += `<option value="${safeCurrent}" selected>${safeCurrent}</option>`; }
+    // Fallback for GENDER
+    if(fieldName==='GENDER' && !safeCurrent){
+      optsHtml += `<option value="MALE">MALE</option><option value="FEMALE">FEMALE</option>`;
+    }
   }
-  optsHtml += `<option value="__ADD_NEW__" style="font-weight:bold; color:#800020;">+ Add new option</option>`;
-  return `<select data-prev="${safeCurrent}" onchange="if(this.value==='__ADD_NEW__'){ handleAddNewOption('${fieldName}', this); } else { updateJemaahField('${recId}', '${fieldName}', this.value); }" class="w-full text-xs p-1.5 font-bold rounded-lg border border-transparent hover:border-slate-300 focus:bg-white bg-transparent">${optsHtml}</select>`;
+  // V89: No + Add new option for GENDER in table too
+  if(fieldName!=='GENDER'){
+    optsHtml += `<option value="__ADD_NEW__" style="font-weight:bold; color:#800020;">+ Add new option</option>`;
+  }
+  return `<select data-prev="${safeCurrent}" data-rec-id="${recId}" onchange="if(this.value==='__ADD_NEW__'){ handleAddNewOption('${fieldName}', this); } else { updateJemaahField('${recId}', '${fieldName}', this.value); }" class="w-full text-xs p-1.5 font-bold rounded-lg border border-transparent hover:border-slate-300 focus:bg-white bg-transparent">${optsHtml}</select>`;
 }
+
+
 function renderMultiSelectCell(recId, fieldName, currentValues){
   const options = jemaahFieldOptions[fieldName] || [];
   const currentArr = Array.isArray(currentValues) ? currentValues : (currentValues ? [currentValues] : []);
@@ -527,21 +1419,143 @@ function renderMultiSelectCell(recId, fieldName, currentValues){
   } else { pillsHtml = `<span class="text-slate-300 text-[10px]">-</span>`; }
   let optsHtml = '';
   if(options.length>0){
-    options.forEach(opt=>{ const isSelected = currentArr.includes(opt.name); optsHtml += `<label class="flex items-center gap-2 px-2 py-1.5 hover:bg-slate-50 cursor-pointer text-xs"><input type="checkbox" ${isSelected?'checked':''} onchange="toggleMultiSelectValue('${recId}', '${fieldName}', '${opt.name.replace(/'/g, "\'")}', this.checked)" class="w-3.5 h-3.5 rounded border-slate-300 text-brand-maroon"> <span>${opt.name}</span></label>`; });
+    // Filter out blank options
+    const filteredOpts = options.filter(opt=> opt.name && opt.name.trim()!=='');
+    filteredOpts.forEach(opt=>{ const isSelected = currentArr.includes(opt.name); optsHtml += `<label class="flex items-center gap-2 px-2 py-1.5 hover:bg-slate-50 cursor-pointer text-xs"><input type="checkbox" ${isSelected?'checked':''} onchange="toggleMultiSelectValue('${recId}', '${fieldName}', '${opt.name.replace(/'/g, "\'")}', this.checked)" class="w-3.5 h-3.5 rounded border-slate-300 text-brand-maroon"> <span>${opt.name}</span></label>`; });
   }
-  optsHtml += `<div class="border-t border-slate-200 mt-1 pt-1"><button onclick="handleAddNewMultiOption('${fieldName}')" class="w-full text-left px-2 py-1 text-[11px] font-bold text-brand-maroon hover:bg-rose-50 rounded">+ Add option</button></div>`;
+  optsHtml += `<div class="border-t border-slate-200 mt-1 pt-1"><button onclick="handleAddNewMultiOption('${fieldName}', this, '${recId}')" class="w-full text-left px-2 py-1 text-[11px] font-bold text-brand-maroon hover:bg-rose-50 rounded flex items-center gap-1"><span>+ Add new option</span></button></div>`;
   const dropdownId = `ms-dropdown-${recId}-${fieldName.replace(/\s/g,'')}`;
   return `<div class="relative cell-dropdown-wrapper"><div class="flex flex-wrap items-center gap-1 p-1 min-h-[28px] border border-transparent hover:border-slate-300 rounded-lg cursor-pointer" onclick="event.stopPropagation(); toggleCellDropdown('${dropdownId}')">${pillsHtml}<i class="fa-solid fa-chevron-down text-[10px] text-slate-400 ml-auto"></i></div><div id="${dropdownId}" data-cell-dropdown class="hidden absolute left-0 top-full mt-1 w-56 bg-white rounded-xl shadow-xl border border-slate-200 z-50 max-h-64 overflow-y-auto p-1">${optsHtml}</div></div>`;
 }
 
 function toggleMultiSelectValue(recId, fieldName, value, isChecked){
+  // V84: Prevent blank values from being added
+  if(!value || value.trim()===''){
+    console.warn('Prevented blank value in toggleMultiSelectValue');
+    return;
+  }
   const rec = allJemaahUmrahRecords.find(r=> r.id===recId); if(!rec) return;
   let current = rec.fields[fieldName]; let arr = Array.isArray(current) ? [...current] : (current ? [current] : []);
+  // Filter out any existing blank
+  arr = arr.filter(v=> v && v.trim()!=='');
   if(isChecked){ if(!arr.includes(value)) arr.push(value); } else { arr = arr.filter(v=> v!==value); }
+  // Final filter blank before sending
+  arr = arr.filter(v=> v && v.trim()!=='');
   updateJemaahField(recId, fieldName, arr); rec.fields[fieldName] = arr; filterAndRenderJemaahGrid();
 }
 function removeMultiSelectValue(recId, fieldName, value){ toggleMultiSelectValue(recId, fieldName, value, false); }
-function handleAddNewMultiOption(fieldName){ const newVal = prompt(`Tambah option baru untuk ${fieldName}:`); if(!newVal) return; const trimmed = newVal.trim().toUpperCase(); if(!trimmed) return; addNewOptionToField(fieldName, trimmed); }
+function handleAddNewMultiOption(fieldName, btnEl=null, recId=null){
+  const newVal = prompt(`Tambah pilihan baharu untuk ${fieldName}:`);
+  if(!newVal) return; 
+  const trimmed = newVal.trim().toUpperCase(); 
+  if(!trimmed) return;
+  
+  let originalBtnHTML = '';
+  let loadingBtn = btnEl;
+  let isModal = false;
+  try{
+    if(!loadingBtn){
+      const active = document.activeElement;
+      if(active && active.textContent && active.textContent.includes('Add option')){
+        loadingBtn = active;
+      }
+    }
+    if(loadingBtn){
+      isModal = !!loadingBtn.closest('#expandRecordModal') || !!loadingBtn.closest('#addModalForm');
+    } else {
+      // Check if we're in modal without button
+      isModal = !!document.getElementById('expandRecordModal')?.classList.contains('flex') || !!document.getElementById('addModalForm');
+    }
+  }catch{}
+  
+  if(loadingBtn){
+    originalBtnHTML = loadingBtn.innerHTML;
+    loadingBtn.disabled = true;
+    loadingBtn.innerHTML = '<span class="inline-flex items-center gap-1"><svg class="animate-spin h-3 w-3" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Menambah...</span>';
+    loadingBtn.classList.add('opacity-70');
+  }
+  
+  // Show loading in dropdown list for modal multi
+  let boardList = null;
+  let insuranList = null;
+  try{
+    if(fieldName==='BOARD BASIS'){
+      boardList = document.getElementById('boardBasisList');
+      if(boardList){
+        boardList.dataset.originalHTML = boardList.innerHTML;
+        boardList.innerHTML = `<div class="p-3 text-xs text-slate-500 flex items-center gap-2"><svg class="animate-spin h-3 w-3" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Menambah ${trimmed}...</div>`;
+      }
+    }
+    if(fieldName==='INSURAN'){
+      insuranList = document.getElementById('insuranList');
+      if(insuranList){
+        insuranList.dataset.originalHTML = insuranList.innerHTML;
+        insuranList.innerHTML = `<div class="p-3 text-xs text-slate-500 flex items-center gap-2"><svg class="animate-spin h-3 w-3" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Menambah ${trimmed}...</div>`;
+      }
+    }
+  }catch{}
+  
+  if(!recId){
+    try{
+      const wrapper = loadingBtn?.closest('.cell-dropdown-wrapper');
+      if(wrapper){
+        const idAttr = wrapper.closest('tr')?.getAttribute('data-rec-id');
+        if(idAttr) recId = idAttr;
+      }
+    }catch{}
+  }
+  
+  addNewOptionToField(fieldName, trimmed, loadingBtn, recId).then(async ok=>{
+    if(loadingBtn){
+      loadingBtn.innerHTML = originalBtnHTML;
+      loadingBtn.disabled = false;
+      loadingBtn.classList.remove('opacity-70');
+    }
+    
+    if(ok){
+      // V90: For modal multi, rebuild dropdown with new option checked
+      try{
+        await fetchJemaahMetaOptionsFromMeta();
+        const opts = (jemaahFieldOptions[fieldName]||[]).filter(o=> o.name && o.name.trim()!=='');
+        
+        if(fieldName==='BOARD BASIS'){
+          const list = document.getElementById('boardBasisList');
+          if(list){
+            list.innerHTML = opts.map(opt=>{
+              const checked = opt.name===trimmed ? 'checked' : '';
+              return `<label class="flex items-center gap-2 px-3 py-2 hover:bg-slate-50 cursor-pointer"><input type="checkbox" value="${opt.name}" ${checked} class="board-checkbox w-4 h-4 rounded border-slate-300 text-brand-maroon"><span class="text-xs font-bold">${opt.name}</span></label>`;
+            }).join('') + `<div class="border-t border-slate-200 mt-1 pt-1"><button onclick="handleAddNewMultiOption('BOARD BASIS', this)" class="w-full text-left px-2 py-1 text-[11px] font-bold text-brand-maroon hover:bg-rose-50 rounded">+ Add option</button></div>`;
+            document.querySelectorAll('.board-checkbox').forEach(cb=>{ cb.addEventListener('change', updateBoardBasisSelected); });
+            if(typeof updateBoardBasisSelected==='function') updateBoardBasisSelected();
+            console.log(`V90 BOARD BASIS rebuilt with ${trimmed} checked`);
+          }
+        }
+        if(fieldName==='INSURAN'){
+          const list = document.getElementById('insuranList');
+          if(list){
+            list.innerHTML = opts.map(opt=>{
+              const checked = opt.name===trimmed ? 'checked' : '';
+              return `<label class="flex items-center gap-2 px-3 py-2 hover:bg-slate-50 cursor-pointer"><input type="checkbox" value="${opt.name}" ${checked} class="insuran-checkbox w-4 h-4 rounded border-slate-300 text-brand-maroon"><span class="text-xs font-bold">${opt.name}</span></label>`;
+            }).join('') + `<div class="border-t border-slate-200 mt-1 pt-1"><button onclick="handleAddNewMultiOption('INSURAN', this)" class="w-full text-left px-2 py-1 text-[11px] font-bold text-brand-maroon hover:bg-rose-50 rounded">+ Add option</button></div>`;
+            document.querySelectorAll('.insuran-checkbox').forEach(cb=>{ cb.addEventListener('change', updateInsuranSelected); });
+            if(typeof updateInsuranSelected==='function') updateInsuranSelected();
+            console.log(`V90 INSURAN rebuilt with ${trimmed} checked`);
+          }
+        }
+      }catch(e){ console.warn('V90 rebuild error', e); }
+      
+      if(recId){
+        setTimeout(()=>{ if(typeof filterAndRenderJemaahGrid==='function') filterAndRenderJemaahGrid(); }, 500);
+      }
+    } else {
+      // Restore original if failed
+      try{
+        if(boardList && boardList.dataset.originalHTML) boardList.innerHTML = boardList.dataset.originalHTML;
+        if(insuranList && insuranList.dataset.originalHTML) insuranList.innerHTML = insuranList.dataset.originalHTML;
+      }catch{}
+    }
+  });
+}
 function renderEjenCell(recId, currentEjenIds){
   const ids = Array.isArray(currentEjenIds) ? currentEjenIds : (currentEjenIds ? [currentEjenIds] : []);
   let pillsHtml = '';
@@ -602,6 +1616,46 @@ async function fetchJemaahUmrahData(isManualClick = false) {
     const icon = document.getElementById('iconRefreshJemaah');
     if (icon) icon.classList.add('fa-spin');
 
+    // V89: Dim right table 50% and make not clickable when refresh clicked
+    let loadingOverlay = null;
+    let rightContainer = null;
+    if(isManualClick){
+      try{
+        // Find right container (flex-1 with table)
+        rightContainer = document.querySelector('.flex-1.flex.flex-col.space-y-3.min-w-0');
+        if(!rightContainer){
+          // Fallback: find by main grid table parent
+          const gridTable = document.getElementById('mainJemaahGridTable');
+          if(gridTable) rightContainer = gridTable.closest('.flex-1');
+        }
+        if(rightContainer){
+          rightContainer.style.position = 'relative';
+          loadingOverlay = document.createElement('div');
+          loadingOverlay.id = 'jemaahTableLoadingOverlay';
+          loadingOverlay.className = 'absolute inset-0 bg-white/60 backdrop-blur-[0.5px] flex flex-col items-center justify-center z-40 rounded-2xl';
+          loadingOverlay.style.pointerEvents = 'auto';
+          loadingOverlay.innerHTML = `
+            <div class="bg-white border border-slate-300 shadow-lg rounded-2xl px-6 py-4 flex flex-col items-center gap-3">
+              <svg class="animate-spin h-8 w-8 text-brand-maroon" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+              <span class="text-xs font-bold text-slate-700">Memuat semula data jemaah...</span>
+              <span class="text-[10px] text-slate-500">Sila tunggu sebentar</span>
+            </div>
+          `;
+          rightContainer.appendChild(loadingOverlay);
+          // Also dim the table itself
+          const tableEl = document.getElementById('mainJemaahGridTable');
+          if(tableEl){
+            tableEl.style.opacity = '0.5';
+            tableEl.style.pointerEvents = 'none';
+          }
+        }
+      }catch(e){ console.warn('V89 overlay error', e); }
+    }
+
+
     const cachedData = localStorage.getItem('cache_jemaah_records');
     if (cachedData && allJemaahUmrahRecords.length === 0) {
         try {
@@ -648,6 +1702,22 @@ async function fetchJemaahUmrahData(isManualClick = false) {
         console.error("Background sync error:", err);
     } finally {
         if (icon) icon.classList.remove('fa-spin');
+        // V89: Remove loading overlay and restore table
+        try{
+          const overlay = document.getElementById('jemaahTableLoadingOverlay');
+          if(overlay) overlay.remove();
+          const tableEl = document.getElementById('mainJemaahGridTable');
+          if(tableEl){
+            tableEl.style.opacity = '1';
+            tableEl.style.pointerEvents = 'auto';
+          }
+          const rc = document.querySelector('.flex-1.flex.flex-col.space-y-3.min-w-0');
+          if(rc && rc.contains){
+            // Ensure no leftover overlay
+            const leftover = rc.querySelector('#jemaahTableLoadingOverlay');
+            if(leftover) leftover.remove();
+          }
+        }catch{}
     }
 }
 
@@ -902,8 +1972,8 @@ function renderTableHeader() {
         'col-ic': `<th draggable="true" data-col="col-ic" class="p-3 border-r border-slate-300 col-ic draggable-header relative select-none overflow-hidden text-ellipsis">IC NO.<div class="col-resizer"></div></th>`,
         'col-passport': `<th draggable="true" data-col="col-passport" class="p-3 border-r border-slate-300 col-passport draggable-header relative select-none overflow-hidden text-ellipsis">PASSPORT NO.<div class="col-resizer"></div></th>`,
         'col-gender': `<th draggable="true" data-col="col-gender" class="p-3 border-r border-slate-300 col-gender draggable-header relative select-none overflow-hidden text-ellipsis">GENDER<div class="col-resizer"></div></th>`,
-        'col-age': `<th draggable="true" data-col="col-age" class="p-3 border-r border-slate-300 col-age draggable-header relative select-none overflow-hidden text-ellipsis">🔒 AGE<div class="col-resizer"></div></th>`,
-        'col-dob': `<th draggable="true" data-col="col-dob" class="p-3 border-r border-slate-300 col-dob draggable-header relative select-none overflow-hidden text-ellipsis">🔒 DOB<div class="col-resizer"></div></th>`,
+        'col-age': `<th draggable="true" data-col="col-age" class="p-3 border-r border-slate-300 col-age draggable-header relative select-none overflow-hidden text-ellipsis bg-amber-50/50"><span class="inline-flex items-center gap-1"><i class="fa-solid fa-calculator text-[10px] text-amber-600"></i><span class="italic font-bold">ƒx</span> AGE</span><div class="col-resizer"></div></th>`,
+        'col-dob': `<th draggable="true" data-col="col-dob" class="p-3 border-r border-slate-300 col-dob draggable-header relative select-none overflow-hidden text-ellipsis bg-amber-50/50"><span class="inline-flex items-center gap-1"><i class="fa-solid fa-calculator text-[10px] text-amber-600"></i><span class="italic font-bold">ƒx</span> DOB</span><div class="col-resizer"></div></th>`,
         'col-dobf': `<th draggable="true" data-col="col-dobf" class="p-3 border-r border-slate-300 col-dobf draggable-header relative select-none overflow-hidden text-ellipsis">DOB (FOREIGNER)<div class="col-resizer"></div></th>`,
         'col-nat': `<th draggable="true" data-col="col-nat" class="p-3 border-r border-slate-300 col-nat draggable-header relative select-none overflow-hidden text-ellipsis">NATIONALITY<div class="col-resizer"></div></th>`,
         'col-visa': `<th draggable="true" data-col="col-visa" class="p-3 border-r border-slate-300 col-visa draggable-header relative select-none overflow-hidden text-ellipsis">STATUS VISA<div class="col-resizer"></div></th>`,
@@ -935,7 +2005,7 @@ function filterAndRenderJemaahGrid() {
 
     if (!selectedTripFilter && !selectedHijriFilter) {
         if (tbody) {
-            tbody.innerHTML = `
+            const thead0 = document.getElementById('jemaahTableHeaderRow'); if(thead0) thead0.style.display='none'; tbody.innerHTML = `
                 <tr>
                     <td colspan="19" class="text-center py-24 text-slate-400">
                         <i class="fa-solid fa-hand-pointer text-3xl mb-3 text-brand-maroon animate-bounce"></i>
@@ -949,6 +2019,8 @@ function filterAndRenderJemaahGrid() {
     }
 
     let filtered = [...allJemaahUmrahRecords];
+    // show header bila ada filter
+    const theadShow = document.getElementById('jemaahTableHeaderRow'); if(theadShow) theadShow.style.display=''; const headerWrapShow = document.querySelector('#jemaahTableContainer thead'); if(headerWrapShow) headerWrapShow.style.display='';
 
     if(selectedHijriFilter){
       if(selectedHijriFilter === 'TBC'){
@@ -981,10 +2053,41 @@ function filterAndRenderJemaahGrid() {
         });
     }
 
+    // V66 FIX: Proper sorting for AGE (muda-tua) - fixes Nur Dini issue
+    function parseAgeToMonthsForSort(ageStr){
+      if(!ageStr) return -1;
+      const s = ageStr.toString().toLowerCase().trim();
+      if(!s || s==='-' || s.toLowerCase()==='tbc') return -1;
+      let years = 0, months = 0;
+      const yMatch = s.match(/(\d+)\s*y/);
+      const mMatch = s.match(/(\d+)\s*m/);
+      if(yMatch) years = parseInt(yMatch[1])||0;
+      if(mMatch) months = parseInt(mMatch[1])||0;
+      if(!yMatch && !mMatch){
+        const num = parseFloat(s)||0;
+        if(num>0){
+          years = Math.floor(num);
+          months = Math.round((num - years)*12);
+        }
+      }
+      return years*12 + months;
+    }
+
     filtered.sort((a, b) => {
         let valA = a.fields[currentSortField] || '';
         let valB = b.fields[currentSortField] || '';
-
+        
+        if(currentSortField === 'AGE'){
+          const monthsA = parseAgeToMonthsForSort(valA);
+          const monthsB = parseAgeToMonthsForSort(valB);
+          if(monthsA===-1 && monthsB===-1) return 0;
+          if(monthsA===-1) return 1;
+          if(monthsB===-1) return -1;
+          if(monthsA < monthsB) return currentSortDir === 'asc' ? -1 : 1;
+          if(monthsA > monthsB) return currentSortDir === 'asc' ? 1 : -1;
+          return 0;
+        }
+        
         if (typeof valA === 'string') valA = valA.toLowerCase();
         if (typeof valB === 'string') valB = valB.toLowerCase();
 
@@ -1004,8 +2107,18 @@ function renderJemaahRows(records) {
     tbody.innerHTML = '';
 
     if (records.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="19" class="text-center py-12 text-slate-400">Tiada rekod jemaah untuk view ini.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="19" class="text-center py-16 text-slate-400"><div class="flex flex-col items-center gap-2"><i class="fa-solid fa-inbox text-3xl text-slate-300"></i><span class="text-sm font-bold">Tiada rekod jemaah untuk view ini.</span><span class="text-[11px] text-slate-400">Cuba pilih trip lain atau tambah jemaah baru</span></div></td></tr>';
+        // FIX UI: hide header bila takde item - bagi nampak cantik
+        const thead = document.getElementById('jemaahTableHeaderRow');
+        if(thead) thead.style.display = 'none';
+        const headerWrap = document.querySelector('#jemaahTableContainer thead');
+        if(headerWrap) headerWrap.style.display = 'none';
         return;
+    } else {
+        const thead = document.getElementById('jemaahTableHeaderRow');
+        if(thead) thead.style.display = '';
+        const headerWrap = document.querySelector('#jemaahTableContainer thead');
+        if(headerWrap) headerWrap.style.display = '';
     }
 
     records.forEach((rec, idx) => {
@@ -1030,8 +2143,8 @@ function renderJemaahRows(records) {
             'col-ic': `<td class="p-1 border-r border-slate-300 col-ic"><input type="text" value="${f['IC NO.'] || ''}" onchange="updateJemaahField('${id}', 'IC NO.', this.value)" class="w-full text-xs p-1.5 font-mono rounded-lg border border-transparent hover:border-slate-300 focus:border-brand-maroon focus:bg-white bg-transparent"></td>`,
             'col-passport': `<td class="p-1 border-r border-slate-300 col-passport"><input type="text" value="${f['PASSPORT NO.'] || ''}" onchange="updateJemaahField('${id}', 'PASSPORT NO.', this.value)" class="w-full text-xs p-1.5 font-mono font-bold uppercase rounded-lg border border-transparent hover:border-slate-300 focus:border-brand-maroon focus:bg-white bg-transparent"></td>`,
             'col-gender': `<td class="p-1 border-r border-slate-300 col-gender"><select onchange="updateJemaahField('${id}', 'GENDER', this.value)" class="w-full text-xs p-1.5 font-bold rounded-lg border border-transparent hover:border-slate-300 focus:bg-white bg-transparent"><option value="">--</option><option value="MALE" ${f['GENDER'] === 'MALE' ? 'selected' : ''}>MALE</option><option value="FEMALE" ${f['GENDER'] === 'FEMALE' ? 'selected' : ''}>FEMALE</option></select></td>`,
-            'col-age': `<td class="p-2.5 border-r border-slate-300 bg-slate-50/50 font-semibold text-slate-600 col-age" id="age-cell-${id}">${f['AGE'] || '-'}</td>`,
-            'col-dob': `<td class="p-2.5 border-r border-slate-300 bg-slate-50/50 font-semibold text-slate-600 col-dob" id="dob-cell-${id}">${f['DOB'] || '-'}</td>`,
+            'col-age': `<td class="p-2.5 border-r border-slate-300 bg-white font-semibold text-slate-700 col-age" id="age-cell-${id}">${f['AGE'] || '-'}</td>`,
+            'col-dob': `<td class="p-2.5 border-r border-slate-300 bg-white font-semibold text-slate-700 col-dob" id="dob-cell-${id}">${f['DOB'] ? (f['DOB'].includes('/') ? f['DOB'] : new Date(f['DOB']).toLocaleDateString('en-GB')) : '-'}</td>`,
             'col-dobf': `<td class="p-1 border-r border-slate-300 col-dobf"><input type="date" value="${f['DOB (FOREIGNER)'] || ''}" onchange="updateJemaahField('${id}', 'DOB (FOREIGNER)', this.value)" class="w-full text-xs p-1.5 rounded-lg border border-transparent hover:border-slate-300 focus:bg-white bg-transparent"></td>`,
             'col-nat': `<td class="p-1 border-r border-slate-300 col-nat">${renderSingleSelectCell(id, 'NATIONALITY', f['NATIONALITY'])}</td>`,
             'col-visa': `<td class="p-1 border-r border-slate-300 col-visa">${renderSingleSelectCell(id, 'STATUS VISA', f['STATUS VISA'])}</td>`,
@@ -1685,9 +2798,17 @@ function openExpandModal(recId) {
     if (modal) modal.classList.remove('hidden');
 }
 
-function closeExpandModal() {
+function closeExpandModal(){
     const modal = document.getElementById('expandRecordModal');
-    if (modal) modal.classList.add('hidden');
+    if(modal){
+        modal.classList.add('hidden');
+        modal.style.display='none';
+    }
+    // clear addModalFiles
+    try{ addModalFiles = { 'PICTURE': [], 'PASSPORT_COPY': [], 'VISA_COPY': [], 'MOFABIO': [], 'INSURAN_DOC': [] }; }catch(e){}
+    // also reset form container
+    const container = document.getElementById('expandModalFormContainer');
+    if(container) container.innerHTML = '';
 }
 
 function renderDropZoneHtml(recId, fieldName, currentFiles) {
@@ -1974,6 +3095,7 @@ function openAddJemaahModal() {
     const delBtn = document.getElementById('modalDeleteBtn');
     const saveBtn = document.getElementById('modalSaveBtn');
 
+    addModalFiles = { 'PICTURE': [], 'PASSPORT_COPY': [], 'VISA_COPY': [], 'MOFABIO': [], 'INSURAN_DOC': [] };
     if (titleEl) titleEl.textContent = 'TAMBAH JEMAAH BAHARU';
     if (delBtn) delBtn.classList.add('hidden');
     if (saveBtn) {
@@ -1988,68 +3110,313 @@ function openAddJemaahModal() {
         return `<option value="${t.id}" ${selected}>${title}</option>`;
     }).join('');
 
+    function buildSelectWithAddNew(fieldName, placeholder, isMulti=false){
+        const options = jemaahFieldOptions[fieldName] || [];
+        let html = '';
+        if(!isMulti){
+            html += `<option value="">${placeholder}</option>`;
+            if(options.length>0){
+                // Filter blank
+                const filtered = options.filter(o=> o.name && o.name.trim()!=='');
+                filtered.forEach(opt=>{
+                    html += `<option value="${opt.name}">${opt.name}</option>`;
+                });
+            } else {
+                if(fieldName==='GENDER'){
+                    html += '<option value="MALE">MALE</option><option value="FEMALE">FEMALE</option>';
+                }
+            }
+            // V89: No + Add new option for GENDER
+            if(fieldName!=='GENDER'){
+                html += `<option value="__ADD_NEW__" style="font-weight:bold;color:#800020;">+ Add new option</option>`;
+            }
+        } else {
+            if(options.length>0){
+                const filtered = options.filter(o=> o.name && o.name.trim()!=='');
+                filtered.forEach(opt=>{
+                    html += `<option value="${opt.name}">${opt.name}</option>`;
+                });
+            }
+        }
+        return html;
+    }
+
+    // Build ejen multi-select options with checkboxes
+    const ejenMultiHtml = (()=> {
+        let html = '';
+        if(ejenListCache && ejenListCache.length>0){
+            ejenListCache.forEach(e=>{
+                html += `<label class="flex items-center gap-2 px-3 py-2 hover:bg-slate-50 cursor-pointer"><input type="checkbox" value="${e.id}" class="ejen-checkbox w-4 h-4 rounded border-slate-300 text-brand-maroon focus:ring-brand-maroon"><span class="text-xs font-bold text-slate-700">${e.name}</span><span class="text-[10px] text-slate-400 ml-auto">${e.status||'AKTIF'}</span></label>`;
+            });
+        } else {
+            html = '<div class="p-3 text-xs text-slate-400">Tiada data ejen. Sila refresh.</div>';
+        }
+        return html;
+    
+// Hook setup after openAddJemaahModal original
+(function(){
+    const _origOpenAdd = window.openAddJemaahModal;
+    if(_origOpenAdd){
+        const original = _origOpenAdd;
+        window.openAddJemaahModal = function(){
+            original.apply(this, arguments);
+            setTimeout(()=>{
+                const modal = document.getElementById('expandRecordModal');
+                if(modal){
+                    modal.classList.remove('hidden');
+                    modal.style.display='flex';
+                }
+                setupAddModalFilePickers();
+            }, 100);
+        };
+    } else {
+        // if not yet defined, patch via event
+        document.addEventListener('DOMContentLoaded', ()=>{
+            const orig = window.openAddJemaahModal;
+            if(orig){
+                window.openAddJemaahModal = function(){
+                    orig.apply(this, arguments);
+                    setTimeout(()=>{
+                        const modal = document.getElementById('expandRecordModal');
+                        if(modal){
+                            modal.classList.remove('hidden');
+                            modal.style.display='flex';
+                        }
+                        setupAddModalFilePickers();
+                    }, 100);
+                };
+            }
+        });
+    }
+})();
+
+})();
+
+    // V91: Board Basis multi - filter blank + Add option
+    const boardBasisOptions = (jemaahFieldOptions['BOARD BASIS'] || []).filter(o=> o.name && o.name.trim()!=='');
+    let boardBasisMultiHtml = '';
+    if(boardBasisOptions.length>0){
+      boardBasisMultiHtml = boardBasisOptions.map(opt=>`<label class="flex items-center gap-2 px-3 py-2 hover:bg-slate-50 cursor-pointer"><input type="checkbox" value="${opt.name}" class="board-checkbox w-4 h-4 rounded border-slate-300 text-brand-maroon"><span class="text-xs font-bold">${opt.name}</span></label>`).join('');
+    } else {
+      boardBasisMultiHtml = '<div class="p-3 text-xs text-slate-400">Tiada pilihan. Tambah baru.</div>';
+    }
+    boardBasisMultiHtml += `<div class="border-t border-slate-200 mt-1"><button type="button" onclick="handleAddNewMultiOption('BOARD BASIS', this)" class="w-full text-left px-3 py-2 text-[11px] font-bold text-brand-maroon hover:bg-rose-50">+ Add option</button></div>`;
+
+    // V91: Insuran multi - filter blank + Add option
+    const insuranOptions = (jemaahFieldOptions['INSURAN'] || []).filter(o=> o.name && o.name.trim()!=='');
+    let insuranMultiHtml = '';
+    if(insuranOptions.length>0){
+      insuranMultiHtml = insuranOptions.map(opt=>`<label class="flex items-center gap-2 px-3 py-2 hover:bg-slate-50 cursor-pointer"><input type="checkbox" value="${opt.name}" class="insuran-checkbox w-4 h-4 rounded border-slate-300 text-brand-maroon"><span class="text-xs font-bold">${opt.name}</span></label>`).join('');
+    } else {
+      insuranMultiHtml = '<div class="p-3 text-xs text-slate-400">Tiada pilihan. Tambah baru.</div>';
+    }
+    insuranMultiHtml += `<div class="border-t border-slate-200 mt-1"><button type="button" onclick="handleAddNewMultiOption('INSURAN', this)" class="w-full text-left px-3 py-2 text-[11px] font-bold text-brand-maroon hover:bg-rose-50">+ Add option</button></div>`;
+
     container.innerHTML = `
-        <form id="addModalForm" class="space-y-4">
+        <form id="addModalForm" class="space-y-3 max-h-[70vh] overflow-y-auto pr-2 scrollbar-thin">
             
-            <div class="grid grid-cols-1 sm:grid-cols-3 items-center gap-2">
-                <label class="font-bold text-slate-500 uppercase">NAME *</label>
-                <div class="sm:col-span-2">
-                    <input type="text" name="NAME" required placeholder="Contoh: AHMAD BIN ABDULLAH" class="w-full p-2.5 font-bold text-sm text-slate-900 border border-slate-300 rounded-xl focus:ring-2 focus:ring-brand-maroon focus:outline-none uppercase">
+            <div class="bg-slate-50 rounded-xl p-3 border border-slate-100">
+                <h4 class="font-bold text-[11px] text-slate-600 uppercase tracking-wider mb-3 flex items-center"><i class="fa-solid fa-user mr-1.5"></i> Maklumat Peribadi</h4>
+                <div class="grid grid-cols-1 sm:grid-cols-3 items-center gap-2 mb-3">
+                    <label class="font-bold text-slate-500 uppercase text-[11px]">NAME *</label>
+                    <div class="sm:col-span-2">
+                        <input type="text" name="NAME" required placeholder="CONTOH: AHMAD BIN ABDULLAH" class="w-full p-2.5 font-bold text-sm text-slate-900 border border-slate-300 rounded-xl focus:ring-2 focus:ring-brand-maroon focus:outline-none uppercase">
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-3 items-center gap-2 mb-3">
+                    <label class="font-bold text-slate-500 uppercase text-[11px]">IC NO.</label>
+                    <div class="sm:col-span-2">
+                        <input type="text" name="IC NO." placeholder="900101015555" class="w-full p-2.5 font-mono border border-slate-300 rounded-xl focus:ring-2 focus:ring-brand-maroon focus:outline-none">
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-3 items-center gap-2 mb-3">
+                    <label class="font-bold text-slate-500 uppercase text-[11px]">GENDER</label>
+                    <div class="sm:col-span-2">
+                        <select name="GENDER" data-field="GENDER" onchange="if(this.value==='__ADD_NEW__'){ handleAddNewOption('GENDER', this); }" class="w-full p-2.5 font-bold border border-slate-300 rounded-xl focus:ring-2 focus:ring-brand-maroon focus:outline-none">
+                            ${buildSelectWithAddNew('GENDER', '-- Pilih Jantina --')}
+                        </select>
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-3 items-center gap-2 mb-3">
+                    <label class="font-bold text-slate-500 uppercase text-[11px]">DOB (FOREIGNER)</label>
+                    <div class="sm:col-span-2">
+                        <input type="date" name="DOB (FOREIGNER)" class="w-full p-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-brand-maroon focus:outline-none">
+                        <p class="text-[10px] text-slate-400 mt-1">Untuk jemaah warga asing sahaja</p>
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-3 items-center gap-2">
+                    <label class="font-bold text-slate-500 uppercase text-[11px]">NATIONALITY</label>
+                    <div class="sm:col-span-2">
+                        <select name="NATIONALITY" data-field="NATIONALITY" onchange="if(this.value==='__ADD_NEW__'){ handleAddNewOption('NATIONALITY', this); }" class="w-full p-2.5 font-bold border border-slate-300 rounded-xl focus:ring-2 focus:ring-brand-maroon focus:outline-none">
+                            ${buildSelectWithAddNew('NATIONALITY', '-- Pilih Warganegara --')}
+                        </select>
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-3 items-start gap-2 mt-3">
+                    <label class="font-bold text-slate-500 uppercase text-[11px] mt-2"><i class="fa-solid fa-image mr-1"></i> PICTURE</label>
+                    <div class="sm:col-span-2">
+                        <div id="addModalDropzone-PICTURE" class="border-2 border-dashed border-slate-300 rounded-xl p-4 text-center bg-slate-50 hover:bg-white hover:border-brand-maroon transition cursor-pointer group">
+                            <input type="file" id="addModalFileInput-PICTURE" accept="image/*,.pdf,application/pdf" class="hidden" multiple>
+                            <div class="flex flex-col items-center gap-2">
+                                <i class="fa-solid fa-cloud-arrow-up text-2xl text-slate-400 group-hover:text-brand-maroon"></i>
+                                <span class="text-[11px] font-bold text-slate-600">Drag & drop gambar/PDF atau klik untuk pilih</span>
+                                <span class="text-[10px] text-slate-400">JPG, PNG, PDF max 10MB</span>
+                            </div>
+                            <div id="addModalPreview-PICTURE" class="mt-3 flex flex-wrap gap-2 justify-center"></div>
+                        </div>
+                    </div>
                 </div>
             </div>
 
-            <div class="grid grid-cols-1 sm:grid-cols-3 items-center gap-2 border-t border-slate-100 pt-3">
-                <label class="font-bold text-slate-500 uppercase">IC NO.</label>
-                <div class="sm:col-span-2">
-                    <input type="text" name="IC NO." placeholder="900101015555" class="w-full p-2.5 font-mono border border-slate-300 rounded-xl focus:ring-2 focus:ring-brand-maroon focus:outline-none">
+            <div class="bg-sky-50/50 rounded-xl p-3 border border-sky-100">
+                <h4 class="font-bold text-[11px] text-sky-700 uppercase tracking-wider mb-3 flex items-center"><i class="fa-solid fa-passport mr-1.5"></i> Dokumen Perjalanan</h4>
+                <div class="grid grid-cols-1 sm:grid-cols-3 items-center gap-2 mb-3">
+                    <label class="font-bold text-slate-500 uppercase text-[11px]">PASSPORT NO.</label>
+                    <div class="sm:col-span-2">
+                        <input type="text" name="PASSPORT NO." placeholder="A12345678" class="w-full p-2.5 font-mono font-bold uppercase border border-slate-300 rounded-xl focus:ring-2 focus:ring-brand-maroon focus:outline-none">
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-3 items-start gap-2 mb-3">
+                    <label class="font-bold text-slate-500 uppercase text-[11px] mt-2"><i class="fa-solid fa-file-image mr-1"></i> PASSPORT COPY</label>
+                    <div class="sm:col-span-2">
+                        <div id="addModalDropzone-PASSPORT_COPY" class="border-2 border-dashed border-slate-300 rounded-xl p-4 text-center bg-slate-50 hover:bg-white hover:border-brand-maroon transition cursor-pointer group">
+                            <input type="file" id="addModalFileInput-PASSPORT_COPY" accept="image/*,.pdf" class="hidden" multiple>
+                            <div class="flex flex-col items-center gap-2">
+                                <i class="fa-solid fa-cloud-arrow-up text-2xl text-slate-400 group-hover:text-brand-maroon"></i>
+                                <span class="text-[11px] font-bold text-slate-600">Drag & drop passport copy atau klik</span>
+                                <span class="text-[10px] text-slate-400">JPG, PNG, PDF max 10MB</span>
+                            </div>
+                            <div id="addModalPreview-PASSPORT_COPY" class="mt-3 flex flex-wrap gap-2 justify-center"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-3">
+                    <div>
+                        <label class="font-bold text-slate-500 uppercase text-[11px] block mb-1">DATE OF ISSUE</label>
+                        <input type="date" name="DATE OF ISSUE" class="w-full p-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-brand-maroon focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="font-bold text-slate-500 uppercase text-[11px] block mb-1">DATE OF EXPIRE</label>
+                        <input type="date" name="DATE OF EXPIRE" class="w-full p-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-brand-maroon focus:outline-none">
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-3 items-center gap-2 mb-3">
+                    <label class="font-bold text-slate-500 uppercase text-[11px]">STATUS VISA</label>
+                    <div class="sm:col-span-2">
+                        <select name="STATUS VISA" data-field="STATUS VISA" onchange="if(this.value==='__ADD_NEW__'){ handleAddNewOption('STATUS VISA', this); }" class="w-full p-2.5 font-bold border border-slate-300 rounded-xl focus:ring-2 focus:ring-brand-maroon focus:outline-none">
+                            ${buildSelectWithAddNew('STATUS VISA', '-- Pilih Status Visa --')}
+                        </select>
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-3 items-center gap-2">
+                    <label class="font-bold text-slate-500 uppercase text-[11px]">FIT TICKET</label>
+                    <div class="sm:col-span-2">
+                        <label class="flex items-center gap-2 cursor-pointer">
+                            <input type="checkbox" name="FIT TICKET" class="w-4 h-4 rounded border-slate-300 text-brand-maroon focus:ring-brand-maroon">
+                            <span class="text-xs font-bold text-slate-600">Tiket FIT</span>
+                        </label>
+                    </div>
                 </div>
             </div>
 
-            <div class="grid grid-cols-1 sm:grid-cols-3 items-center gap-2 border-t border-slate-100 pt-3">
-                <label class="font-bold text-slate-500 uppercase">PASSPORT NO.</label>
-                <div class="sm:col-span-2">
-                    <input type="text" name="PASSPORT NO." placeholder="A12345678" class="w-full p-2.5 font-mono font-bold uppercase border border-slate-300 rounded-xl focus:ring-2 focus:ring-brand-maroon focus:outline-none">
+            <div class="bg-amber-50/50 rounded-xl p-3 border border-amber-100">
+                <h4 class="font-bold text-[11px] text-amber-700 uppercase tracking-wider mb-3 flex items-center"><i class="fa-solid fa-kaaba mr-1.5"></i> Maklumat Trip & Pakej</h4>
+                <div class="grid grid-cols-1 sm:grid-cols-3 items-center gap-2 mb-3">
+                    <label class="font-bold text-slate-500 uppercase text-[11px]">TRIP</label>
+                    <div class="sm:col-span-2">
+                        <select name="TRIP" class="w-full p-2.5 font-bold border border-slate-300 rounded-xl focus:ring-2 focus:ring-brand-maroon focus:outline-none">
+                            <option value="">-- TBC / Tanpa Trip --</option>
+                            ${tripOptionsHtml}
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="grid grid-cols-1 sm:grid-cols-3 items-start gap-2 mb-3">
+                    <label class="font-bold text-slate-500 uppercase text-[11px] pt-2">BOARD BASIS</label>
+                    <div class="sm:col-span-2">
+                        <div class="relative">
+                            <button type="button" onclick="toggleModalMultiDropdown('boardBasisDropdown')" class="w-full p-2.5 font-bold border border-slate-300 rounded-xl bg-white text-left flex items-center justify-between hover:bg-slate-50">
+                                <span id="boardBasisLabel" class="text-xs text-slate-500">-- Pilih Board Basis --</span>
+                                <i class="fa-solid fa-chevron-down text-[10px] text-slate-400"></i>
+                            </button>
+                            <div id="boardBasisDropdown" class="hidden absolute left-0 right-0 mt-1 bg-white border border-slate-300 rounded-xl shadow-lg z-50 max-h-48 overflow-y-auto">
+                                <div id="boardBasisList">
+                                    ${boardBasisMultiHtml}
+                                </div>
+                                <div class="p-2 border-t border-slate-100">
+                                    <button type="button" onclick="handleAddNewOption('BOARD BASIS', null, 'boardBasisDropdown')" class="text-[11px] font-bold text-brand-maroon hover:text-rose-900">+ Add option</button>
+                                </div>
+                            </div>
+                        </div>
+                        <div id="boardBasisSelected" class="flex flex-wrap gap-1 mt-2"></div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-3 items-center gap-2 mb-3">
+                    <label class="font-bold text-slate-500 uppercase text-[11px]">PAKEJ</label>
+                    <div class="sm:col-span-2">
+                        <select name="PAKEJ" data-field="PAKEJ" onchange="if(this.value==='__ADD_NEW__'){ handleAddNewOption('PAKEJ', this); }" class="w-full p-2.5 font-bold border border-slate-300 rounded-xl focus:ring-2 focus:ring-brand-maroon focus:outline-none">
+                            ${buildSelectWithAddNew('PAKEJ', '-- Pilih Pakej --')}
+                        </select>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-3 items-start gap-2 mb-3">
+                    <label class="font-bold text-slate-500 uppercase text-[11px] pt-2">INSURAN</label>
+                    <div class="sm:col-span-2">
+                        <div class="relative">
+                            <button type="button" onclick="toggleModalMultiDropdown('insuranDropdown')" class="w-full p-2.5 font-bold border border-slate-300 rounded-xl bg-white text-left flex items-center justify-between hover:bg-slate-50">
+                                <span id="insuranLabel" class="text-xs text-slate-500">-- Pilih Insuran --</span>
+                                <i class="fa-solid fa-chevron-down text-[10px] text-slate-400"></i>
+                            </button>
+                            <div id="insuranDropdown" class="hidden absolute left-0 right-0 mt-1 bg-white border border-slate-300 rounded-xl shadow-lg z-50 max-h-48 overflow-y-auto">
+                                <div id="insuranList">
+                                    ${insuranMultiHtml}
+                                </div>
+                            </div>
+                        </div>
+                        <div id="insuranSelected" class="flex flex-wrap gap-1 mt-2"></div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-3">
+                    <div>
+                        <label class="font-bold text-slate-500 uppercase text-[11px] block mb-1">TRAIN</label>
+                        <label class="flex items-center gap-2 cursor-pointer border border-slate-300 rounded-xl p-2.5 bg-white hover:bg-slate-50">
+                            <input type="checkbox" name="TRAIN" class="w-4 h-4 rounded border-slate-300 text-brand-maroon focus:ring-brand-maroon">
+                            <span class="text-xs font-bold">Speed Train</span>
+                        </label>
+                    </div>
+                    <div class="sm:col-span-1">
+                        <label class="font-bold text-slate-500 uppercase text-[11px] block mb-1">EJEN</label>
+                        <div class="relative">
+                            <button type="button" onclick="toggleModalMultiDropdown('ejenDropdown')" class="w-full p-2.5 font-bold border border-slate-300 rounded-xl bg-white text-left flex items-center justify-between hover:bg-slate-50">
+                                <span id="ejenLabel" class="text-xs text-slate-500">-- Pilih Ejen --</span>
+                                <i class="fa-solid fa-chevron-down text-[10px] text-slate-400"></i>
+                            </button>
+                            <div id="ejenDropdown" class="hidden absolute left-0 right-0 mt-1 bg-white border border-slate-300 rounded-xl shadow-lg z-50 max-h-64 overflow-hidden flex flex-col">
+                                <div class="p-2 border-b border-slate-100">
+                                    <div class="relative">
+                                        <i class="fa-solid fa-magnifying-glass absolute left-2.5 top-2.5 text-slate-400 text-[10px]"></i>
+                                        <input type="text" id="ejenSearchModal" onkeyup="filterEjenModal(this.value)" placeholder="Search ejen..." class="w-full text-xs pl-7 pr-3 py-1.5 border border-slate-300 rounded-lg bg-slate-50 focus:bg-white focus:outline-none">
+                                    </div>
+                                </div>
+                                <div id="ejenListModal" class="overflow-y-auto flex-1">
+                                    ${ejenMultiHtml}
+                                </div>
+                            </div>
+                        </div>
+                        <div id="ejenSelected" class="flex flex-wrap gap-1 mt-2"></div>
+                    </div>
                 </div>
             </div>
 
-            <div class="grid grid-cols-1 sm:grid-cols-3 items-center gap-2 border-t border-slate-100 pt-3">
-                <label class="font-bold text-slate-500 uppercase">GENDER</label>
-                <div class="sm:col-span-2">
-                    <select name="GENDER" class="w-full p-2.5 font-bold border border-slate-300 rounded-xl focus:ring-2 focus:ring-brand-maroon focus:outline-none">
-                        <option value="">-- Pilih --</option>
-                        <option value="MALE">MALE</option>
-                        <option value="FEMALE">FEMALE</option>
-                    </select>
-                </div>
-            </div>
-
-            <div class="grid grid-cols-1 sm:grid-cols-3 items-center gap-2 border-t border-slate-100 pt-3">
-                <label class="font-bold text-slate-500 uppercase">STATUS VISA</label>
-                <div class="sm:col-span-2">
-                    <select name="STATUS VISA" class="w-full p-2.5 font-bold border border-slate-300 rounded-xl focus:ring-2 focus:ring-brand-maroon focus:outline-none">
-                        <option value="">-- Pilih --</option>
-                        <option value="TOURIST">TOURIST</option>
-                        <option value="TOURIST (VALID)">TOURIST (VALID)</option>
-                        <option value="UMRAH">UMRAH</option>
-                        <option value="UMRAH (VALID)">UMRAH (VALID)</option>
-                    </select>
-                </div>
-            </div>
-
-            <div class="grid grid-cols-1 sm:grid-cols-3 items-center gap-2 border-t border-slate-100 pt-3">
-                <label class="font-bold text-slate-500 uppercase">TRIP</label>
-                <div class="sm:col-span-2">
-                    <select name="TRIP" class="w-full p-2.5 font-bold border border-slate-300 rounded-xl focus:ring-2 focus:ring-brand-maroon focus:outline-none">
-                        <option value="">-- TBC / Tanpa Trip --</option>
-                        ${tripOptionsHtml}
-                    </select>
-                </div>
-            </div>
-
-            <div class="grid grid-cols-1 sm:grid-cols-3 items-center gap-2 border-t border-slate-100 pt-3">
-                <label class="font-bold text-slate-500 uppercase">NOTES</label>
-                <div class="sm:col-span-2">
-                    <textarea name="Notes" rows="2" class="w-full p-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-brand-maroon focus:outline-none"></textarea>
+            <div class="bg-slate-50 rounded-xl p-3 border border-slate-100">
+                <div class="grid grid-cols-1 sm:grid-cols-3 items-start gap-2">
+                    <label class="font-bold text-slate-500 uppercase text-[11px]">NOTES</label>
+                    <div class="sm:col-span-2">
+                        <textarea name="NOTES" rows="3" placeholder="Catatan tambahan..." class="w-full p-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-brand-maroon focus:outline-none text-sm"></textarea>
+                    </div>
                 </div>
             </div>
 
@@ -2057,110 +3424,208 @@ function openAddJemaahModal() {
     `;
 
     if (modal) modal.classList.remove('hidden');
+
+    // Attach listeners for multi-select checkboxes
+    setTimeout(()=>{
+        document.querySelectorAll('.board-checkbox').forEach(cb=>{
+            cb.addEventListener('change', updateBoardBasisSelected);
+        });
+        document.querySelectorAll('.insuran-checkbox').forEach(cb=>{
+            cb.addEventListener('change', updateInsuranSelected);
+        });
+        document.querySelectorAll('.ejen-checkbox').forEach(cb=>{
+            cb.addEventListener('change', updateEjenSelected);
+        });
+    }, 100);
 }
 
-async function createNewJemaahFromModal() {
+// Helper functions for modal multi-dropdowns
+function toggleModalMultiDropdown(dropdownId){
+    const dd = document.getElementById(dropdownId);
+    if(!dd) return;
+    // Close other dropdowns
+    ['boardBasisDropdown','insuranDropdown','ejenDropdown'].forEach(id=>{
+        if(id!==dropdownId){
+            const other = document.getElementById(id);
+            if(other) other.classList.add('hidden');
+        }
+    });
+    dd.classList.toggle('hidden');
+}
+
+function updateBoardBasisSelected(){
+    const checked = Array.from(document.querySelectorAll('.board-checkbox:checked')).map(cb=>cb.value);
+    const label = document.getElementById('boardBasisLabel');
+    const container = document.getElementById('boardBasisSelected');
+    if(label){
+        label.textContent = checked.length>0 ? checked.join(', ') : '-- Pilih Board Basis --';
+        label.className = checked.length>0 ? 'text-xs font-bold text-slate-900' : 'text-xs text-slate-500';
+    }
+    if(container){
+        container.innerHTML = checked.map(v=>`<span class="inline-flex items-center gap-1 bg-sky-100 text-sky-700 text-[10px] font-bold px-2 py-1 rounded-full">${v} <button type="button" onclick="uncheckBoardBasis('${v}')" class="ml-1 hover:text-sky-900">x</button></span>`).join('');
+    }
+}
+
+function uncheckBoardBasis(val){
+    document.querySelectorAll('.board-checkbox').forEach(cb=>{ if(cb.value===val) cb.checked=false; });
+    updateBoardBasisSelected();
+}
+
+function updateInsuranSelected(){
+    const checked = Array.from(document.querySelectorAll('.insuran-checkbox:checked')).map(cb=>cb.value);
+    const label = document.getElementById('insuranLabel');
+    const container = document.getElementById('insuranSelected');
+    if(label){
+        label.textContent = checked.length>0 ? checked.join(', ') : '-- Pilih Insuran --';
+        label.className = checked.length>0 ? 'text-xs font-bold text-slate-900' : 'text-xs text-slate-500';
+    }
+    if(container){
+        container.innerHTML = checked.map(v=>`<span class="inline-flex items-center gap-1 bg-emerald-100 text-emerald-700 text-[10px] font-bold px-2 py-1 rounded-full">${v} <button type="button" onclick="uncheckInsuran('${v}')" class="ml-1 hover:text-emerald-900">x</button></span>`).join('');
+    }
+}
+
+function uncheckInsuran(val){
+    document.querySelectorAll('.insuran-checkbox').forEach(cb=>{ if(cb.value===val) cb.checked=false; });
+    updateInsuranSelected();
+}
+
+function updateEjenSelected(){
+    const checked = Array.from(document.querySelectorAll('.ejen-checkbox:checked'));
+    const label = document.getElementById('ejenLabel');
+    const container = document.getElementById('ejenSelected');
+    const names = checked.map(cb=>{
+        const labelEl = cb.parentElement.querySelector('span.font-bold');
+        return labelEl ? labelEl.textContent : cb.value;
+    });
+    if(label){
+        label.textContent = names.length>0 ? names.join(', ') : '-- Pilih Ejen --';
+        label.className = names.length>0 ? 'text-xs font-bold text-slate-900 truncate' : 'text-xs text-slate-500';
+    }
+    if(container){
+        container.innerHTML = checked.map(cb=>{
+            const labelEl = cb.parentElement.querySelector('span.font-bold');
+            const name = labelEl ? labelEl.textContent : cb.value;
+            return `<span class="inline-flex items-center gap-1 bg-amber-100 text-amber-700 text-[10px] font-bold px-2 py-1 rounded-full">${name} <button type="button" onclick="uncheckEjen('${cb.value}')" class="ml-1 hover:text-amber-900">x</button></span>`;
+        }).join('');
+    }
+}
+
+function uncheckEjen(val){
+    document.querySelectorAll('.ejen-checkbox').forEach(cb=>{ if(cb.value===val) cb.checked=false; });
+    updateEjenSelected();
+}
+
+function filterEjenModal(query){
+    const q = query.toLowerCase();
+    document.querySelectorAll('#ejenListModal label').forEach(lbl=>{
+        const text = lbl.textContent.toLowerCase();
+        if(text.includes(q)) lbl.classList.remove('hidden');
+        else lbl.classList.add('hidden');
+    });
+}
+
+async function createNewJemaahFromModal(){
     const form = document.getElementById('addModalForm');
-    if (!form) return;
-
+    if(!form){ alert('Form tidak ditemui'); return; }
     const formData = new FormData(form);
-    const nameVal = formData.get('NAME');
-
-    if (!nameVal) {
-        alert("Sila masukkan NAMA Jemaah!");
-        return;
-    }
-
-    let payloadFields = {};
-    formData.forEach((val, key) => {
-        if (key === 'NAME' || key === 'PASSPORT NO.') {
-            payloadFields[key] = val ? val.toUpperCase().trim() : null;
-        } else if (key === 'TRIP') {
-            payloadFields[key] = val ? [val] : null;
-        } else {
-            payloadFields[key] = val === '' ? null : val;
+    const fields = {};
+    for(let [k,v] of formData.entries()){
+        if(k==='TRAIN' || k==='FIT TICKET') continue;
+        if(k==='BOARD BASIS' || k==='INSURAN') continue;
+        if(v && String(v).trim()!==''){
+            if(k==='NAME') v = String(v).toUpperCase().trim();
+            if(k==='PASSPORT NO.') v = String(v).toUpperCase().trim();
+            fields[k] = v;
         }
-    });
-
-    const saveBtn = document.getElementById('modalSaveBtn');
-    if (saveBtn) saveBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> Menambah...';
-
-    try {
-        const url = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/DATA%20JEMAAH%20UMRAH`;
-        const response = await fetch(url, {
-            method: 'POST',
-            headers: {
-                Authorization: `Bearer ${AIRTABLE_PAT}`,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ fields: payloadFields })
-        });
-
-        if (response.ok) {
-            const newRecord = await response.json();
-            allJemaahUmrahRecords.unshift(newRecord);
-            filterAndRenderJemaahGrid();
-            closeExpandModal();
-        } else {
-            alert("Gagal menambah jemaah baharu.");
-        }
-    } catch (e) {
-        console.error("Error creating jemaah:", e);
-    } finally {
-        if (saveBtn) saveBtn.innerHTML = '<i class="fa-solid fa-plus mr-1"></i> Tambah Jemaah';
     }
-}
-
-function initHeaderDragAndDrop() {
-    let draggedCol = null;
-    const headers = document.querySelectorAll('#jemaahTableHeaderRow th.draggable-header');
-
-    headers.forEach(th => {
-        th.addEventListener('dragstart', (e) => {
-            draggedCol = th.getAttribute('data-col');
-            e.dataTransfer.effectAllowed = 'move';
-            th.classList.add('opacity-50');
-        });
-
-        th.addEventListener('dragend', () => {
-            th.classList.remove('opacity-50');
-            headers.forEach(h => h.classList.remove('drag-over'));
-        });
-
-        th.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            e.dataTransfer.dropEffect = 'move';
-            th.classList.add('drag-over');
-        });
-
-        th.addEventListener('dragleave', () => {
-            th.classList.remove('drag-over');
-        });
-
-        th.addEventListener('drop', (e) => {
-            e.preventDefault();
-            th.classList.remove('drag-over');
-
-            const targetCol = th.getAttribute('data-col');
-            if (draggedCol && targetCol && draggedCol !== targetCol) {
-                const fromIndex = columnOrder.indexOf(draggedCol);
-                const toIndex = columnOrder.indexOf(targetCol);
-
-                if (fromIndex !== -1 && toIndex !== -1) {
-                    columnOrder.splice(fromIndex, 1);
-                    columnOrder.splice(toIndex, 0, draggedCol);
-
-                    localStorage.setItem('jemaahColOrder', JSON.stringify(columnOrder));
-
-                    renderTableHeader();
-                    filterAndRenderJemaahGrid();
-                    initColumnResizers();
-                    initHeaderDragAndDrop();
+    const trainChk = form.querySelector('input[name="TRAIN"]');
+    if(trainChk) fields['TRAIN'] = trainChk.checked ? true : false;
+    const fitChk = form.querySelector('input[name="FIT TICKET"]');
+    if(fitChk) fields['FIT TICKET'] = fitChk.checked ? true : false;
+    const boardChecked = Array.from(form.querySelectorAll('.board-checkbox:checked')).map(cb=>cb.value);
+    if(boardChecked.length>0) fields['BOARD BASIS'] = boardChecked;
+    const insuranChecked = Array.from(form.querySelectorAll('.insuran-checkbox:checked')).map(cb=>cb.value);
+    if(insuranChecked.length>0) fields['INSURAN'] = insuranChecked;
+    const ejenChecked = Array.from(form.querySelectorAll('.ejen-checkbox:checked')).map(cb=>cb.value);
+    if(ejenChecked.length>0) fields['EJEN'] = ejenChecked;
+    const tripSel = form.querySelector('select[name="TRIP"]');
+    if(tripSel && tripSel.value){ fields['TRIP'] = [tripSel.value]; }
+    if(!fields['NAME']){ alert('NAME wajib isi'); return; }
+    
+    // === OPTIMISTIC: close modal instantly, no loading ===
+    const tempId = 'temp_' + Date.now();
+    const localPreviewUrls = {};
+    for(let localKey in addModalFiles){
+        const files = addModalFiles[localKey];
+        if(!files || files.length===0) continue;
+        localPreviewUrls[localKey] = files.map(f=>{
+            try{ return { url: URL.createObjectURL(f), filename: f.name }; }catch(e){ return null; }
+        }).filter(Boolean);
+    }
+    const tempFields = { ...fields };
+    if(localPreviewUrls['PICTURE']) tempFields['PICTURE'] = localPreviewUrls['PICTURE'];
+    if(localPreviewUrls['PASSPORT_COPY']) tempFields['PASSPORT COPY'] = localPreviewUrls['PASSPORT_COPY'];
+    if(localPreviewUrls['VISA_COPY']) tempFields['VISA COPY'] = localPreviewUrls['VISA_COPY'];
+    if(localPreviewUrls['MOFABIO']) tempFields['MOFABIO'] = localPreviewUrls['MOFABIO'];
+    tempFields['AGE'] = '...'; // formula placeholder, akan calculate Airtable nanti
+    tempFields['_optimistic'] = true;
+    
+    const tempRecord = { id: tempId, fields: tempFields };
+    allJemaahUmrahRecords.unshift(tempRecord);
+    try{ localStorage.setItem('effah_jemaah_optimistic', JSON.stringify(allJemaahUmrahRecords.slice(0,50))); }catch(e){}
+    if(typeof filterAndRenderJemaahGrid==='function') filterAndRenderJemaahGrid();
+    closeExpandModal();
+    if(typeof App!=='undefined' && App.toast) App.toast('Jemaah ditambah - sync background...');
+    
+    // Background upload
+    (async()=>{
+        try{
+            const cloudName = "dfb839ep";
+            const uploadPreset = "Effah Travel";
+            const uploadFieldMap = { 'PICTURE': 'PICTURE', 'PASSPORT_COPY': 'PASSPORT COPY', 'VISA_COPY': 'VISA COPY', 'MOFABIO': 'MOFABIO' };
+            const finalFields = { ...fields };
+            for(let localKey in addModalFiles){
+                const files = addModalFiles[localKey];
+                if(!files || files.length===0) continue;
+                const airtableField = uploadFieldMap[localKey];
+                if(!airtableField) continue;
+                const uploadedUrls = [];
+                for(let file of files){
+                    const fd = new FormData();
+                    fd.append('file', file);
+                    fd.append('upload_preset', uploadPreset);
+                    fd.append('folder', `effah/${localKey.toLowerCase()}`);
+                    try{
+                        const res = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/auto/upload`, { method: 'POST', body: fd });
+                        const data = await res.json();
+                        if(data.secure_url) uploadedUrls.push({ url: data.secure_url, filename: file.name });
+                    }catch(e){ console.error('Upload fail', e); }
                 }
+                if(uploadedUrls.length>0) finalFields[airtableField] = uploadedUrls;
             }
-        });
-    });
+            const pat = window.AIRTABLE_PAT || localStorage.getItem('effah_api_pat') || AIRTABLE_PAT;
+            const base = window.AIRTABLE_BASE_ID || localStorage.getItem('effah_base_id') || AIRTABLE_BASE_ID;
+            if(!pat || !base) throw new Error('PAT / Base ID belum set');
+            const url = `https://api.airtable.com/v0/${base}/DATA%20JEMAAH%20UMRAH`;
+            const res = await fetch(url, { method: 'POST', headers: { 'Authorization': `Bearer ${pat}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ fields: finalFields }) });
+            const result = await res.json();
+            if(result.error) throw new Error(result.error.message || 'Gagal simpan Airtable');
+            const idx = allJemaahUmrahRecords.findIndex(r=>r.id===tempId);
+            if(idx!==-1) allJemaahUmrahRecords[idx] = result;
+            if(typeof filterAndRenderJemaahGrid==='function') filterAndRenderJemaahGrid();
+            // background refresh selepas 3 saat, bukan blocking
+            setTimeout(()=>{ if(typeof fetchJemaahUmrahData==='function') fetchJemaahUmrahData(); }, 3000);
+            if(typeof App!=='undefined' && App.toast) App.toast('Jemaah berjaya sync!');
+        }catch(err){
+            console.error(err);
+            const rec = allJemaahUmrahRecords.find(r=>r.id===tempId);
+            if(rec){ rec.fields._syncError = err.message; }
+            if(typeof filterAndRenderJemaahGrid==='function') filterAndRenderJemaahGrid();
+            if(typeof App!=='undefined' && App.toast) App.toast('Gagal sync background: ' + err.message);
+        }
+    })();
 }
+
 
 function toggleSortDropdown() {
     const drop = document.getElementById('sortDropdownMenu');
@@ -2296,10 +3761,11 @@ function getFieldTypeIcon(type){
     'attachment': '<i class="fa-solid fa-paperclip text-slate-400 text-[11px]"></i>',
     'date': '<i class="fa-regular fa-calendar text-slate-400 text-[11px]"></i>',
     'checkbox': '<i class="fa-regular fa-square-check text-slate-400 text-[11px]"></i>',
-    'formula': '<i class="fa-solid fa-calculator text-purple-400 text-[11px]"></i>',
+    'formula': '<span class="italic text-[11px] text-slate-500">ƒx</span>',
     'link': '<i class="fa-solid fa-link text-amber-500 text-[11px]"></i>',
     'text': '<i class="fa-solid fa-align-left text-slate-400 text-[11px]"></i>',
-    'A': '<span class="text-[11px] font-bold text-slate-500">A</span>'
+    'A': '<span class="text-[11px] font-bold text-slate-500">A</span>',
+    '🖼️': '<span class="text-[11px]">🖼️</span>'
   };
   return map[type] || '<span class="text-[10px] text-slate-400">T</span>';
 }
@@ -2311,12 +3777,15 @@ function buildHideFieldsList() {
     if (!listContainer) return;
     listContainer.innerHTML = '';
 
+    const excludedFromToggle = []; // FIX v6: include AGE & DOB dalam Arrange Fields
     const orderedDefs = [];
     columnOrder.forEach(k=>{
+      if(excludedFromToggle.includes(k)) return;
       const def = columnDefinitions.find(c=> c.key===k);
       if(def) orderedDefs.push(def);
     });
-    columnDefinitions.forEach(def=>{
+    const filteredColumnDefs = columnDefinitions.filter(d=> !excludedFromToggle.includes(d.key));
+    filteredColumnDefs.forEach(def=>{
       if(!orderedDefs.find(d=> d.key===def.key)){
         if(def.key==='col-idx') return;
         orderedDefs.push(def);
@@ -2405,13 +3874,13 @@ function resetFieldsToDefault(){
   hiddenColumns = {};
   columnOrder = [
     'col-idx', 'col-name', 'col-picture', 'col-ic', 'col-passport', 
-    'col-gender', 'col-age', 'col-dob', 'col-dobf', 'col-nat', 
+    'col-gender', 'col-dobf', 'col-nat', 
     'col-visa', 'col-passcopy', 'col-visacopy', 'col-mofabio', 
     'col-fit', 'col-trip', 'col-issue', 'col-expire', 'col-notes',
     'col-board', 'col-train', 'col-insuran', 'col-pakej', 'col-ejen'
   ];
-  localStorage.removeItem('jemaahColOrder');
-  localStorage.removeItem('jemaahHiddenColumns');
+  localStorage.setItem('jemaahColOrder', JSON.stringify(columnOrder));
+  localStorage.setItem('jemaahHiddenColumns', JSON.stringify(hiddenColumns));
   renderTableHeader();
   filterAndRenderJemaahGrid();
   buildHideFieldsList();
@@ -2633,6 +4102,44 @@ function filterJemaahTable() {
   #modul-maklumat-jemaah{overflow:auto;}
   `;
   document.head.appendChild(style);
+
+// Hook setup after openAddJemaahModal original
+(function(){
+    const _origOpenAdd = window.openAddJemaahModal;
+    if(_origOpenAdd){
+        const original = _origOpenAdd;
+        window.openAddJemaahModal = function(){
+            original.apply(this, arguments);
+            setTimeout(()=>{
+                const modal = document.getElementById('expandRecordModal');
+                if(modal){
+                    modal.classList.remove('hidden');
+                    modal.style.display='flex';
+                }
+                setupAddModalFilePickers();
+            }, 100);
+        };
+    } else {
+        // if not yet defined, patch via event
+        document.addEventListener('DOMContentLoaded', ()=>{
+            const orig = window.openAddJemaahModal;
+            if(orig){
+                window.openAddJemaahModal = function(){
+                    orig.apply(this, arguments);
+                    setTimeout(()=>{
+                        const modal = document.getElementById('expandRecordModal');
+                        if(modal){
+                            modal.classList.remove('hidden');
+                            modal.style.display='flex';
+                        }
+                        setupAddModalFilePickers();
+                    }, 100);
+                };
+            }
+        });
+    }
+})();
+
 })();
 
 
@@ -2655,6 +4162,44 @@ function filterJemaahTable() {
       fetchJemaahUmrahData();
     }
   },500);
+
+// Hook setup after openAddJemaahModal original
+(function(){
+    const _origOpenAdd = window.openAddJemaahModal;
+    if(_origOpenAdd){
+        const original = _origOpenAdd;
+        window.openAddJemaahModal = function(){
+            original.apply(this, arguments);
+            setTimeout(()=>{
+                const modal = document.getElementById('expandRecordModal');
+                if(modal){
+                    modal.classList.remove('hidden');
+                    modal.style.display='flex';
+                }
+                setupAddModalFilePickers();
+            }, 100);
+        };
+    } else {
+        // if not yet defined, patch via event
+        document.addEventListener('DOMContentLoaded', ()=>{
+            const orig = window.openAddJemaahModal;
+            if(orig){
+                window.openAddJemaahModal = function(){
+                    orig.apply(this, arguments);
+                    setTimeout(()=>{
+                        const modal = document.getElementById('expandRecordModal');
+                        if(modal){
+                            modal.classList.remove('hidden');
+                            modal.style.display='flex';
+                        }
+                        setupAddModalFilePickers();
+                    }, 100);
+                };
+            }
+        });
+    }
+})();
+
 })();
 
 
@@ -2787,6 +4332,44 @@ document.addEventListener('click', function(e){
       }
     }
   });
+
+// Hook setup after openAddJemaahModal original
+(function(){
+    const _origOpenAdd = window.openAddJemaahModal;
+    if(_origOpenAdd){
+        const original = _origOpenAdd;
+        window.openAddJemaahModal = function(){
+            original.apply(this, arguments);
+            setTimeout(()=>{
+                const modal = document.getElementById('expandRecordModal');
+                if(modal){
+                    modal.classList.remove('hidden');
+                    modal.style.display='flex';
+                }
+                setupAddModalFilePickers();
+            }, 100);
+        };
+    } else {
+        // if not yet defined, patch via event
+        document.addEventListener('DOMContentLoaded', ()=>{
+            const orig = window.openAddJemaahModal;
+            if(orig){
+                window.openAddJemaahModal = function(){
+                    orig.apply(this, arguments);
+                    setTimeout(()=>{
+                        const modal = document.getElementById('expandRecordModal');
+                        if(modal){
+                            modal.classList.remove('hidden');
+                            modal.style.display='flex';
+                        }
+                        setupAddModalFilePickers();
+                    }, 100);
+                };
+            }
+        });
+    }
+})();
+
 })();
 
 
@@ -2797,5 +4380,43 @@ document.addEventListener('click', function(e){
   }
 });
 
+
+
+// Hook setup after openAddJemaahModal original
+(function(){
+    const _origOpenAdd = window.openAddJemaahModal;
+    if(_origOpenAdd){
+        const original = _origOpenAdd;
+        window.openAddJemaahModal = function(){
+            original.apply(this, arguments);
+            setTimeout(()=>{
+                const modal = document.getElementById('expandRecordModal');
+                if(modal){
+                    modal.classList.remove('hidden');
+                    modal.style.display='flex';
+                }
+                setupAddModalFilePickers();
+            }, 100);
+        };
+    } else {
+        // if not yet defined, patch via event
+        document.addEventListener('DOMContentLoaded', ()=>{
+            const orig = window.openAddJemaahModal;
+            if(orig){
+                window.openAddJemaahModal = function(){
+                    orig.apply(this, arguments);
+                    setTimeout(()=>{
+                        const modal = document.getElementById('expandRecordModal');
+                        if(modal){
+                            modal.classList.remove('hidden');
+                            modal.style.display='flex';
+                        }
+                        setupAddModalFilePickers();
+                    }, 100);
+                };
+            }
+        });
+    }
+})();
 
 })();

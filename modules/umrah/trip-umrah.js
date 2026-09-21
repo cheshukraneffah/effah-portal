@@ -109,8 +109,8 @@ function renderTripUmrahHTML() {
     const container = document.getElementById('modul-pakej-umrah');
     if (!container) return;
     container.innerHTML = `
-        <div class="flex flex-col lg:flex-row gap-6 min-h-[calc(100vh-140px)]">
-            <div class="w-full lg:w-80 bg-white rounded-2xl border border-slate-200/80 shadow-2xs p-4 flex flex-col flex-shrink-0">
+        <div class="flex flex-col lg:flex-row gap-6 h-[calc(100vh-90px)] overflow-hidden items-stretch">
+            <div class="w-full lg:w-80 bg-white rounded-2xl border border-slate-200/80 shadow-2xs p-4 flex flex-col flex-shrink-0 h-full overflow-hidden">
                 <div class="mb-3">
                     <div id="hijriFilterTabs" class="flex gap-1.5 overflow-x-auto pb-2 scrollbar-hide"></div>
                     <div class="mt-3 p-2.5 bg-slate-50 rounded-xl border border-slate-100">
@@ -156,14 +156,14 @@ function renderTripUmrahHTML() {
                         <div id="tripLoadingBar" class="bg-slate-900 h-2 rounded-full transition-all duration-300 ease-out" style="width:0%"></div>
                     </div>
                 </div>
-                <div id="tripSidebarContainer" class="space-y-1 overflow-y-auto flex-1 max-h-[60vh] pr-1">
+                <div id="tripSidebarContainer" class="space-y-1 overflow-y-auto flex-1 pr-1 scrollbar-thin">
                     <div class="text-center py-10 text-slate-400 text-xs">
                         <div class="w-8 h-8 mx-auto mb-2 border-2 border-slate-200 border-t-slate-900 rounded-full animate-spin"></div>
                         Memuat trip...
                     </div>
                 </div>
             </div>
-            <div class="flex-1 flex flex-col space-y-6 overflow-x-hidden" id="tripMainDetailWorkspace">
+            <div class="flex-1 flex flex-col space-y-6 overflow-y-auto overflow-x-hidden pr-1 scrollbar-thin" id="tripMainDetailWorkspace">
                 <div class="bg-white rounded-2xl border border-slate-200/80 shadow-2xs p-12 text-center text-slate-400 my-auto">
                     <i class="fa-solid fa-kaaba text-5xl mb-3 text-slate-200"></i>
                     <p class="text-xs font-semibold">Sila pilih mana-mana trip di senarai belah kiri untuk melihat perincian & data jemaah.</p>
@@ -393,7 +393,7 @@ function updateHijriFilterTabs(){
   Object.keys(counts).forEach(h=>{
     if(!order.includes(h) && counts[h]>0 && !existingHijri.includes(h)) existingHijri.push(h);
   });
-  // Sort by order
+  // Sort by order - earliest first (1448H, then 1449H, etc)
   existingHijri.sort((a,b)=>{
     const ia=order.indexOf(a); const ib=order.indexOf(b);
     if(ia!==-1 && ib!==-1) return ia-ib;
@@ -401,6 +401,16 @@ function updateHijriFilterTabs(){
     if(ib!==-1) return 1;
     return a.localeCompare(b);
   });
+  // V39 FIX: Auto-select earliest season on first load instead of SEMUA
+  // User request: bila load portal auto select season paling awal (1448H now, 1449 later), taknak SEMUA dulu
+  if(!window._hijriInitialSet && tripFilters.hijri==='All' && existingHijri.length>0){
+    const earliest = existingHijri[0]; // e.g., 1448H is earliest
+    console.log('V39 auto-select earliest hijri season:', earliest, 'instead of SEMUA');
+    tripFilters.hijri = earliest;
+    window._hijriInitialSet = true;
+    // Trigger filter after this function completes to avoid recursion
+    setTimeout(()=>{ if(typeof filterTripSidebar==='function') filterTripSidebar(); }, 50);
+  }
   let html = `<button onclick="setHijriFilter('All')" class="px-3 py-1.5 rounded-full text-[11px] font-bold border transition ${tripFilters.hijri==='All' ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'}">SEMUA <span class="ml-1 opacity-70">(${total})</span></button>`;
   existingHijri.forEach(h=>{
     const c = counts[h]||0;
@@ -989,50 +999,226 @@ function renderTripDetailForm(rec) {
                 <div class="md:col-span-2"><label class="block font-bold text-slate-600 mb-1">Sektor</label>${buildSelectDropdown(id, 'Sektor', f['Sektor'], selectOptions.sektor, 'sektor')}</div>
             </div>
         </div>
-        <div class="bg-white rounded-2xl border border-slate-200/80 shadow-2xs p-6 md:p-8">
-            <div class="flex flex-col sm:flex-row justify-between sm:items-center mb-5 gap-3">
-                <h3 class="font-extrabold text-base text-slate-900 tracking-tight">DATA JEMAAH UMRAH</h3>
-                <div class="flex items-center gap-2">
-                    <div class="relative"><i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-slate-400 text-[10px]"></i><input type="text" onkeyup="filterTripJemaahTable(this.value)" placeholder="Search..." class="pl-8 pr-3 py-2 border border-slate-200 rounded-xl text-xs bg-slate-50 focus:bg-white focus:outline-none focus:ring-1 focus:ring-slate-300 w-24 md:w-36"></div>
-                    <button onclick="printTripManifest()" class="bg-white border border-slate-300 text-slate-700 font-bold px-3 py-2 rounded-xl hover:bg-slate-50 transition text-xs flex items-center shadow-xs"><i class="fa-solid fa-print mr-1.5"></i> Print</button>
-                    <button onclick="exportTripPdf()" class="bg-emerald-600 text-white font-bold px-3 py-2 rounded-xl hover:bg-emerald-700 transition text-xs flex items-center shadow-xs"><i class="fa-solid fa-file-arrow-down mr-1.5"></i> Export PDF</button>
-                    <button onclick="openTripAddCustomerModal()" class="bg-slate-900 text-white font-bold px-3.5 py-2 rounded-xl hover:bg-black transition text-xs flex items-center shadow-xs"><i class="fa-solid fa-plus mr-1.5"></i> Add customer</button>
-                </div>
+        <div class="bg-white rounded-2xl border border-slate-200/80 shadow-2xs p-6 md:p-8 flex flex-col items-center justify-center text-center">
+            <div class="w-16 h-16 bg-slate-900 rounded-2xl flex items-center justify-center mb-4 shadow-sm">
+                <i class="fa-solid fa-users text-white text-xl"></i>
             </div>
-            <div class="overflow-auto border border-slate-200/80 rounded-xl max-h-[55vh] md:max-h-[60vh] scrollbar-thin">
-                <table class="w-full text-left text-xs" id="tripJemaahTable">
-                    <thead class="bg-slate-50 text-slate-500 font-bold uppercase tracking-wider border-b border-slate-200/80 sticky top-0 z-10">
-                        <tr>
-                            <th class="p-3 w-10 text-center">#</th>
-                            <th class="p-3 cursor-pointer hover:text-slate-800 select-none" onclick="sortTripJemaahBy('NAME')">NAME <span class="sort-icon" data-field="NAME">↑</span></th>
-                            <th class="p-3">PICTURE</th>
-                            <th class="p-3">PASSPORT COPY</th>
-                            <th class="p-3 cursor-pointer hover:text-slate-800 select-none" onclick="sortTripJemaahBy('PASSPORT NO.')">PASSPORT NO. <span class="sort-icon" data-field="PASSPORT NO."></span></th>
-                            <th class="p-3 cursor-pointer hover:text-slate-800 select-none" onclick="sortTripJemaahBy('AGE')">AGE <span class="sort-icon" data-field="AGE"></span></th>
-                            <th class="p-3 cursor-pointer hover:text-slate-800 select-none" onclick="sortTripJemaahBy('GENDER')">GENDER <span class="sort-icon" data-field="GENDER"></span></th>
-                            <th class="p-3 cursor-pointer hover:text-slate-800 select-none" onclick="sortTripJemaahBy('NATIONALITY')">NATIONALITY <span class="sort-icon" data-field="NATIONALITY"></span></th>
-                        </tr>
-                    </thead>
-                    <tbody id="tripJemaahTableBody" class="divide-y divide-slate-100 font-medium text-slate-800">
-                        ${currentTripJemaahList.length === 0 ? `<tr><td colspan="8" class="p-8 text-center text-slate-400 font-normal">Tiada data jemaah berdaftar di bawah trip ini lagi.</td></tr>` : currentTripJemaahList.map((j, idx) => {
-                            const jf = j.fields;
-                            const picObj = (jf['PICTURE'] && jf['PICTURE'][0]) ? jf['PICTURE'][0] : null;
-                            const pic = picObj ? picObj.url : '';
-                            const picId = picObj ? picObj.id : '';
-                            const picName = picObj ? (picObj.filename || '') : '';
-                            const passObj = (jf['PASSPORT COPY'] && jf['PASSPORT COPY'][0]) ? jf['PASSPORT COPY'][0] : null;
-                            const passCopy = passObj ? passObj.url : '';
-                            const passId = passObj ? passObj.id : '';
-                            const passName = passObj ? (passObj.filename || '') : '';
-                            const genderBadge = jf['GENDER'] === 'MALE' ? 'bg-sky-100/80 text-sky-800 border-sky-200' : 'bg-rose-100/80 text-rose-800 border-rose-200';
-                            const recId = j.id;
-                            return `<tr class="hover:bg-slate-50/80 transition"><td class="p-3 text-center text-slate-400 font-bold">${idx + 1}</td><td class="p-3 font-bold text-slate-900 uppercase">${jf['NAME'] || '-'}</td><td class="p-3">${pic ? `<img src="${pic}" onclick="openTripPreviewModal('${pic}', '${(jf['NAME']||'').replace(/'/g, '')} - PICTURE', {recordId:'${recId}', fieldName:'PICTURE', attachmentId:'${picId}', filename:'${picName.replace(/'/g,'')}'})" class="w-9 h-9 rounded-lg object-cover border border-slate-200 cursor-pointer hover:scale-110 transition" title="Click to preview">` : `<div class="w-9 h-9 bg-slate-100 rounded-lg flex items-center justify-center text-slate-400"><i class="fa-solid fa-user"></i></div>`}</td><td class="p-3">${passCopy ? `<button onclick="openTripPreviewModal('${passCopy}', '${(jf['NAME']||'').replace(/'/g, '')} - PASSPORT COPY', {recordId:'${recId}', fieldName:'PASSPORT COPY', attachmentId:'${passId}', filename:'${passName.replace(/'/g,'')}'})" class="text-sky-600 hover:text-sky-800 underline font-semibold flex items-center text-xs"><i class="fa-solid fa-file-pdf mr-1"></i> View Copy</button>` : `<span class="text-slate-300">-</span>`}</td><td class="p-3 font-mono font-bold text-slate-700">${jf['PASSPORT NO.'] || '-'}</td><td class="p-3 text-slate-600">${jf['AGE'] || '-'}</td><td class="p-3"><span class="text-[10px] font-bold px-2.5 py-0.5 rounded-md border uppercase ${genderBadge}">${jf['GENDER'] || '-'}</span></td><td class="p-3"><span class="bg-sky-100/80 text-sky-900 border border-sky-200 text-[10px] font-bold px-2 py-0.5 rounded-md uppercase">${jf['NATIONALITY'] || 'MALAYSIA'}</span></td></tr>`;
-                        }).join('')}
-                    </tbody>
-                </table>
-            </div>
+            <h3 class="font-extrabold text-base text-slate-900 tracking-tight">Senarai Jemaah Umrah</h3>
+            <p class="text-xs text-slate-500 mt-1.5 mb-5">${currentTripJemaahList.length} jemaah berdaftar untuk trip ini</p>
+            <button onclick="openTripJemaahListModal()" class="bg-slate-900 hover:bg-black text-white font-bold px-6 py-2.5 rounded-xl text-sm flex items-center gap-2 transition shadow-sm">
+                <i class="fa-solid fa-eye"></i> Lihat Senarai Jemaah
+            </button>
         </div>
     `;
+
+function openTripJemaahListModal(){
+  const existing = document.getElementById('tripJemaahListModal');
+  if(existing) existing.remove();
+  const tripName = selectedTripRecord ? (selectedTripRecord.fields['Trip'] || selectedTripRecord.fields['NAME'] || 'Trip') : 'Trip';
+  const count = currentTripJemaahList ? currentTripJemaahList.length : 0;
+  
+  const modal = document.createElement('div');
+  modal.id = 'tripJemaahListModal';
+  modal.className = 'fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-[200] flex items-center justify-center p-2 md:p-4 overflow-hidden';
+  modal.innerHTML = `
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-6xl max-h-[92vh] flex flex-col border border-slate-200/80 overflow-hidden">
+      <!-- Header -->
+      <div class="flex items-center justify-between p-4 md:p-6 border-b border-slate-100 bg-white shrink-0">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 bg-slate-900 rounded-xl flex items-center justify-center">
+            <i class="fa-solid fa-users text-white"></i>
+          </div>
+          <div>
+            <h3 class="font-extrabold text-base text-slate-900 tracking-tight">DATA JEMAAH UMRAH</h3>
+            <p class="text-[11px] text-slate-500 font-medium">${tripName} • ${count} jemaah</p>
+          </div>
+        </div>
+        <button onclick="closeTripJemaahListModal()" class="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-500 hover:text-slate-700 transition">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+      
+      <!-- Toolbar with Search + Buttons -->
+      <div class="flex flex-col sm:flex-row justify-between sm:items-center gap-3 p-4 border-b border-slate-100 bg-slate-50/50 shrink-0">
+        <div class="relative flex-1 max-w-xs">
+          <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-slate-400 text-[11px]"></i>
+          <input type="text" id="tripJemaahModalSearch" onkeyup="filterTripJemaahModalTable(this.value)" placeholder="Search..." class="pl-8 pr-3 py-2 border border-slate-200 rounded-xl text-xs bg-white focus:outline-none focus:ring-1 focus:ring-slate-300 w-full">
+        </div>
+        <div class="flex items-center gap-2">
+          <button onclick="printTripManifest()" class="bg-white border border-slate-300 text-slate-700 font-bold px-3 py-2 rounded-xl hover:bg-slate-50 transition text-xs flex items-center shadow-xs">
+            <i class="fa-solid fa-print mr-1.5"></i> Print
+          </button>
+          <button onclick="exportTripPdf()" class="bg-emerald-600 text-white font-bold px-3 py-2 rounded-xl hover:bg-emerald-700 transition text-xs flex items-center shadow-xs">
+            <i class="fa-solid fa-file-arrow-down mr-1.5"></i> Export PDF
+          </button>
+          <button onclick="openTripAddCustomerModal(); closeTripJemaahListModal();" class="bg-slate-900 text-white font-bold px-3.5 py-2 rounded-xl hover:bg-black transition text-xs flex items-center shadow-xs">
+            <i class="fa-solid fa-plus mr-1.5"></i> Add customer
+          </button>
+        </div>
+      </div>
+      
+      <!-- Table -->
+      <div class="flex-1 overflow-auto scrollbar-thin">
+        <table class="w-full text-left text-xs" id="tripJemaahModalTable">
+          <thead class="bg-slate-50 text-slate-500 font-bold uppercase tracking-wider border-b border-slate-200/80 sticky top-0 z-10">
+            <tr>
+              <th class="p-3 w-10 text-center">#</th>
+              <th class="p-3 cursor-pointer hover:text-slate-800 select-none" onclick="sortTripJemaahModalBy('NAME')">NAME <span class="sort-icon-modal" data-field="NAME">↑</span></th>
+              <th class="p-3">PICTURE</th>
+              <th class="p-3">PASSPORT COPY</th>
+              <th class="p-3 cursor-pointer hover:text-slate-800 select-none" onclick="sortTripJemaahModalBy('PASSPORT NO.')">PASSPORT NO. <span class="sort-icon-modal" data-field="PASSPORT NO."></span></th>
+              <th class="p-3 cursor-pointer hover:text-slate-800 select-none" onclick="sortTripJemaahModalBy('AGE')">AGE <span class="sort-icon-modal" data-field="AGE"></span></th>
+              <th class="p-3 cursor-pointer hover:text-slate-800 select-none" onclick="sortTripJemaahModalBy('GENDER')">GENDER <span class="sort-icon-modal" data-field="GENDER"></span></th>
+              <th class="p-3 cursor-pointer hover:text-slate-800 select-none" onclick="sortTripJemaahModalBy('NATIONALITY')">NATIONALITY <span class="sort-icon-modal" data-field="NATIONALITY"></span></th>
+            </tr>
+          </thead>
+          <tbody id="tripJemaahModalTableBody" class="divide-y divide-slate-100 font-medium text-slate-800">
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+  modal.addEventListener('click', (e)=>{ if(e.target===modal) closeTripJemaahListModal(); });
+  // Render table content
+  renderTripJemaahModalTable();
+  // Focus search
+  setTimeout(()=>{ const inp=document.getElementById('tripJemaahModalSearch'); if(inp) inp.focus(); }, 100);
+}
+
+function closeTripJemaahListModal(){
+  const modal=document.getElementById('tripJemaahListModal');
+  if(modal) modal.remove();
+}
+
+function renderTripJemaahModalTable(){
+  const tbody=document.getElementById('tripJemaahModalTableBody');
+  if(!tbody) return;
+  if(!currentTripJemaahList || currentTripJemaahList.length===0){
+    tbody.innerHTML='<tr><td colspan="8" class="p-8 text-center text-slate-400">Tiada data jemaah berdaftar di bawah trip ini lagi.</td></tr>';
+    return;
+  }
+  tbody.innerHTML=currentTripJemaahList.map((j, idx)=>{
+    const jf=j.fields;
+    const picObj=(jf['PICTURE']&&jf['PICTURE'][0])?jf['PICTURE'][0]:null;
+    const pic=picObj?picObj.url:'';
+    const picId=picObj?picObj.id:'';
+    const picName=picObj?(picObj.filename||''):'';
+    const passObj=(jf['PASSPORT COPY']&&jf['PASSPORT COPY'][0])?jf['PASSPORT COPY'][0]:null;
+    const passCopy=passObj?passObj.url:'';
+    const passId=passObj?passObj.id:'';
+    const passName=passObj?(passObj.filename||''):'';
+    const genderBadge=jf['GENDER']==='MALE'?'bg-sky-100/80 text-sky-800 border-sky-200':'bg-rose-100/80 text-rose-800 border-rose-200';
+    const recId=j.id;
+    return `<tr class="hover:bg-slate-50/80 transition"><td class="p-3 text-center text-slate-400 font-bold">${idx+1}</td><td class="p-3 font-bold text-slate-900 uppercase">${jf['NAME']||'-'}</td><td class="p-3">${pic?`<img src="${pic}" onclick="openTripPreviewModal('${pic}', '${(jf['NAME']||'').replace(/'/g,'')} - PICTURE', {recordId:'${recId}', fieldName:'PICTURE', attachmentId:'${picId}', filename:'${picName.replace(/'/g,'')}'})" class="w-9 h-9 rounded-lg object-cover border border-slate-200 cursor-pointer hover:scale-110 transition" title="Click to preview">`:`<div class="w-9 h-9 bg-slate-100 rounded-lg flex items-center justify-center text-slate-400"><i class="fa-solid fa-user"></i></div>`}</td><td class="p-3">${passCopy?`<button onclick="openTripPreviewModal('${passCopy}', '${(jf['NAME']||'').replace(/'/g,'')} - PASSPORT COPY', {recordId:'${recId}', fieldName:'PASSPORT COPY', attachmentId:'${passId}', filename:'${passName.replace(/'/g,'')}'})" class="text-sky-600 hover:text-sky-800 underline font-semibold flex items-center text-xs"><i class="fa-solid fa-file-pdf mr-1"></i> View Copy</button>`:`<span class="text-slate-300">-</span>`}</td><td class="p-3 font-mono font-bold text-slate-700">${jf['PASSPORT NO.']||'-'}</td><td class="p-3 text-slate-600">${jf['AGE']||'-'}</td><td class="p-3"><span class="text-[10px] font-bold px-2.5 py-0.5 rounded-md border uppercase ${genderBadge}">${jf['GENDER']||'-'}</span></td><td class="p-3"><span class="bg-sky-100/80 text-sky-900 border border-sky-200 text-[10px] font-bold px-2 py-0.5 rounded-md uppercase">${jf['NATIONALITY']||'MALAYSIA'}</span></td></tr>`;
+  }).join('');
+}
+
+function filterTripJemaahModalTable(q){
+  const tbody=document.getElementById('tripJemaahModalTableBody');
+  if(!tbody) return;
+  const query=(q||'').toLowerCase();
+  if(!query){
+    renderTripJemaahModalTable();
+    return;
+  }
+  const filtered=currentTripJemaahList.filter(j=>{
+    const name=(j.fields['NAME']||'').toLowerCase();
+    const passport=(j.fields['PASSPORT NO.']||'').toLowerCase();
+    const gender=(j.fields['GENDER']||'').toLowerCase();
+    return name.includes(query) || passport.includes(query) || gender.includes(query);
+  });
+  if(filtered.length===0){
+    tbody.innerHTML='<tr><td colspan="8" class="p-8 text-center text-slate-400">Tiada keputusan untuk "'+q+'"</td></tr>';
+    return;
+  }
+  tbody.innerHTML=filtered.map((j, idx)=>{
+    const jf=j.fields;
+    const picObj=(jf['PICTURE']&&jf['PICTURE'][0])?jf['PICTURE'][0]:null;
+    const pic=picObj?picObj.url:'';
+    const picId=picObj?picObj.id:'';
+    const picName=picObj?(picObj.filename||''):'';
+    const passObj=(jf['PASSPORT COPY']&&jf['PASSPORT COPY'][0])?jf['PASSPORT COPY'][0]:null;
+    const passCopy=passObj?passObj.url:'';
+    const passId=passObj?passObj.id:'';
+    const passName=passObj?(passObj.filename||''):'';
+    const genderBadge=jf['GENDER']==='MALE'?'bg-sky-100/80 text-sky-800 border-sky-200':'bg-rose-100/80 text-rose-800 border-rose-200';
+    const recId=j.id;
+    return `<tr class="hover:bg-slate-50/80 transition"><td class="p-3 text-center text-slate-400 font-bold">${idx+1}</td><td class="p-3 font-bold text-slate-900 uppercase">${jf['NAME']||'-'}</td><td class="p-3">${pic?`<img src="${pic}" onclick="openTripPreviewModal('${pic}', '${(jf['NAME']||'').replace(/'/g,'')} - PICTURE', {recordId:'${recId}', fieldName:'PICTURE', attachmentId:'${picId}', filename:'${picName.replace(/'/g,'')}'})" class="w-9 h-9 rounded-lg object-cover border border-slate-200 cursor-pointer hover:scale-110 transition">`:`<div class="w-9 h-9 bg-slate-100 rounded-lg flex items-center justify-center text-slate-400"><i class="fa-solid fa-user"></i></div>`}</td><td class="p-3">${passCopy?`<button onclick="openTripPreviewModal('${passCopy}', '${(jf['NAME']||'').replace(/'/g,'')} - PASSPORT COPY', {recordId:'${recId}', fieldName:'PASSPORT COPY', attachmentId:'${passId}', filename:'${passName.replace(/'/g,'')}'})" class="text-sky-600 hover:text-sky-800 underline font-semibold flex items-center text-xs"><i class="fa-solid fa-file-pdf mr-1"></i> View Copy</button>`:`<span class="text-slate-300">-</span>`}</td><td class="p-3 font-mono font-bold text-slate-700">${jf['PASSPORT NO.']||'-'}</td><td class="p-3 text-slate-600">${jf['AGE']||'-'}</td><td class="p-3"><span class="text-[10px] font-bold px-2.5 py-0.5 rounded-md border uppercase ${genderBadge}">${jf['GENDER']||'-'}</span></td><td class="p-3"><span class="bg-sky-100/80 text-sky-900 border border-sky-200 text-[10px] font-bold px-2 py-0.5 rounded-md uppercase">${jf['NATIONALITY']||'MALAYSIA'}</span></td></tr>`;
+  }).join('');
+}
+
+// V40 FIX: Sorting toggle A-Z/Z-A for modal, including AGE muda-tua/tua-muda
+let tripJemaahModalSortField = null;
+let tripJemaahModalSortDir = 'asc';
+
+function parseAgeToMonths(ageStr){
+  if(!ageStr) return 0;
+  const s = ageStr.toString().toLowerCase();
+  let years = 0, months = 0;
+  const yMatch = s.match(/(\d+)\s*y/);
+  const mMatch = s.match(/(\d+)\s*m/);
+  if(yMatch) years = parseInt(yMatch[1])||0;
+  if(mMatch) months = parseInt(mMatch[1])||0;
+  if(!yMatch && !mMatch){
+    const num = parseFloat(s)||0;
+    years = Math.floor(num);
+    months = Math.round((num - years)*12);
+  }
+  return years*12 + months;
+}
+
+function sortJemaahArrayModal(arr, field, dir){
+  const sorted=[...arr].sort((a,b)=>{
+    let av=(a.fields[field]||'').toString();
+    let bv=(b.fields[field]||'').toString();
+    if(field==='AGE'){
+      const an=parseAgeToMonths(av);
+      const bn=parseAgeToMonths(bv);
+      return dir==='asc'?an-bn:bn-an;
+    }
+    av=av.toUpperCase();
+    bv=bv.toUpperCase();
+    if(av<bv) return dir==='asc'?-1:1;
+    if(av>bv) return dir==='asc'?1:-1;
+    return 0;
+  });
+  return sorted;
+}
+
+function sortTripJemaahModalBy(field){
+  if(tripJemaahModalSortField===field){
+    tripJemaahModalSortDir=tripJemaahModalSortDir==='asc'?'desc':'asc';
+  }else{
+    tripJemaahModalSortField=field;
+    tripJemaahModalSortDir='asc';
+  }
+  if(typeof sortJemaahArrayModal==='function'){
+    currentTripJemaahList=sortJemaahArrayModal(currentTripJemaahList, field, tripJemaahModalSortDir);
+  }else if(typeof sortJemaahArray==='function'){
+    currentTripJemaahList=sortJemaahArray(currentTripJemaahList, field, tripJemaahModalSortDir);
+  }
+  renderTripJemaahModalTable();
+  setTimeout(()=>{
+    document.querySelectorAll('#tripJemaahModalTable .sort-icon-modal').forEach(el=>{
+      const f=el.getAttribute('data-field');
+      if(f===tripJemaahModalSortField){
+        el.textContent=tripJemaahModalSortDir==='asc'?'↑':'↓';
+        el.classList.add('text-slate-900');
+      }else{
+        el.textContent='';
+      }
+    });
+  }, 10);
+}
+window.openTripJemaahListModal = openTripJemaahListModal;
+window.closeTripJemaahListModal = closeTripJemaahListModal;
+window.renderTripJemaahModalTable = renderTripJemaahModalTable;
+window.filterTripJemaahModalTable = filterTripJemaahModalTable;
+window.sortTripJemaahModalBy = sortTripJemaahModalBy;
+
+
+
 }
 
 function handleDropdownChange(recId, fieldName, selectEl, categoryKey){ 
