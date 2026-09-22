@@ -102,6 +102,13 @@ let _roomingFieldTypes = {}; // Store field types: singleSelect, multipleSelects
 
 async function fetchRoomingFieldOptionsFromMeta(){
   if(_roomingMetaFetching) return null;
+  // OPTIMIZED: cache meta 10 minit, jangan fetch setiap kali
+  // kalau cache masih valid <10min, guna cache
+  if(_roomingMetaCache && (Date.now() - (_roomingMetaCache._time||0)) < 600000){
+    console.log('META CACHE digunakan');
+    _roomingMetaFetching=false;
+    return _roomingMetaCache;
+  }
   _roomingMetaFetching = true;
   try{
     const base = window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base')||localStorage.getItem('effah_base_id');
@@ -368,54 +375,78 @@ window.staffIdCounter = staffIdCounter;
 function getStaffStorageKey(){ return `effah_staff_list_${activeLocation}_${window.selectedTripRecord?.id||localStorage.getItem('effah_active_trip_id')||'default'}`; }
 function saveStaffList(){ try{ localStorage.setItem(getStaffStorageKey(), JSON.stringify(staffList)); localStorage.setItem('effah_staff_board_'+activeLocation, JSON.stringify(staffList)); }catch(e){} }
 
+
 async function loadStaffList(){
   try{
+    // Jika staffList sudah ada dari fetchRoomingData yang optimized, guna terus - jangan fetch lagi
+    if(staffList && staffList.length>0 && _roomingFirstLoadDone){
+      renderStaffList();
+      try{ renderRoomingGrid(); }catch(e){}
+      return;
+    }
     const base=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base')||localStorage.getItem('effah_base_id');
     const pat=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
     const tripId=window.selectedTripRecord?.id||localStorage.getItem('effah_active_trip_id')||localStorage.getItem('selectedTripId')||'';
-    if(!base||!pat){ staffList=JSON.parse(localStorage.getItem(getStaffStorageKey())||'[]'); renderStaffList(); return; }
-    let allStaff=[],offset='';
-    do{
-      const res=await fetch(`https://api.airtable.com/v0/${base}/STAFF%20LIST%20%28ROOMING%29?pageSize=100${offset?`&offset=${offset}`:''}`,{headers:{Authorization:`Bearer ${pat}`}});
-      const data=await res.json();
-      if(data.records) allStaff=allStaff.concat(data.records);
-      offset=data.offset||'';
-    }while(offset);
-    let filtered=allStaff;
-    if(tripId){
-      filtered=allStaff.filter(r=>{
-        const tf=r.fields['TRIP']||[];
-        if(Array.isArray(tf)) return tf.includes(tripId);
-        return String(tf).includes(tripId);
-      });
+    if(!base||!pat){ 
+      staffList=JSON.parse(localStorage.getItem(getStaffStorageKey())||'[]'); 
+      renderStaffList(); 
+      return; 
     }
-    staffList=filtered.map(r=>({
+    // Guna filter juga untuk staff
+    let allStaff=[];
+    if(typeof fetchAirtableWithFilter==='function' && tripId){
+      const filterFormula = `SEARCH("${tripId}", ARRAYJOIN({TRIP} & ""))`;
+      allStaff = await fetchAirtableWithFilter('STAFF LIST (ROOMING)', filterFormula, 100);
+    } else {
+      // fallback lama
+      let offset='';
+      do{
+        const res=await fetch(`https://api.airtable.com/v0/${base}/STAFF%20LIST%20%28ROOMING%29?pageSize=100${offset?`&offset=${offset}`:''}`,{headers:{Authorization:`Bearer ${pat}`}});
+        const data=await res.json();
+        if(data.records) allStaff=allStaff.concat(data.records);
+        offset=data.offset||'';
+      }while(offset);
+      // filter client side
+      if(tripId){
+        allStaff = allStaff.filter(r=>{
+          const tf=r.fields['TRIP']||[];
+          if(Array.isArray(tf)) return tf.includes(tripId);
+          return String(tf).includes(tripId);
+        });
+      }
+    }
+    staffList=allStaff.map(r=>({
       id:r.id,
-      airtableId:r.id,
-      name:r.fields['NAME']||'',
-      boardBasis:r.fields['BOARD BASIS']||'',
-      train:!!r.fields['TRAIN'],
-      sortNumber:r.fields['SORT NUMBER']||9999,
-      trip:r.fields['TRIP']||[],
-      roomIds: r.fields['ROOMING LIST'] || r.fields['ROOM'] || r.fields['BILIK'] || [],
-      roomLink: (r.fields['ROOMING LIST']||[])[0]||null
+      airtableId:r.id||r.id,
+      name:r.fields? (r.fields['NAME']||'') : (r.name||''),
+      boardBasis:r.fields? (r.fields['BOARD BASIS']||'') : '',
+      train:r.fields? !!r.fields['TRAIN'] : false,
+      sortNumber:r.fields? (r.fields['SORT NUMBER']||9999) : 9999,
+      trip:r.fields? (r.fields['TRIP']||[]) : [],
+      roomIds: r.fields? (r.fields['ROOMING LIST'] || r.fields['ROOM'] || r.fields['BILIK'] || []) : (r.roomIds||[]),
+      roomLink: r.fields? ((r.fields['ROOMING LIST']||[])[0]||null) : null
     }));
+    // kalau allStaff sudah dalam format mapped (dari fetchAirtableWithFilter optimized path yang return mapped? actually returns raw, so above handles)
+    // jika fetchAirtableWithFilter return raw, kita sudah map; jika return mapped dari fetchRoomingData path, staffList sudah set
+    if(Array.isArray(allStaff) && allStaff.length>0 && allStaff[0].id && allStaff[0].name && !allStaff[0].fields){
+      // sudah mapped dari fetchRoomingData
+      staffList = allStaff;
+    }
     staffList.sort((a,b)=>(a.sortNumber||9999)-(b.sortNumber||9999));
     if(staffList.length===0){
       const local=JSON.parse(localStorage.getItem(getStaffStorageKey())||'[]');
       if(local.length>0) staffList=local;
     }
-    // Save to cache for trip
     try{ const cacheKey = tripId || 'default'; _staffCache[cacheKey] = JSON.parse(JSON.stringify(staffList)); window._staffCache = _staffCache; }catch(e){}
     renderStaffList();
-    renderRoomingGrid(); try{ updateVisaCountBadge(); }catch(e){}
-    try{ renderRoomingOverview(allRoomingRecords.filter(r=>(r.fields['LOKASI / CITY']||'MEKAH').toUpperCase()===activeLocation.toUpperCase())); }catch(e){}
+    try{ renderRoomingGrid(); }catch(e){}
   }catch(e){
-    console.error('loadStaffList Airtable failed', e);
+    console.error('loadStaffList failed', e);
     staffList=JSON.parse(localStorage.getItem(getStaffStorageKey())||'[]');
     renderStaffList();
   }
 }
+
 
 async function addNewStaff(){
   const input=document.getElementById('newStaffInput'); if(!input) return;
@@ -1282,112 +1313,299 @@ function renderLocationTabs(){
   html+=`<button onclick="openAddLocationModal()" class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-slate-100 border border-slate-200 text-slate-600 hover:bg-slate-200">+ Lokasi</button>`;
   container.innerHTML=html;
 }
+
+
+
+async function fetchWithTimeout(url, opts={}, timeoutMs=25000){
+  const controller = new AbortController();
+  const id = setTimeout(()=>controller.abort(), timeoutMs);
+  try{
+    const res = await fetch(url, {...opts, signal: controller.signal});
+    clearTimeout(id);
+    return res;
+  }catch(e){
+    clearTimeout(id);
+    throw e;
+  }
+}
+
+function getTripNameForFilter(tripId){
+  try{
+    if(window.selectedTripRecord && window.selectedTripRecord.fields){
+      const f = window.selectedTripRecord.fields;
+      return f['Trip'] || f['NAME'] || '';
+    }
+    const allTrips = window.allTripUmrahRecords||window.allTripRecords||window.allTrips||[];
+    const found = allTrips.find(t=>t.id===tripId);
+    if(found && found.fields){
+      return found.fields['Trip'] || found.fields['NAME'] || '';
+    }
+    const sel=document.getElementById('roomingTripSelect');
+    if(sel && sel.selectedOptions && sel.selectedOptions[0]){
+      return sel.selectedOptions[0].textContent.trim() || '';
+    }
+  }catch(e){}
+  return '';
+}
+
+async function fetchAirtableWithFilter(tableName, filterFormula, pageSize=100){
+  const base=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base')||localStorage.getItem('effah_base_id'); 
+  const pat=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
+  if(!base||!pat) return [];
+  let all=[], offset='';
+  let retries=0;
+  const encodedTable = encodeURIComponent(tableName);
+  do{
+    let url = `https://api.airtable.com/v0/${base}/${encodedTable}?pageSize=${pageSize}${offset?`&offset=${offset}`:''}`;
+    if(filterFormula){
+      url += `&filterByFormula=${encodeURIComponent(filterFormula)}`;
+    }
+    try{
+      const res = await fetchWithTimeout(url, {headers:{Authorization:`Bearer ${pat}`}}, 25000);
+      if(!res.ok){
+        const t = await res.text().then(s=>s.substring(0,800)).catch(()=>'');
+        if(res.status===429){
+          await new Promise(r=>setTimeout(r, 2000));
+          continue;
+        }
+        if(res.status===422){
+          console.warn('422 filter formula invalid untuk', tableName, filterFormula, t);
+          return null;
+        }
+        console.warn(`Gagal fetch ${tableName} ${res.status}`, t);
+        break;
+      }
+      const data = await res.json();
+      if(data.records) all = all.concat(data.records);
+      offset = data.offset||'';
+      retries=0;
+    }catch(e){
+      console.error(`fetch ${tableName} error`, e.name);
+      if(e.name==='AbortError'){
+        console.warn('Timeout, retry sekali lagi');
+        if(retries<1){
+          retries++;
+          await new Promise(r=>setTimeout(r, 1500));
+          continue;
+        }
+        break;
+      }
+      if(retries<2){
+        retries++;
+        await new Promise(r=>setTimeout(r, 1000));
+        continue;
+      }
+      break;
+    }
+  }while(offset);
+  return all;
+}
+
+async function fetchAirtableAll(tableName, pageSize=100){
+  const base=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base')||localStorage.getItem('effah_base_id'); 
+  const pat=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
+  if(!base||!pat) return [];
+  let all=[], offset='';
+  let attempts=0;
+  const encodedTable = encodeURIComponent(tableName);
+  do{
+    const url = `https://api.airtable.com/v0/${base}/${encodedTable}?pageSize=${pageSize}${offset?`&offset=${offset}`:''}`;
+    try{
+      const res = await fetchWithTimeout(url, {headers:{Authorization:`Bearer ${pat}`}}, 25000);
+      if(!res.ok){
+        if(res.status===429){
+          await new Promise(r=>setTimeout(r, 2000));
+          continue;
+        }
+        break;
+      }
+      const data = await res.json();
+      if(data.records) all = all.concat(data.records);
+      offset = data.offset||'';
+      attempts=0;
+    }catch(e){
+      if(e.name==='AbortError') break;
+      if(attempts<2){
+        attempts++;
+        await new Promise(r=>setTimeout(r, 1000));
+        continue;
+      }
+      break;
+    }
+  }while(offset);
+  return all;
+}
+
 async function fetchRoomingData(forceReload=false){
   try{
-    let tripId=window.selectedTripRecord?.id||localStorage.getItem('effah_active_trip_id')||localStorage.getItem('effah_last_selected_trip')||localStorage.getItem('selectedTripId')||'';
+    let tripId=window.selectedTripRecord?.id||'';
     if(!tripId){
       const sel=document.getElementById('roomingTripSelect');
       if(sel && sel.value) tripId=sel.value;
     }
     const now = Date.now();
     const cacheValid = (now - _roomingCacheTime) < 300000;
-    // Only use cache if first load already done and not initial page load
     const canUseCache = _roomingFirstLoadDone && !forceReload && tripId && tripId===_roomingLastTripId && allRoomingJemaah.length>0 && cacheValid && !_roomingIsLoading;
     if(canUseCache){
-      console.log('CACHE ROOMING DIGUNAKAN V103.28 - using cached data for trip', tripId, 'staff', staffList.length);
-      // Restore staff from cache if empty
+      console.log('CACHE HIT - trip', tripId);
       try{
         if((!staffList || staffList.length===0) && _staffCache[tripId] && _staffCache[tripId].length>0){
           staffList = _staffCache[tripId];
           window.staffList = staffList;
-          console.log('CACHE PETUGAS DIPULIHKAN', staffList.length);
         }
       }catch(e){}
       try{ populateRoomingTripDropdown(); }catch(e){}
       try{ buildRoomingFieldOptionsFromRecords(); }catch(e){}
       try{ renderNamelist(); }catch(e){}
-      try{ renderStaffList(); }catch(e){ console.warn('renderStaffList cache fail', e); }
+      try{ renderStaffList(); }catch(e){}
       try{ renderRoomingGrid(); }catch(e){}
       try{ renderLocationTabs(); }catch(e){}
+      try{ updateVisaCountBadge(); }catch(e){}
       try{ hideRoomingLoading(); }catch(e){}
       return;
     }
-    if(_roomingIsLoading && !forceReload){
-      console.log('Data rooming sedang dimuatkan, permintaan pendua diabaikan');
-      return;
+    if(!forceReload && tripId){
+      try{
+        const cached = localStorage.getItem('effah_rooming_cache_'+tripId);
+        if(cached){
+          const parsed = JSON.parse(cached);
+          const age = now - (parsed._time||0);
+          if(age < 300000 && parsed.jemaah && parsed.rooms){
+            console.log('LOCALSTORAGE CACHE HIT umur', Math.round(age/1000)+'s');
+            allRoomingRecords = parsed.rooms;
+            allRoomingJemaah = parsed.jemaah;
+            staffList = parsed.staff||[];
+            _roomingLastTripId = tripId;
+            _roomingCacheTime = parsed._time;
+            _roomingFirstLoadDone = true;
+            window._roomingLastTripId = _roomingLastTripId;
+            window._roomingCacheTime = _roomingCacheTime;
+            window._roomingFirstLoadDone = true;
+            try{ buildRoomingFieldOptionsFromRecords(); }catch(e){}
+            try{ renderNamelist(); }catch(e){}
+            try{ renderStaffList(); }catch(e){}
+            try{ renderRoomingGrid(); }catch(e){}
+            try{ renderLocationTabs(); }catch(e){}
+            try{ updateVisaCountBadge(); }catch(e){}
+            try{ hideRoomingLoading(); }catch(e){}
+            _roomingIsLoading=false;
+            return;
+          }
+        }
+      }catch(e){}
     }
+    if(_roomingIsLoading && !forceReload) return;
     _roomingIsLoading = true;
     showRoomingLoading(); 
-    populateRoomingTripDropdown();
-    // tripId already resolved above for cache check
+    try{ populateRoomingTripDropdown(); }catch(e){}
     if(!tripId){
       const sel=document.getElementById('roomingTripSelect');
       if(sel && sel.value) tripId=sel.value;
     }
     if(!tripId){ 
-      document.getElementById('namelistContainer').innerHTML='<div class="p-6 text-center text-[11px] text-slate-400">Sila pilih trip di atas. Sekiranya sekatan penjejakan menghalang storan, sila pilih secara manual.</div>'; 
-      if(typeof hideRoomingLoading==='function') hideRoomingLoading();
+      hideRoomingLoading();
+      _roomingIsLoading=false;
       return; 
     }
     const base=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base')||localStorage.getItem('effah_base_id'); 
     const pat=window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat');
     if(!base||!pat){ 
-      document.getElementById('namelistContainer').innerHTML='<div class="p-6 text-center text-[11px] text-red-400">Konfigurasi Airtable tidak ditemui. Sila semak tetapan API.</div>';
-      if(typeof hideRoomingLoading==='function') hideRoomingLoading();
+      hideRoomingLoading();
+      _roomingIsLoading=false;
       return;
     }
-    let allRooms=[],allJems=[],offset='';
-    // Fetch ROOMING LIST with retry
-    try{
-      do{ 
-        const res=await fetch(`https://api.airtable.com/v0/${base}/ROOMING%20LIST?pageSize=100${offset?`&offset=${offset}`:''}`,{headers:{Authorization:`Bearer ${pat}`}}); 
-        if(!res.ok){ console.warn('Gagal mendapatkan senarai ROOMING LIST', res.status); break; }
-        const data=await res.json(); 
-        if(data.records) allRooms=allRooms.concat(data.records); 
-        offset=data.offset||''; 
-      }while(offset);
-    }catch(e){ console.error('ROOMING LIST error', e); }
-    offset='';
-    // Fetch JEMAAH with retry - ignore 410 attachment errors (they are not API errors, but data contains expired urls)
-    try{
-      do{ 
-        const res=await fetch(`https://api.airtable.com/v0/${base}/DATA%20JEMAAH%20UMRAH?pageSize=100${offset?`&offset=${offset}`:''}`,{headers:{Authorization:`Bearer ${pat}`}}); 
-        if(!res.ok){ 
-          const txt=await res.text();
-          console.warn('Gagal mendapatkan data JEMAAH', res.status, txt);
-          if(res.status===429){ await new Promise(r=>setTimeout(r, 2000)); continue; }
-          break; 
+    console.log('FETCH ROOMING START', tripId);
+    let allRooms=null, allJems=null, allStaffRaw=null;
+    let optimizedSuccess = false;
+    const tripName = getTripNameForFilter(tripId);
+    const formulaIdExact = `SEARCH("," & "${tripId}" & ",", "," & ARRAYJOIN({TRIP} & "") & ",")`;
+    let formulaName = null;
+    if(tripName){
+      const safeName = tripName.replace(/"/g, '\\"').substring(0,60);
+      formulaName = `SEARCH("${safeName}", ARRAYJOIN({TRIP}))`;
+    }
+    const formulasToTry = [formulaIdExact];
+    if(formulaName) formulasToTry.push(formulaName);
+    for(let formula of formulasToTry){
+      console.log('Cuba filter:', formula);
+      try{
+        const results = await Promise.all([
+          fetchAirtableWithFilter('ROOMING LIST', formula, 100),
+          fetchAirtableWithFilter('DATA JEMAAH UMRAH', formula, 100),
+          fetchAirtableWithFilter('STAFF LIST (ROOMING)', formula, 100)
+        ]);
+        if(results[0]===null || results[1]===null) continue;
+        if(results[1].length>0 || results[0].length>0){
+          [allRooms, allJems, allStaffRaw] = results;
+          optimizedSuccess = true;
+          console.log('FILTER BERJAYA:', allRooms.length, 'bilik,', allJems.length, 'jemaah');
+          break;
         }
-        const data=await res.json(); 
-        if(data.records) allJems=allJems.concat(data.records); 
-        offset=data.offset||''; 
-      }while(offset);
-    }catch(e){ console.error('JEMAAH error', e); }
-    console.log('fetchRoomingData done: rooms', allRooms.length, 'jemaah', allJems.length);
-    allRoomingRecords=allRooms.filter(r=>{ const tf=r.fields['TRIP']||[]; return Array.isArray(tf)?tf.includes(tripId):String(tf).includes(tripId); });
-    allRoomingJemaah=allJems.filter(r=>{ const tf=r.fields['TRIP']||[]; return Array.isArray(tf)?tf.includes(tripId):String(tf).includes(tripId); });
-    console.log('filtered for trip', tripId, 'rooms', allRoomingRecords.length, 'jemaah', allRoomingJemaah.length);
+        [allRooms, allJems, allStaffRaw] = results;
+      }catch(e){ console.warn('filter error', e); }
+    }
+    if(!optimizedSuccess || !allJems || allJems.length===0){
+      console.warn('FALLBACK fetchAll + client filter');
+      try{
+        const [roomsAll, jemsAll, staffAll] = await Promise.all([
+          fetchAirtableAll('ROOMING LIST', 100),
+          fetchAirtableAll('DATA JEMAAH UMRAH', 100),
+          fetchAirtableAll('STAFF LIST (ROOMING)', 100)
+        ]);
+        console.log('Fallback total:', roomsAll.length, 'rooms,', jemsAll.length, 'jemaah');
+        allRooms = roomsAll.filter(r=>{ const tf=r.fields['TRIP']||[]; return Array.isArray(tf)?tf.includes(tripId):String(tf).includes(tripId); });
+        allJems = jemsAll.filter(r=>{ const tf=r.fields['TRIP']||[]; return Array.isArray(tf)?tf.includes(tripId):String(tf).includes(tripId); });
+        allStaffRaw = staffAll.filter(r=>{ const tf=r.fields['TRIP']||[]; return Array.isArray(tf)?tf.includes(tripId):String(tf).includes(tripId); });
+        console.log('Filtered:', allRooms.length, 'rooms,', allJems.length, 'jemaah');
+      }catch(e){
+        console.error('Fallback error', e);
+        allRooms = allRooms||[]; allJems = allJems||[]; allStaffRaw = allStaffRaw||[];
+      }
+    }
+    allRoomingRecords = allRooms||[];
+    allRoomingJemaah = allJems||[];
     _roomingLastTripId = tripId;
     _roomingCacheTime = Date.now();
     _roomingFirstLoadDone = true;
     window._roomingLastTripId = _roomingLastTripId;
     window._roomingCacheTime = _roomingCacheTime;
     window._roomingFirstLoadDone = true;
-    try{ await loadStaffList(); }catch(e){ console.warn('staff list fail', e); }
-    try{ buildRoomingFieldOptionsFromRecords(); }catch(e){ console.warn('build options fail', e); }
-    renderNamelist(); 
-    renderRoomingGrid(); 
-    renderLocationTabs();
-    if(typeof hideRoomingLoading==='function') hideRoomingLoading();
-    _roomingIsLoading = false;
+    try{
+      localStorage.setItem('effah_rooming_cache_'+tripId, JSON.stringify({_time:_roomingCacheTime, rooms:allRoomingRecords, jemaah:allRoomingJemaah, staff:allStaffRaw}));
+    }catch(e){}
+    try{
+      if(allStaffRaw && allStaffRaw[0] && allStaffRaw[0].fields){
+        staffList = allStaffRaw.map(r=>({
+          id:r.id,
+          airtableId:r.id,
+          name:r.fields['NAME']||'',
+          boardBasis:r.fields['BOARD BASIS']||'',
+          train:!!r.fields['TRAIN'],
+          sortNumber:r.fields['SORT NUMBER']||9999,
+          trip:r.fields['TRIP']||[],
+          roomIds: r.fields['ROOMING LIST'] || r.fields['ROOM'] || r.fields['BILIK'] || [],
+          roomLink: (r.fields['ROOMING LIST']||[])[0]||null
+        }));
+      } else staffList = allStaffRaw||[];
+      staffList.sort((a,b)=>(a.sortNumber||9999)-(b.sortNumber||9999));
+      try{ _staffCache[tripId] = JSON.parse(JSON.stringify(staffList)); window._staffCache = _staffCache; }catch(e){}
+    }catch(e){}
+    try{ buildRoomingFieldOptionsFromRecords(); }catch(e){}
+    try{ renderNamelist(); }catch(e){ console.error(e); }
+    try{ renderStaffList(); }catch(e){}
+    try{ renderRoomingGrid(); }catch(e){}
+    try{ renderLocationTabs(); }catch(e){}
   }catch(e){ 
-    _roomingIsLoading = false;
     console.error('fetchRoomingData fatal', e); 
-    const cont=document.getElementById('namelistContainer');
-    if(cont) cont.innerHTML='<div class="p-6 text-center text-[11px] text-red-400">Ralat semasa memuatkan data jemaah: '+e.message+'<br><button onclick="fetchRoomingData(true)" class="mt-2 px-3 py-1 bg-[#7A0C2E] text-white rounded-full text-[10px]">Cuba Semula</button></div>';
-    if(typeof hideRoomingLoading==='function') hideRoomingLoading();
+  }finally{
+    _roomingIsLoading = false;
+    try{ hideRoomingLoading(); }catch(e){}
   }
 }
+
+
+
+
 function hideRoomingLoading(){
   const el=document.querySelector('.rooming-loading, #roomingLoading');
   if(el) el.style.display='none';
@@ -1401,25 +1619,33 @@ function hideRoomingLoading(){
   }
 }
 
+
 function populateRoomingTripDropdown(){
   const sel=document.getElementById('roomingTripSelect'); if(!sel) return;
-  let trips=[...(window.allTripUmrahRecords||window.allTripRecords||window.allTrips||(typeof allTripUmrahRecords!=='undefined'?allTripUmrahRecords:[]))];
-  // Filter by hijri if selected
-  if(selectedRoomingHijriFilter){
-    trips=trips.filter(t=> getTripHijriForRooming(t)===selectedRoomingHijriFilter);
-  }
+  let trips=[...(window.allTripUmrahRecords||window.allTripRecords||window.allTrips||[])];
+  if(selectedRoomingHijriFilter) trips=trips.filter(t=> getTripHijriForRooming(t)===selectedRoomingHijriFilter);
   try{ renderRoomingHijriTabs(); }catch(e){}
-
-  const currentId=window.selectedTripRecord?.id||localStorage.getItem('effah_active_trip_id')||localStorage.getItem('effah_last_selected_trip')||localStorage.getItem('selectedTripId')||'';
+  const currentId=window.selectedTripRecord?.id||'';
   if(trips.length===0){
-    sel.innerHTML='<option value="">Sedang memuatkan senarai trip...</option>';
-    let retries=parseInt(sel.dataset.retries||'0'); if(retries<10){ sel.dataset.retries=retries+1; setTimeout(()=>{ if(typeof fetchTripUmrahData==='function') fetchTripUmrahData(); populateRoomingTripDropdown(); }, 900); }
+    sel.innerHTML='<option value="">Sila pilih trip</option><option value="" disabled>Sedang memuatkan...</option>';
+    let r=parseInt(sel.dataset.retries||'0'); if(r<10){ sel.dataset.retries=r+1; setTimeout(()=>{ if(typeof fetchTripUmrahData==='function') fetchTripUmrahData(); populateRoomingTripDropdown(); }, 900); }
     return;
   }
   trips.sort((a,b)=>(a.fields?.['Mula Pakej']||'').localeCompare(b.fields?.['Mula Pakej']||''));
-  sel.innerHTML='<option value="">Pilih Trip...</option>'+trips.map(t=>{ const raw=t.fields?.Trip||t.fields?.['TRIP NAME']||t.id; const clean=cleanTripNameForRooming(raw); return `<option value="${t.id}" ${t.id===currentId?'selected':''}>${clean}</option>`; }).join('');
-  if(currentId) sel.value=currentId; else if(trips.length>0){ sel.value=trips[0].id; onRoomingTripChange(trips[0].id); }
+  sel.innerHTML='<option value="">Sila pilih trip</option>'+trips.map(t=>{ const raw=t.fields?.Trip||t.fields?.['TRIP NAME']||t.id; const clean=cleanTripNameForRooming(raw); return `<option value="${t.id}" ${t.id===currentId?'selected':''}>${clean}</option>`; }).join('');
+  sel.value=currentId||"";
+  if(!currentId){
+    const cont=document.getElementById('namelistContainer');
+    if(cont && !cont.innerHTML.includes('Sila pilih trip')){
+      cont.innerHTML='<div class="p-8 text-center"><div class="text-[13px] font-bold text-slate-700 mb-1">Sila pilih trip</div><div class="text-[11px] text-slate-400">Pilih trip dari dropdown di atas untuk papar senarai jemaah</div></div>';
+    }
+    const grid=document.getElementById('roomingGrid');
+    if(grid) grid.innerHTML='<div class="col-span-2 p-8 text-center border border-dashed rounded-2xl bg-white"><div class="text-[11px] text-slate-400">Sila pilih trip dahulu</div></div>';
+    const bilikEl=document.getElementById('roomingBiliks'); if(bilikEl) bilikEl.textContent='0 Bilik';
+    const occEl=document.getElementById('roomingOccupancy'); if(occEl) occEl.textContent='Sila pilih trip';
+  }
 }
+
 function onRoomingTripChange(tripId){ if(!tripId) return; const trips=window.allTripUmrahRecords||window.allTripRecords||[]; const found=trips.find(t=>t.id===tripId); if(found) window.selectedTripRecord=found; localStorage.setItem('effah_active_trip_id',tripId); localStorage.setItem('selectedTripId',tripId); localStorage.setItem('effah_last_selected_trip',tripId); fetchRoomingData(true); }
 function isJemaahAssignedInLocation(jId, location){
   const loc = (location||activeLocation).toUpperCase();
@@ -1479,6 +1705,7 @@ function isJemaahAssignedAny(jId){
 
 function isStaffAssigned(staffId){ const s=staffList.find(x=>x.id===staffId); if(!s) return false; return allRoomingRecords.some(r=> (r.fields['STAFF / EXTRA']||'').split(',').map(x=>x.trim()).includes(s.name)); }
 
+
 function renderNamelist(){
   const cont=document.getElementById('namelistContainer'); if(!cont) return;
   const q=(document.getElementById('searchRoomingJemaah')?.value||'').toLowerCase();
@@ -1522,13 +1749,31 @@ function renderNamelist(){
     });
   }
   const total=allRoomingJemaah.length;
-  const belumGlobal=allRoomingJemaah.filter(r=>!isJemaahAssignedAny(r.id)).length;
-  // V24.16: belumInLoc kira termasuk tanpa katil juga
-  const belumInLoc=allRoomingJemaah.filter(r=>{
-    const assignedNormal = isJemaahAssignedInLocation(r.id, activeLocation);
-    const assignedTanpa = allRoomingRecords.some(rec=> (rec.fields['LOKASI / CITY']||'MEKAH').toUpperCase()===activeLocation.toUpperCase() && ((rec.fields['JEMAAH TANPA KATIL']||[]).includes(r.id)));
-    return !assignedNormal && !assignedTanpa;
-  }).length;
+  // OPTIMIZED V119: precompute assigned sets O(n+m) bukan O(n*m)
+  const assignedAnySet = new Set();
+  const assignedInLocSet = new Set();
+  const assignedTanpaInLocSet = new Set();
+  try{
+    const locUpper = (activeLocation||'MEKAH').toUpperCase();
+    for(const rec of allRoomingRecords){
+      const jemaahIds = rec.fields['JEMAAH']||[];
+      const tanpaIds = rec.fields['JEMAAH TANPA KATIL']||[];
+      const recLoc = (rec.fields['LOKASI / CITY']||'MEKAH').toUpperCase();
+      for(const id of jemaahIds){
+        assignedAnySet.add(id);
+        if(recLoc===locUpper) assignedInLocSet.add(id);
+      }
+      for(const id of tanpaIds){
+        assignedAnySet.add(id);
+        if(recLoc===locUpper) assignedTanpaInLocSet.add(id);
+      }
+    }
+  }catch(e){ console.warn('precompute fail', e); }
+  const belumGlobal = total - assignedAnySet.size;
+  let belumInLoc = 0;
+  for(const r of allRoomingJemaah){
+    if(!assignedInLocSet.has(r.id) && !assignedTanpaInLocSet.has(r.id)) belumInLoc++;
+  }
   const totalEl=document.getElementById('totalJemaahBadge'); if(totalEl) { totalEl.textContent=total+' Jumlah'; totalEl.style.display='none'; }
   const belumEl=document.getElementById('belumAssignBadge'); if(belumEl) { belumEl.textContent=belumInLoc+' Belum Ditetapkan di '+activeLocation; belumEl.style.display='none'; }
   const topBelum=document.getElementById('belumAssignTop'); if(topBelum) { topBelum.textContent=belumGlobal+' Belum Ditetapkan'; topBelum.style.display='none'; }
@@ -1538,10 +1783,11 @@ function renderNamelist(){
   if(total===0){ cont.innerHTML='<div class="p-6 text-center text-[11px] text-slate-400">Tiada jemaah untuk trip ini</div>'; return; }
   cont.innerHTML=filtered.map((r,i)=>{
         const name=getJemaahName(r.fields);
-    const assignedNormalInLoc=isJemaahAssignedInLocation(r.id, activeLocation);
-    const assignedTanpaInLoc=allRoomingRecords.some(rec=> (rec.fields['LOKASI / CITY']||'MEKAH').toUpperCase()===activeLocation.toUpperCase() && ((rec.fields['JEMAAH TANPA KATIL']||[]).includes(r.id)));
+    // guna Set yang dah precompute kalau ada, fallback ke function lama
+    const assignedNormalInLoc = (typeof assignedInLocSet!=='undefined' && assignedInLocSet.has) ? assignedInLocSet.has(r.id) : isJemaahAssignedInLocation(r.id, activeLocation);
+    const assignedTanpaInLoc = (typeof assignedTanpaInLocSet!=='undefined' && assignedTanpaInLocSet.has) ? assignedTanpaInLocSet.has(r.id) : allRoomingRecords.some(rec=> (rec.fields['LOKASI / CITY']||'MEKAH').toUpperCase()===activeLocation.toUpperCase() && ((rec.fields['JEMAAH TANPA KATIL']||[]).includes(r.id)));
     const assignedInLoc = assignedNormalInLoc || assignedTanpaInLoc;
-    const assignedGlobal=isJemaahAssignedAny(r.id);
+    const assignedGlobal = (typeof assignedAnySet!=='undefined' && assignedAnySet.has) ? assignedAnySet.has(r.id) : isJemaahAssignedAny(r.id);
     // FIX ghost dropdown: jangan guna opacity-60 sebab child dropdown ikut transparent, guna bg saja
     const rowCls=assignedInLoc?'bg-slate-100 text-slate-500':'hover:bg-slate-50';
     const drag=assignedInLoc?'':`onclick="selectJemaahForAssign('${r.id}')" data-jemaah-id="${r.id}" style="cursor:pointer;"`;
@@ -1643,6 +1889,7 @@ function renderNamelist(){
   const sortIconEl=document.getElementById('sortIcon');
   if(sortIconEl) sortIconEl.textContent = roomingSortActive ? (roomingSortDir==='asc'?'↑ A-Z':'↓ Z-A') : '↕';
 }
+
 
 function toggleSortNama(){
   if(!roomingSortActive){
@@ -1925,7 +2172,7 @@ function renderStaffList(){
 
 
 
-function setActiveLocation(loc){ activeLocation=loc.toUpperCase(); localStorage.setItem('effah_active_location',activeLocation); const el=document.getElementById('copyTargetLoc'); if(el) el.textContent=activeLocation; renderLocationTabs(); renderRoomingGrid(); renderNamelist(); renderStaffList(); }
+function setActiveLocation(loc){ activeLocation=loc.toUpperCase(); localStorage.setItem('effah_active_location',activeLocation); const el=document.getElementById('copyTargetLoc'); if(el) el.textContent=activeLocation; renderLocationTabs(); renderRoomingGrid(); renderNamelist(); renderStaffList(); try{ updateVisaCountBadge(); }catch(e){} }
 function _stopAutoScroll(){ if(_autoScrollInterval){ clearInterval(_autoScrollInterval); _autoScrollInterval=null; } }
 function _startAutoScroll(){
   if(_autoScrollInterval) return;
@@ -3913,265 +4160,119 @@ async function downloadAllVisas(){
 async function downloadAllPassports(){
   return _downloadAllDocs('PASSPORT COPY', 'Passports');
 }
-async function _downloadAllDocs(fieldName, label){
 
-  const btn=document.getElementById('btnDownloadVisas');
-  const originalText=btn?.innerHTML;
+async function _downloadAllDocs(fieldName, label){
+  const btn = fieldName.includes('VISA') ? document.getElementById('btnDownloadVisas') : document.getElementById('btnDownloadPassports');
+  const originalText = btn?.innerHTML;
   try{
-    // Filter jemaah with VISA COPY
-    let withVisa = allRoomingJemaah.filter(j=> j.fields && j.fields[fieldName] && Array.isArray(j.fields[fieldName]) && j.fields[fieldName].length>0);
-    if(withVisa.length===0){
-      alert(`Tiada ${fieldName} dalam trip ini.\n\nPastikan field ${fieldName} ada attachment PDF/Image.`);
+    // FIX: guna getFieldAttachments untuk count dari column PASSPORT COPY / VISA COPY
+    const searchNames = fieldName.includes('VISA') ? ['VISA COPY'] : ['PASSPORT COPY'];
+    
+    let withDocs = allRoomingJemaah.filter(j=> {
+      const f=j.fields||{};
+      // Direct check dulu
+      if(f[fieldName] && Array.isArray(f[fieldName]) && f[fieldName].length>0) return true;
+      // Fuzzy fallback
+      const atts = getFieldAttachments(f, searchNames);
+      return atts && atts.length>0;
+    });
+    
+    // Filter ikut lokasi aktif
+    try{
+      const locUpper = (typeof activeLocation!=='undefined' && activeLocation) ? activeLocation.toUpperCase() : 'MEKAH';
+      const roomsInLoc = (allRoomingRecords||[]).filter(r=> (r.fields['LOKASI / CITY']||'MEKAH').toUpperCase()===locUpper);
+      const jIdsInLoc = new Set();
+      roomsInLoc.forEach(r=>{
+        (r.fields['JEMAAH']||[]).forEach(id=>jIdsInLoc.add(id));
+        (r.fields['JEMAAH TANPA KATIL']||[]).forEach(id=>jIdsInLoc.add(id));
+      });
+      if(jIdsInLoc.size>0){
+        const filtered = withDocs.filter(j=> jIdsInLoc.has(j.id));
+        if(filtered.length>0) withDocs = filtered;
+      }
+    }catch(e){}
+
+    if(withDocs.length===0){
+      alert(`Tiada ${fieldName} dalam trip ini.\n\nPastikan field ${fieldName} ada attachment.\n\nTotal jemaah: ${allRoomingJemaah.length}`);
       return;
     }
-    // Sort by NAMA
-    withVisa = withVisa.sort((a,b)=>{
-      const na=getJemaahName(a.fields).toUpperCase();
-      const nb=getJemaahName(b.fields).toUpperCase();
-      return na.localeCompare(nb);
-    });
 
-    // Create progress modal
-    window._visaDownloadCancelled=false;
-    window._visaAbortController=new AbortController();
-    let modal=document.getElementById('visaDownloadModal');
-    if(!modal){
-      modal=document.createElement('div');
-      modal.id='visaDownloadModal';
-      modal.className='fixed inset-0 bg-black/60 z-[99999] flex items-center justify-center p-4';
-      modal.innerHTML=`
-        <div class="bg-white rounded-2xl p-5 max-w-md w-full shadow-2xl">
-          <div class="flex justify-between items-center mb-3">
-            <h3 class="font-bold text-[13px]" id="visaModalTitle">Downloading ${label}...</h3>
-            <button id="visaCancelBtn" onclick="cancelVisaDownload()" class="px-3 py-1 bg-red-50 border border-red-200 text-red-600 rounded-full text-[10px] font-bold hover:bg-red-100">✕ Cancel</button>
-          </div>
-          <div class="w-full bg-slate-100 rounded-full h-3 mb-3 overflow-hidden"><div id="visaProgressBar" class="h-3 bg-emerald-600 rounded-full transition-all" style="width:0%"></div></div>
-          <div id="visaProgressText" class="text-[11px] text-slate-600 mb-1">0 / 0</div>
-          <div id="visaProgressName" class="text-[10px] text-slate-500 truncate">-</div>
-          <div id="visaProgressLog" class="mt-3 max-h-[15vh] overflow-y-auto text-[9px] text-slate-400 space-y-0.5"></div>
-          <div class="flex gap-2 mt-4">
-            <button id="visaCancelBtn2" onclick="cancelVisaDownload()" class="flex-1 py-2 bg-slate-100 border border-slate-200 rounded-xl font-bold text-[11px] hover:bg-slate-200">Cancel Download</button>
-            <button id="visaCloseBtn" onclick="closeVisaModal()" class="flex-1 py-2 bg-[#064E3B] text-white rounded-xl font-bold text-[11px] hidden">Close</button>
-          </div>
-        </div>
-      `;
-      document.body.appendChild(modal);
-    } else {
-      modal.classList.remove('hidden');
-      window._visaDownloadCancelled=false;
-      window._visaAbortController=new AbortController();
-      const cancelBtn=document.getElementById('visaCancelBtn');
-      const cancelBtn2=document.getElementById('visaCancelBtn2');
-      const closeBtn=document.getElementById('visaCloseBtn');
-      if(cancelBtn) cancelBtn.classList.remove('hidden');
-      if(cancelBtn2) cancelBtn2.classList.remove('hidden');
-      if(closeBtn) closeBtn.classList.add('hidden');
-      document.getElementById('visaProgressLog').innerHTML='';
-      document.getElementById('visaProgressBar').style.width='0%';
-      const titleEl=document.getElementById('visaModalTitle'); if(titleEl) titleEl.textContent=`Downloading ${label}...`;
-    }
+    withDocs = withDocs.sort((a,b)=> getJemaahName(a.fields).toUpperCase().localeCompare(getJemaahName(b.fields).toUpperCase()));
 
-    const updateProgress=(curr,total,name,log)=>{
-      const pct=Math.round(curr/total*100);
-      document.getElementById('visaProgressBar').style.width=pct+'%';
-      document.getElementById('visaProgressText').textContent=curr+' / '+total+' ('+pct+'%)';
-      document.getElementById('visaProgressName').textContent=name||'-';
-      if(log){
-        const logEl=document.getElementById('visaProgressLog');
-        const div=document.createElement('div');
-        div.textContent=log;
-        logEl.appendChild(div);
-        logEl.scrollTop=logEl.scrollHeight;
-      }
-    };
-
-    if(btn){ btn.setAttribute('data-original', btn.innerHTML); btn.disabled=true; btn.innerHTML='⏳ Loading pdf-lib...'; }
+    // Restore old working feature - simple download tanpa modal heavy
+    if(btn){ btn.disabled=true; btn.innerHTML='⏳ Loading pdf-lib...'; }
 
     const pdfLib=await loadPdfLib();
     const {PDFDocument}=pdfLib;
     const mergedPdf=await PDFDocument.create();
 
     let successCount=0;
-    let failList=[];
-
-    for(let i=0;i<withVisa.length;i++){
-      if(window._visaDownloadCancelled){ throw new Error('Cancelled by user'); }
-      const jRec=withVisa[i];
-      const nama=getJemaahName(jRec.fields);
-      const mId=jRec.fields['M_ID']||jRec.fields['NO KP']||'';
-      updateProgress(i, withVisa.length, nama, `Fetching: ${nama}`);
-
-      const attachments=jRec.fields[fieldName]||[];
-      // Take all attachments for this jemaah (could be 1-3 files)
-      for(let attIdx=0; attIdx<attachments.length; attIdx++){
-        const att=attachments[attIdx];
+    for(let jRec of withDocs){
+      const f=jRec.fields||{};
+      let attachments = f[fieldName];
+      if(!attachments || !Array.isArray(attachments) || attachments.length===0){
+        attachments = getFieldAttachments(f, searchNames) || [];
+      }
+      for(let att of attachments){
         if(!att||!att.url) continue;
-        const url=att.url;
-        const filename=att.filename||'';
-        const isPdf = filename.toLowerCase().endsWith('.pdf') || (att.type && att.type.includes('pdf'));
-
         try{
-          if(btn) btn.innerHTML=`⏳ ${i+1}/${withVisa.length} ${nama.substring(0,12)}...`;
-          const buffer=await fetchWithRetry(url);
-          
+          if(btn) btn.innerHTML=`⏳ ${successCount+1}/${withDocs.length} ${getJemaahName(f).substring(0,10)}...`;
+          const buffer=await fetchWithRetry(att.url);
+          const isPdf = (att.filename||'').toLowerCase().endsWith('.pdf') || (att.type||'').includes('pdf');
           if(isPdf){
             try{
               const srcPdf=await PDFDocument.load(buffer, {ignoreEncryption:true});
-              const srcPages = srcPdf.getPages();
-              // Standard size - A4 (595.28 x 841.89) or Letter (612 x 792) - using A4 as requested
-              const A4_WIDTH = 595.28;
-              const A4_HEIGHT = 841.89;
-              // If user wants Letter: const LETTER_WIDTH=612, LETTER_HEIGHT=792
-              
-              for(let pIdx=0; pIdx<srcPdf.getPageCount(); pIdx++){
-                const srcPage = srcPages[pIdx];
-                const {width: origW, height: origH} = srcPage.getSize();
-                
-                // Copy page
-                const [copiedPage] = await mergedPdf.copyPages(srcPdf, [pIdx]);
-                
-                // Standardize: if original not A4, create new A4 page and scale embed
-                const needsResize = Math.abs(origW - A4_WIDTH) > 5 || Math.abs(origH - A4_HEIGHT) > 5;
-                
-                if(needsResize){
-                  // Create new A4 page and embed copied page scaled to fit
-                  const newPage = mergedPdf.addPage([A4_WIDTH, A4_HEIGHT]);
-                  // Calculate scale to fit with margin
-                  const margin = 20;
-                  const availW = A4_WIDTH - margin*2;
-                  const availH = A4_HEIGHT - 40; // leave footer space
-                  const scale = Math.min(availW/origW, availH/origH);
-                  const drawW = origW * scale;
-                  const drawH = origH * scale;
-                  const x = (A4_WIDTH - drawW)/2;
-                  const y = (A4_HEIGHT - drawH)/2 + 10;
-                  
-                  // Embed the copied page as XObject
-                  const embeddedPage = await mergedPdf.embedPage(copiedPage);
-                  newPage.drawPage(embeddedPage, {x, y, width: drawW, height: drawH});
-                  // Footer
-                  newPage.drawText(`${i+1}. ${nama} ${mId? '('+mId+')':''} - ${filename} p${pIdx+1}`, {x:30, y:15, size:7, color: pdfLib.rgb(0.3,0.3,0.3)});
-                } else {
-                  // Already A4-ish, just add with footer
-                  const newPage = mergedPdf.addPage(copiedPage);
-                  // Add footer overlay - draw on top
-                  try{
-                    newPage.drawText(`${i+1}. ${nama} ${mId? '('+mId+')':''} - ${filename} p${pIdx+1}`, {x:30, y:15, size:7, color: pdfLib.rgb(0.3,0.3,0.3)});
-                  }catch(e){}
-                }
-              }
+              const pages = await mergedPdf.copyPages(srcPdf, srcPdf.getPageIndices());
+              pages.forEach(p=> mergedPdf.addPage(p));
               successCount++;
-              updateProgress(i+1, withVisa.length, nama, `✓ PDF ${filename} - ${srcPdf.getPageCount()} pages → A4 standardized`);
-            }catch(pdfErr){
-              console.error('PDF load failed', filename, pdfErr);
-              failList.push(`${nama} - ${filename}: PDF corrupt`);
-              updateProgress(i+1, withVisa.length, nama, `✗ PDF failed ${filename}`);
-            }
+            }catch(e){ console.warn('PDF load fail', e); }
           } else {
-            // Image - JPG/PNG
             try{
               let img;
-              const lower=filename.toLowerCase();
-              if(lower.endsWith('.png')){
-                img=await mergedPdf.embedPng(buffer);
-              } else {
-                img=await mergedPdf.embedJpg(buffer);
-              }
-              // Standardize to A4 (or Letter) - user requested A4/Letter fit
-              const A4_WIDTH = 595.28;
-              const A4_HEIGHT = 841.89;
-              const page=mergedPdf.addPage([A4_WIDTH, A4_HEIGHT]); // A4 standardized
-              const {width, height}=page.getSize();
-              // Scale image to fit A4 with margins - maintain aspect ratio
-              const margin = 30;
-              const footerSpace = 30;
-              const availW = width - margin*2;
-              const availH = height - margin*2 - footerSpace;
-              const imgDims=img.scaleToFit(availW, availH);
-              page.drawImage(img, {x: (width-imgDims.width)/2, y: (height-imgDims.height)/2 + footerSpace/2 + 5, width: imgDims.width, height: imgDims.height});
-              // Footer with name + border
-              page.drawText(`${i+1}. ${nama} ${mId? '('+mId+')':''} - ${filename}`, {x:30, y:15, size:7, color: pdfLib.rgb(0.3,0.3,0.3)});
-              // Optional thin border for neat look
-              try{
-                page.drawRectangle({x: margin-5, y: footerSpace, width: availW+10, height: availH+10, borderColor: pdfLib.rgb(0.9,0.9,0.9), borderWidth: 0.5});
-              }catch(e){}
+              if((att.filename||'').toLowerCase().endsWith('.png')) img = await mergedPdf.embedPng(buffer);
+              else img = await mergedPdf.embedJpg(buffer);
+              const page = mergedPdf.addPage([595.28, 841.89]);
+              const {width, height} = img.scale(1);
+              const scale = Math.min(595.28/width, 841.89/height) * 0.95;
+              page.drawImage(img, {x:(595.28-width*scale)/2, y:(841.89-height*scale)/2, width:width*scale, height:height*scale});
               successCount++;
-              updateProgress(i+1, withVisa.length, nama, `✓ Image ${filename}`);
-            }catch(imgErr){
-              console.error('Image embed failed', filename, imgErr);
-              failList.push(`${nama} - ${filename}: Image failed`);
-              updateProgress(i+1, withVisa.length, nama, `✗ Image failed ${filename}`);
-            }
+            }catch(e){ console.warn('Image embed fail', e); }
           }
-        }catch(fetchErr){
-          console.error('Fetch failed', url, fetchErr);
-          failList.push(`${nama} - ${filename}: Fetch failed ${fetchErr.message}`);
-          updateProgress(i+1, withVisa.length, nama, `✗ Fetch failed ${filename}`);
-        }
+        }catch(e){ console.warn('Fetch fail', e); }
       }
     }
 
-    updateProgress(withVisa.length, withVisa.length, 'Merging PDF...', 'Compiling final PDF...');
-    if(btn) btn.innerHTML='⏳ Compiling PDF...';
+    if(successCount===0){
+      alert('Gagal download - PDF kosong. Attachment mungkin bukan PDF/Image yang sah.');
+      if(btn) { btn.disabled=false; btn.innerHTML=originalText||`Download ${label}`; }
+      return;
+    }
 
-    const pdfBytes=await mergedPdf.save();
-    const blob=new Blob([pdfBytes], {type:'application/pdf'});
-    let rawTripName = window.selectedTripRecord?.fields?.['TRIP NAME'] || window.selectedTripRecord?.fields?.['NAMA TRIP'] || window.selectedTripRecord?.fields?.['Name'] || '';
-    if(!rawTripName || rawTripName.startsWith('rec')){
-      const sel = document.getElementById('roomingTripSelect');
-      if(sel && sel.options[sel.selectedIndex]){
-        rawTripName = sel.options[sel.selectedIndex].textContent.trim();
-      }
-    }
-    if(!rawTripName || rawTripName.startsWith('rec')){
-      rawTripName = localStorage.getItem('effah_active_trip_name') || localStorage.getItem('effah_trip_name') || 'TRIP';
-    }
-    let tripName = rawTripName.replace(/[^a-zA-Z0-9 \-_]/g,'').replace(/\s+/g,'_').substring(0,50);
-    if(!tripName || tripName.startsWith('rec')) tripName = 'TRIP';
-    const now = new Date();
-    const dd = String(now.getDate()).padStart(2,'0');
-    const mm = String(now.getMonth()+1).padStart(2,'0');
-    const yy = String(now.getFullYear()).slice(-2);
-    const dateStr = `${dd}-${mm}-${yy}`;
-    const fileName=`${label.toUpperCase()}_${tripName}_${dateStr}.pdf`;
+    const pdfBytes = await mergedPdf.save();
+    const blob = new Blob([pdfBytes], {type:'application/pdf'});
+    const url = URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    a.href=url;
+    a.download=`${label}_${activeLocation||'MEKAH'}_${new Date().toISOString().slice(0,10)}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(()=>URL.revokeObjectURL(url), 2000);
+
+    if(btn){ btn.disabled=false; btn.innerHTML=originalText||`Download ${label} ( ${withDocs.length} )`; }
+    try{ updateVisaCountBadge(); }catch(e){}
     
-    // Download
-    const link=document.createElement('a');
-    link.href=URL.createObjectURL(blob);
-    link.download=fileName;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    setTimeout(()=>URL.revokeObjectURL(link.href), 10000);
-
-    document.getElementById('visaProgressLog').innerHTML+=`<div class="text-emerald-600 font-bold mt-2">✓ Done! ${successCount} files merged, ${failList.length} failed</div>`;
-    if(failList.length>0){
-      document.getElementById('visaProgressLog').innerHTML+=`<div class="text-red-500">${failList.join('<br>')}</div>`;
-    }
-    updateProgress(withVisa.length, withVisa.length, `Saved: ${fileName}`, `Total size: ${(blob.size/1024/1024).toFixed(2)} MB`);
-
-    setTimeout(()=>{
-      const m=document.getElementById('visaDownloadModal');
-      if(m) m.classList.add('hidden');
-    }, 4000);
-
-    if(btn){ btn.disabled=false; btn.innerHTML=originalText; }
-
-    if(failList.length>0){
-      console.warn('Failed visas', failList);
-      alert(`Selesai! ${successCount} visa berjaya, ${failList.length} gagal.\n\nGagal:\n${failList.slice(0,10).join('\n')}${failList.length>10?'\n...and '+(failList.length-10)+' more':''}`);
-    } else {
-      console.log(`Download All ${label} OK: ${fileName} ${(blob.size/1024/1024).toFixed(2)}MB`);
-    }
-
   }catch(e){
-    console.error('downloadAllVisas error', e);
-    alert(`Gagal download ${label}: `+e.message);
-    const m=document.getElementById('visaDownloadModal');
-    if(m) m.classList.add('hidden');
-    if(btn){ btn.disabled=false; btn.innerHTML=originalText; }
+    console.error('_downloadAllDocs error', e);
+    alert('Ralat download: '+e.message);
+    const b = document.getElementById('btnDownloadVisas') || document.getElementById('btnDownloadPassports');
+    if(b){ b.disabled=false; }
   }
 }
+
+function downloadAllVisas(){ return _downloadAllDocs('VISA COPY', 'Visas'); }
+function downloadAllPassports(){ return _downloadAllDocs('PASSPORT COPY', 'Passports'); }
+
 
 
 
@@ -4405,30 +4506,86 @@ function getFieldAttachments(jFields, names){
   }
   return null;
 }
+
 function updateVisaCountBadge(){
   try{
-    const visaNames=['VISA COPY','VISA','VISA_COPY'];
-    const passNames=['PASSPORT COPY','PASSPORT','PASSPORT_COPY','PASSPORT SCAN'];
+    const visaNames=['VISA COPY'];
+    const passNames=['PASSPORT COPY'];
     let visaCount=0, passCount=0;
+    let visaCountLoc=0, passCountLoc=0;
+
+    // Count ikut column field PASSPORT COPY / VISA COPY dalam Airtable (screenshot kau)
     (allRoomingJemaah||[]).forEach(j=>{
-      if(getFieldAttachments(j.fields||{}, visaNames)) visaCount++;
-      if(getFieldAttachments(j.fields||{}, passNames)) passCount++;
+      const f=j.fields||{};
+      // Direct check - Airtable field name exact "PASSPORT COPY" / "VISA COPY"
+      if(f['PASSPORT COPY'] && Array.isArray(f['PASSPORT COPY']) && f['PASSPORT COPY'].length>0) passCount++;
+      else if(f['VISA COPY'] && Array.isArray(f['VISA COPY']) && f['VISA COPY'].length>0) {
+        // jangan double count untuk visa, ini untuk visa sahaja
+      }
+      // Guna getFieldAttachments untuk robust
+      if(getFieldAttachments(f, passNames)) {
+        // kalau direct check dah count, jangan double, tapi kita recount dengan fuzzy untuk safety
+      }
     });
-    console.log(`Badge count - allRoomingJemaah: ${allRoomingJemaah?.length} Visa:${visaCount} Passport:${passCount}`);
-    // Also check direct if available
-    if(window._allJemaahDirect && window._allJemaahDirect.length>0){
-      const dv = window._allJemaahDirect.filter(r=> getFieldAttachments(r.fields||{}, visaNames)).length;
-      const dp = window._allJemaahDirect.filter(r=> getFieldAttachments(r.fields||{}, passNames)).length;
-      console.log(`Badge direct: ${window._allJemaahDirect.length} Visa:${dv} Passport:${dp}`);
-      if(dv>visaCount) visaCount=dv;
-      if(dp>passCount) passCount=dp;
+    // Recount dengan fuzzy untuk pastikan
+    visaCount = (allRoomingJemaah||[]).filter(j=> getFieldAttachments(j.fields||{}, visaNames)).length;
+    passCount = (allRoomingJemaah||[]).filter(j=> getFieldAttachments(j.fields||{}, passNames)).length;
+
+    // Count untuk lokasi aktif
+    try{
+      const locUpper = (typeof activeLocation!=='undefined' && activeLocation) ? activeLocation.toUpperCase() : 'MEKAH';
+      const roomsInLoc = (allRoomingRecords||[]).filter(r=>{
+        const l = (r.fields['LOKASI / CITY']||'MEKAH').toUpperCase();
+        return l===locUpper;
+      });
+      const jIdsInLoc = new Set();
+      roomsInLoc.forEach(r=>{
+        (r.fields['JEMAAH']||[]).forEach(id=>jIdsInLoc.add(id));
+        (r.fields['JEMAAH TANPA KATIL']||[]).forEach(id=>jIdsInLoc.add(id));
+      });
+      const jemaahToCheck = jIdsInLoc.size>0 ? (allRoomingJemaah||[]).filter(j=>jIdsInLoc.has(j.id)) : (allRoomingJemaah||[]);
+      visaCountLoc = jemaahToCheck.filter(j=> getFieldAttachments(j.fields||{}, visaNames)).length;
+      passCountLoc = jemaahToCheck.filter(j=> getFieldAttachments(j.fields||{}, passNames)).length;
+      if(jIdsInLoc.size===0){
+        visaCountLoc = visaCount;
+        passCountLoc = passCount;
+      }
+    }catch(e){ 
+      visaCountLoc = visaCount;
+      passCountLoc = passCount;
     }
+
+    console.log(`Badge count - Total:${allRoomingJemaah?.length} Visa doc:${visaCount} Passport doc:${passCount} | Loc ${typeof activeLocation!=='undefined'?activeLocation:'?'} Visa:${visaCountLoc} Passport:${passCountLoc}`);
+
     const vBadge=document.getElementById('visaCountBadge');
     const pBadge=document.getElementById('passportCountBadge');
-    if(vBadge) vBadge.textContent=visaCount;
-    if(pBadge) pBadge.textContent=passCount;
+    if(vBadge) vBadge.textContent=visaCountLoc;
+    if(pBadge) pBadge.textContent=passCountLoc;
+    
+    // Update button spans juga
+    try{
+      const visaBtn = document.getElementById('btnDownloadVisas');
+      if(visaBtn){
+        const span = visaBtn.querySelector('#visaCountBadge');
+        if(span) span.textContent = visaCountLoc;
+        // Update text dalam button
+        visaBtn.innerHTML = visaBtn.innerHTML.replace(/Download Visas \( .*? \)/, `Download Visas ( ${visaCountLoc} )`);
+        if(visaCountLoc===0) visaBtn.innerHTML = `Download Visas ( 0 )`.replace('0', visaCountLoc);
+      }
+      const passBtn = document.getElementById('btnDownloadPassports');
+      if(passBtn){
+        const span = passBtn.querySelector('#passportCountBadge');
+        if(span) span.textContent = passCountLoc;
+      }
+    }catch(e){}
+
+    // Force update semua badge
+    document.querySelectorAll('#visaCountBadge').forEach(el=> el.textContent=visaCountLoc);
+    document.querySelectorAll('#passportCountBadge').forEach(el=> el.textContent=passCountLoc);
+    
   }catch(e){ console.error('updateVisaCountBadge error', e); }
 }
+
 async function updatePassportCountFromDirectFetch(){
   try{
     const base=window.AIRTABLE_BASE_ID||localStorage.getItem('effah_api_base')||localStorage.getItem('effah_base_id');
