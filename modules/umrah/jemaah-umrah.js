@@ -279,15 +279,43 @@ document.addEventListener('DOMContentLoaded', () => {
         currentSortDir = savedSort.dir || 'asc';
     }
     let savedOrder = JSON.parse(localStorage.getItem('jemaahColOrder'));
-    try{ if(savedOrder && (!savedOrder.includes('col-age') || !savedOrder.includes('col-dob'))){ localStorage.removeItem('jemaahColOrder'); savedOrder = null; console.log('Migrating columnOrder to include AGE/DOB'); } }catch(e){}
+    // FIX v5: Force AGE & DOB sebelum DOBF (FOREIGNER) by default
+    try{
+        // kalau ada saved order lama tanpa age/dob, atau age/dob di hujung, kita migrasi
+        if(savedOrder && Array.isArray(savedOrder)){
+            const hasAge = savedOrder.includes('col-age');
+            const hasDob = savedOrder.includes('col-dob');
+            const ageIdx = savedOrder.indexOf('col-age');
+            const dobIdx = savedOrder.indexOf('col-dob');
+            const dobfIdx = savedOrder.indexOf('col-dobf');
+            const isWrongPos = hasAge && hasDob && dobfIdx!==-1 && (ageIdx > dobfIdx || dobIdx > dobfIdx);
+            if(!hasAge || !hasDob || isWrongPos){
+                console.log('Migrating columnOrder to put AGE/DOB before DOBF');
+                localStorage.removeItem('jemaahColOrder');
+                savedOrder = null;
+            }
+        }
+    }catch(e){}
     if (savedOrder && Array.isArray(savedOrder)) {
-        // FIX: validate, buang legacy col-age/dob, buang duplikat, pastikan semua default ada
-        let cleaned = [...new Set(savedOrder.filter(k=> k!=='col-age' && k!=='col-dob' && DEFAULT_COLUMN_ORDER.includes(k)))];
-        // tambah yang missing dari default supaya tak hilang
+        // bersihkan duplicate & filter yang valid sahaja
+        let base = [...new Set(savedOrder.filter(k=> DEFAULT_COLUMN_ORDER.includes(k)))];
+        // buang age/dob dulu untuk insert semula di posisi betul
+        base = base.filter(k=> k!=='col-age' && k!=='col-dob');
+        // cari posisi DOBF
+        let idxDobf = base.indexOf('col-dobf');
+        if(idxDobf===-1){
+            let idxGender = base.indexOf('col-gender');
+            idxDobf = idxGender!==-1 ? idxGender+1 : 5;
+        }
+        // insert AGE, DOB sebelum DOBF
+        base.splice(idxDobf, 0, 'col-age', 'col-dob');
+        // tambah apa2 column missing dari default (ikut urutan default) kecuali age/dob dah handle
         DEFAULT_COLUMN_ORDER.forEach(k=>{
-            if(!cleaned.includes(k)) cleaned.push(k);
+            if(!base.includes(k) && k!=='col-age' && k!=='col-dob'){
+                base.push(k);
+            }
         });
-        columnOrder = cleaned.length>0 ? cleaned : [...DEFAULT_COLUMN_ORDER];
+        columnOrder = base.length>0 ? base : [...DEFAULT_COLUMN_ORDER];
         if(columnOrder.length===0){
             columnOrder = [...DEFAULT_COLUMN_ORDER];
         }
@@ -3874,7 +3902,7 @@ function resetFieldsToDefault(){
   hiddenColumns = {};
   columnOrder = [
     'col-idx', 'col-name', 'col-picture', 'col-ic', 'col-passport', 
-    'col-gender', 'col-dobf', 'col-nat', 
+    'col-gender', 'col-age', 'col-dob', 'col-dobf', 'col-nat', 
     'col-visa', 'col-passcopy', 'col-visacopy', 'col-mofabio', 
     'col-fit', 'col-trip', 'col-issue', 'col-expire', 'col-notes',
     'col-board', 'col-train', 'col-insuran', 'col-pakej', 'col-ejen'
