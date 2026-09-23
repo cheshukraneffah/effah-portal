@@ -10,6 +10,62 @@ let ejenListCache = [];
 let jemaahMetaTableId = null;
 let jemaahMetaFieldsByName = {};
 
+// OPTIMIZED fetch with timeout 60s + retry
+function fetchWithTimeoutJemaah(url, opts={}, timeoutMs=60000){
+  const controller = new AbortController();
+  const id = setTimeout(()=>controller.abort(), timeoutMs);
+  return fetch(url, {...opts, signal: controller.signal}).finally(()=>clearTimeout(id));
+}
+
+async function fetchAirtableWithFilterJemaah(tableName, filterFormula, pageSize=100){
+  const base = window.AIRTABLE_BASE_ID||localStorage.getItem('effah_base_id')||'appSsn4JyQD4DnYu0';
+  const pat = window.AIRTABLE_PAT||localStorage.getItem('effah_api_pat')||'';
+  if(!base||!pat) return [];
+  let all=[], offset='';
+  let retries=0;
+  const encodedTable = encodeURIComponent(tableName);
+  do{
+    let url = `https://api.airtable.com/v0/${base}/${encodedTable}?pageSize=${pageSize}${offset?`&offset=${offset}`:''}`;
+    if(filterFormula){
+      url += `&filterByFormula=${encodeURIComponent(filterFormula)}`;
+    }
+    try{
+      const res = await fetchWithTimeoutJemaah(url, {headers:{Authorization:`Bearer ${pat}`}}, 60000);
+      if(!res.ok){
+        if(res.status===429){
+          console.warn('429 rate limit jemaah, tunggu 3s');
+          await new Promise(r=>setTimeout(r, 3000));
+          continue;
+        }
+        if(res.status===422){
+          console.warn('422 filter invalid jemaah', filterFormula);
+          return null;
+        }
+        console.warn(`Gagal fetch ${tableName} ${res.status}`);
+        break;
+      }
+      const data = await res.json();
+      if(data.records) all = all.concat(data.records);
+      offset = data.offset||'';
+      retries=0;
+    }catch(e){
+      console.error(`fetch ${tableName} error`, e.name);
+      if(e.name==='AbortError' && retries<3){
+        retries++;
+        await new Promise(r=>setTimeout(r, 2000));
+        continue;
+      }
+      if(retries<3){
+        retries++;
+        await new Promise(r=>setTimeout(r, 1500));
+        continue;
+      }
+      break;
+    }
+  }while(offset);
+  return all;
+}
+
  // AUTO-FILL GLOBAL PAT - FINAL
 try{
   if(typeof AIRTABLE_PAT === 'undefined' || !AIRTABLE_PAT){
@@ -1633,6 +1689,7 @@ function filterEjenDropdown(recId, query){
   labels.forEach(l=>{ const txt = l.textContent.toLowerCase(); if(txt.includes(q)) l.classList.remove('hidden'); else l.classList.add('hidden'); });
 }
 
+
 async function fetchJemaahUmrahData(isManualClick = false) {
     try{
       if (typeof AIRTABLE_PAT === 'undefined' || !AIRTABLE_PAT) {
@@ -1644,15 +1701,12 @@ async function fetchJemaahUmrahData(isManualClick = false) {
     const icon = document.getElementById('iconRefreshJemaah');
     if (icon) icon.classList.add('fa-spin');
 
-    // V89: Dim right table 50% and make not clickable when refresh clicked
     let loadingOverlay = null;
     let rightContainer = null;
     if(isManualClick){
       try{
-        // Find right container (flex-1 with table)
         rightContainer = document.querySelector('.flex-1.flex.flex-col.space-y-3.min-w-0');
         if(!rightContainer){
-          // Fallback: find by main grid table parent
           const gridTable = document.getElementById('mainJemaahGridTable');
           if(gridTable) rightContainer = gridTable.closest('.flex-1');
         }
@@ -1668,12 +1722,11 @@ async function fetchJemaahUmrahData(isManualClick = false) {
                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle>
                 <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
               </svg>
-              <span class="text-xs font-bold text-slate-700">Memuat semula data jemaah...</span>
-              <span class="text-[10px] text-slate-500">Sila tunggu sebentar</span>
+              <span class="text-xs font-bold text-slate-700">Memuat data jemaah...</span>
+              <span class="text-[10px] text-slate-500">Filter ikut trip - laju</span>
             </div>
           `;
           rightContainer.appendChild(loadingOverlay);
-          // Also dim the table itself
           const tableEl = document.getElementById('mainJemaahGridTable');
           if(tableEl){
             tableEl.style.opacity = '0.5';
@@ -1683,7 +1736,7 @@ async function fetchJemaahUmrahData(isManualClick = false) {
       }catch(e){ console.warn('V89 overlay error', e); }
     }
 
-
+    // CACHE: guna cache dulu kalau ada
     const cachedData = localStorage.getItem('cache_jemaah_records');
     if (cachedData && allJemaahUmrahRecords.length === 0) {
         try {
@@ -1701,25 +1754,100 @@ async function fetchJemaahUmrahData(isManualClick = false) {
     fetchJemaahMetaOptions();
     fetchEjenList();
 
+    // OPTIMIZED: fetch ikut trip filter, bukan fetchAll 1000+ rekod
     let newFetchedRecords = [];
-    let offset = '';
-
     try {
-        do {
-            let url = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/DATA%20JEMAAH%20UMRAH?pageSize=100`;
-            if (offset) url += `&offset=${offset}`;
-
-            const response = await fetch(url, { headers: { Authorization: `Bearer ${AIRTABLE_PAT}` } });
-            const data = await response.json();
-
-            if (data.records) {
-                newFetchedRecords = newFetchedRecords.concat(data.records);
+        let filterFormula = null;
+        // Kalau ada selectedTripFilter (bukan ALL/TBC) - filter ikut trip ID atau nama
+        if(selectedTripFilter && selectedTripFilter!=='ALL' && selectedTripFilter!=='TBC'){
+          // selectedTripFilter adalah nama trip bersih, cari recId
+          let tripId = null;
+          // Cari dari rawTripRecordsList
+          for(let t of (rawTripRecordsList||[])){
+            const clean = (tripMap[t.id]?.title)||'';
+            if(clean===selectedTripFilter || t.id===selectedTripFilter){
+              tripId = t.id;
+              break;
             }
-            offset = data.offset || '';
-        } while (offset);
+          }
+          if(tripId){
+            // Filter guna ID - paling laju, elak slash problem
+            filterFormula = `SEARCH("," & "${tripId}" & ",", "," & ARRAYJOIN({TRIP} & "") & ",")`;
+            console.log('JEMAAH FILTER ID:', filterFormula);
+          } else {
+            // Fallback filter guna nama (escape slash)
+            const safeName = selectedTripFilter.replace(/"/g, '\\"').substring(0,40);
+            // Jangan guna nama panjang dengan slash, guna first 20 char je
+            if(!safeName.includes('/') ){
+              filterFormula = `SEARCH("${safeName}", ARRAYJOIN({TRIP}))`;
+              console.log('JEMAAH FILTER NAME:', filterFormula);
+            }
+          }
+        }
+        
+        // Kalau ada hijri filter tapi takde trip filter, biar fetch ikut hijri? Untuk laju, fetch trip IDs untuk hijri tu
+        if(!filterFormula && selectedHijriFilter && selectedHijriFilter!=='TBC'){
+          // Dapatkan semua tripId untuk hijri ini
+          const tripIdsForHijri = rawTripRecordsList.filter(r=>{
+            const hij = tripMap[r.id]?.hijri||'';
+            return hij===selectedHijriFilter;
+          }).map(r=>r.id);
+          if(tripIdsForHijri.length>0 && tripIdsForHijri.length<=10){
+            // Buat OR filter untuk 10 trip max
+            const ors = tripIdsForHijri.map(id=> `SEARCH("," & "${id}" & ",", "," & ARRAYJOIN({TRIP} & "") & ",")`).join(',');
+            filterFormula = `OR(${ors})`;
+            console.log('JEMAAH FILTER HIJRI (OR IDs):', tripIdsForHijri.length, 'trips');
+          }
+          // Kalau lebih 10 trip, jangan filter, fetch semua untuk hijri tu (akan filter client side)
+        }
 
-        allJemaahUmrahRecords = newFetchedRecords;
-        localStorage.setItem('cache_jemaah_records', JSON.stringify(allJemaahUmrahRecords));
+        if(filterFormula){
+          console.log('FETCH JEMAAH OPTIMIZED dengan filter:', filterFormula);
+          newFetchedRecords = await fetchAirtableWithFilterJemaah('DATA JEMAAH UMRAH', filterFormula, 100);
+          if(newFetchedRecords===null){
+            console.warn('Filter fail, fallback tanpa filter tapi cache');
+            newFetchedRecords = [];
+            // Jangan fetchAll berat, guna cache dulu
+            if(allJemaahUmrahRecords.length>0){
+              newFetchedRecords = allJemaahUmrahRecords;
+            } else {
+              // Last resort fetch all tapi dengan limit
+              newFetchedRecords = await fetchAirtableWithFilterJemaah('DATA JEMAAH UMRAH', null, 100);
+            }
+          }
+          console.log(`FETCH JEMAAH BERJAYA: ${newFetchedRecords.length} jemaah (filtered)`);
+        } else {
+          // Tiada filter - fetch all tapi dengan cache 5 minit, bukan setiap kali
+          const cacheTime = localStorage.getItem('cache_jemaah_time');
+          const now = Date.now();
+          const cacheValid = cacheTime && (now - parseInt(cacheTime)) < 300000; // 5 min
+          if(cacheValid && allJemaahUmrahRecords.length>0){
+            console.log('GUNA CACHE JEMAAH 5 minit, tak fetch all');
+            newFetchedRecords = allJemaahUmrahRecords;
+          } else {
+            console.log('FETCH ALL JEMAAH (tiada filter) - akan ambil 30s kalau banyak');
+            newFetchedRecords = await fetchAirtableWithFilterJemaah('DATA JEMAAH UMRAH', null, 100);
+            localStorage.setItem('cache_jemaah_time', now.toString());
+          }
+        }
+
+        // Kalau filtered fetch dapat 0 tapi selectedTripFilter ada, cuba tanpa filter (client filter)
+        if(newFetchedRecords.length===0 && selectedTripFilter && selectedTripFilter!=='ALL' && selectedTripFilter!=='TBC'){
+          console.warn('Filtered fetch 0, cuba client filter dari cache/all');
+          if(allJemaahUmrahRecords.length>0){
+            newFetchedRecords = allJemaahUmrahRecords;
+          } else {
+            const cached = localStorage.getItem('cache_jemaah_records');
+            if(cached){
+              try{ newFetchedRecords = JSON.parse(cached); }catch(e){}
+            }
+          }
+        }
+
+        if(newFetchedRecords.length>0){
+          allJemaahUmrahRecords = newFetchedRecords;
+          try{ localStorage.setItem('cache_jemaah_records', JSON.stringify(allJemaahUmrahRecords)); }catch(e){ console.warn('cache save fail', e); }
+        }
 
         const statJemaah = document.getElementById('statJemaahUmrahCount');
         if (statJemaah) statJemaah.textContent = allJemaahUmrahRecords.length;
@@ -1730,7 +1858,6 @@ async function fetchJemaahUmrahData(isManualClick = false) {
         console.error("Background sync error:", err);
     } finally {
         if (icon) icon.classList.remove('fa-spin');
-        // V89: Remove loading overlay and restore table
         try{
           const overlay = document.getElementById('jemaahTableLoadingOverlay');
           if(overlay) overlay.remove();
@@ -1739,15 +1866,10 @@ async function fetchJemaahUmrahData(isManualClick = false) {
             tableEl.style.opacity = '1';
             tableEl.style.pointerEvents = 'auto';
           }
-          const rc = document.querySelector('.flex-1.flex.flex-col.space-y-3.min-w-0');
-          if(rc && rc.contains){
-            // Ensure no leftover overlay
-            const leftover = rc.querySelector('#jemaahTableLoadingOverlay');
-            if(leftover) leftover.remove();
-          }
         }catch{}
     }
 }
+
 
 function getJemaahHijriForRecord(jemaahRec){
   // V46 Option B: fetch dari tripMap, jangan hardcoded
